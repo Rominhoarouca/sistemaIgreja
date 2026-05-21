@@ -1,17 +1,38 @@
-# sistema_igreja
+# Sistema Igreja
 
-A new Flutter project.
+Projeto de recepcao e integracao de visitantes em celulas, com aplicativo Flutter e API REST em Node.js/TypeScript.
 
-## Getting Started
+## Documentacao em formato Book
 
-This project is a starting point for a Flutter application.
+Para manter o README enxuto, toda a documentacao detalhada foi organizada em capitulos:
 
-A few resources to get you started if this is your first Flutter project:
+- [Book de Documentacao](docs/book/README.md)
+- [Summary do Book](docs/book/SUMMARY.md)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Conteudo incluido no book:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Funcionalidades por perfil (Admin, Lider e fluxo de Visitante)
+- Mapa completo da API REST
+- Arquitetura frontend e backend
+- Diagramas de DER, Sequencia e Classes
+- Galeria com imagens da identidade visual do app
+- Guia de execucao e operacao
+
+## Execucao rapida
+
+### App Flutter
+
+```bash
+flutter pub get
+flutter run
+```
+
+### API
+
+```bash
+cd api
+npm install
+npx prisma generate
+npx prisma migrate dev
+npm run dev
+```
