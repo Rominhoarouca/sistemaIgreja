@@ -1,0 +1,79 @@
+/// App-wide string constants
+abstract final class AppConstants {
+  // ── API ──────────────────────────────────────────────────────────────────
+  // iOS Simulator: 127.0.0.1:3000  |  Android Emulator: 10.0.2.2:3000
+  // Produção: passe --dart-define=API_BASE_URL=https://seu-dominio.com/v1
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:3000/v1',
+  );
+
+  static const Duration connectTimeout = Duration(seconds: 10);
+  static const Duration receiveTimeout = Duration(seconds: 30);
+
+  // ── Storage keys ─────────────────────────────────────────────────────────
+  static const String tokenKey = 'auth_token';
+  static const String refreshTokenKey = 'auth_refresh_token';
+  static const String userProfileKey = 'user_profile';
+  static const String themeKey = 'app_theme';
+
+  // ── Pagination ────────────────────────────────────────────────────────────
+  static const int defaultPageSize = 20;
+
+  // ── User roles ────────────────────────────────────────────────────────────
+  static const String roleAdmin = 'ADMIN';
+  static const String roleLeader = 'LIDER';
+  static const String roleVisitor = 'VISITANTE';
+
+  // ── Visitor statuses ──────────────────────────────────────────────────────
+  static const String statusNew = 'novo';
+  static const String statusFollowing = 'em_acompanhamento';
+  static const String statusIntegrated = 'integrado';
+  static const String statusInactive = 'inativo';
+
+  // ── Referral statuses ─────────────────────────────────────────────────────
+  static const String referralPending = 'pendente';
+  static const String referralContacted = 'contatado';
+  static const String referralIntegrated = 'integrado';
+
+  // ── Geolocation ───────────────────────────────────────────────────────────
+  static const double searchRadiusKm = 10.0;
+
+  // ── File upload ───────────────────────────────────────────────────────────
+  static const List<String> allowedMaterialExtensions = [
+    'pdf',
+    'docx',
+    'ppt',
+    'pptx',
+    'mp4',
+    'mov',
+  ];
+  static const int maxFileSizeMb = 50;
+}
+
+/// Route name constants
+abstract final class AppRoutes {
+  static const String splash = '/';
+  static const String login = '/login';
+  static const String register = '/register';
+
+  // Visitor
+  static const String visitorRegister = '/visitor/register';
+  static const String nearbyCells = '/visitor/cells';
+  static const String cellDetail = '/cells/:id';
+
+  // Leader
+  static const String leaderHome = '/leader';
+  static const String leaderVisitors = '/leader/visitors';
+  static const String visitorDetail = '/leader/visitors/:id';
+  static const String attendance = '/leader/attendance';
+  static const String materials = '/leader/materials';
+
+  // Admin
+  static const String adminDashboard = '/admin';
+  static const String adminVisitors = '/admin/visitors';
+  static const String adminCells = '/admin/cells';
+  static const String adminLeaders = '/admin/leaders';
+  static const String adminReports = '/admin/reports';
+  static const String adminMaterials = '/admin/materials';
+}

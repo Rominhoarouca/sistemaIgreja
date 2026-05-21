@@ -1,0 +1,156 @@
+# docker compose up -d              → sobe postgres + api (produção)
+# docker compose --profile dev up -d → sobe postgres + api_dev (hot-reload)
+# docker compose --profile tools up  → sobe pgadmin (admin DB via browser)
+#
+# Swagger UI: http://localhost:3000/docs   (produção)
+#             http://localhost:3001/docs   (desenvolvimento)
+# PgAdmin:    http://localhost:5050        (apenas profile tools)
+
+services:
+  # ─── Banco de dados ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sistema_igreja_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sistema_igreja
+      POSTGRES_USER: ${POSTGRES_USER:-igreja_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-igreja_pass}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-igreja_user} -d sistema_igreja']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sistema_igreja_net
+
+  # ─── API (produção) ───────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: sistema_igreja_api
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_secret_key_256bits}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh_secret_key_256bits}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      PORT: 3000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio_user}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_password}
+      MINIO_BUCKET: ${MINIO_BUCKET:-materiais}
+      MINIO_USE_SSL: 'false'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - sistema_igreja_net
+    labels:
+      - "traefik.enable=false"
+
+  # ─── API dev (hot-reload) ─────────────────────────────────────────────────
+  # Uso: docker compose --profile dev up api_dev
+  # api_dev:
+  #   build:
+  #     context: ./api
+  #     dockerfile: Dockerfile.dev
+  #   container_name: sistema_igreja_api_dev
+  #   restart: unless-stopped
+  #   ports:
+  #     - '3001:3000'
+  #   environment:
+  #     NODE_ENV: development
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
+  #     JWT_SECRET: dev_secret_key_only_local
+  #     JWT_REFRESH_SECRET: dev_refresh_secret_key_only_local
+  #     JWT_EXPIRES_IN: 15m
+  #     JWT_REFRESH_EXPIRES_IN: 7d
+  #     PORT: 3000
+  #     ALLOWED_ORIGINS: '*'
+  #     MINIO_ENDPOINT: minio
+  #     MINIO_PORT: 9000
+  #     MINIO_ACCESS_KEY: minio_user
+  #     MINIO_SECRET_KEY: minio_password
+  #     MINIO_BUCKET: materiais
+  #     MINIO_USE_SSL: 'false'
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./api:/app
+  #     - /app/node_modules
+  #     - uploads:/app/uploads
+  #   networks:
+  #     - sistema_igreja_net
+  #   profiles:
+  #     - dev
+
+  # ─── MinIO (armazenamento de objetos — materiais de célula) ──────────────
+  minio:
+    image: minio/minio:latest
+    container_name: sistema_igreja_minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_user}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_password}
+    ports:
+      - '9000:9000'   # S3 API
+      - '9001:9001'   # Console web: http://localhost:9001
+    volumes:
+      - minio_data:/data
+    networks:
+      - sistema_igreja_net
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── PgAdmin (gerenciamento visual do banco) ──────────────────────────────
+  # Uso: docker compose --profile tools up pgadmin
+  # Acesso: http://localhost:5050  (login: admin@igreja.local / admin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sistema_igreja_pgadmin
+    restart: unless-stopped
+    ports:
+      - '5050:80'
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@igreja.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sistema_igreja_net
+    profiles:
+      - tools
+
+networks:
+  sistema_igreja_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  uploads:
+  minio_data:
+  pgadmin_data:
