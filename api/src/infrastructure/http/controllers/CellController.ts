@@ -78,7 +78,19 @@ export class CellController {
 
   create = async (req: Request, res: Response): Promise<void> => {
     const data = createCellSchema.parse(req.body);
-    const cell = await this.cellRepo.create(data);
+    const createData = {
+      name: data.name,
+      leaderId: data.leaderId,
+      address: data.address,
+      neighborhood: data.neighborhood,
+      city: data.city,
+      dayOfWeek: data.dayOfWeek,
+      time: data.time,
+      ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
+      ...(data.latitude !== undefined && { latitude: data.latitude }),
+      ...(data.longitude !== undefined && { longitude: data.longitude }),
+    };
+    const cell = await this.cellRepo.create(createData);
     res.status(201).json({ cell });
   };
 
@@ -87,7 +99,19 @@ export class CellController {
     const data = updateCellSchema.parse(req.body);
     const exists = await this.cellRepo.findById(id);
     if (!exists) throw AppError.notFound('Célula não encontrada');
-    const cell = await this.cellRepo.update(id, data);
+    const updateData = {
+      ...(data.name !== undefined && { name: data.name }),
+      ...(data.leaderId !== undefined && { leaderId: data.leaderId }),
+      ...(data.address !== undefined && { address: data.address }),
+      ...(data.neighborhood !== undefined && { neighborhood: data.neighborhood }),
+      ...(data.city !== undefined && { city: data.city }),
+      ...(data.dayOfWeek !== undefined && { dayOfWeek: data.dayOfWeek }),
+      ...(data.time !== undefined && { time: data.time }),
+      ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
+      ...(data.latitude !== undefined && { latitude: data.latitude }),
+      ...(data.longitude !== undefined && { longitude: data.longitude }),
+    };
+    const cell = await this.cellRepo.update(id, updateData);
     res.json({ cell });
   };
 

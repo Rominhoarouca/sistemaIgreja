@@ -1,10 +1,13 @@
-# docker compose up -d              → sobe postgres + api (produção)
-# docker compose --profile dev up -d → sobe postgres + api_dev (hot-reload)
+# docker compose up -d              → sobe postgres + api + nginx (produção)
+# docker compose --profile dev up -d → sobe postgres + api_dev + nginx (hot-reload)
 # docker compose --profile tools up  → sobe pgadmin (admin DB via browser)
 #
-# Swagger UI: http://localhost:3000/docs   (produção)
-#             http://localhost:3001/docs   (desenvolvimento)
-# PgAdmin:    http://localhost:5050        (apenas profile tools)
+# Nginx expõe portas 80 (HTTP) e 443 (HTTPS, após configurar SSL)
+# API Health: http://localhost/health
+# Swagger UI: http://localhost/docs (produção)
+#             http://localhost:3001/docs (api_dev direto, sem nginx)
+# PgAdmin:    http://localhost:5050 (apenas profile tools)
+# MinIO:      http://localhost:9001 (console web, sem nginx exposto)
 
 services:
   # ─── Banco de dados ──────────────────────────────────────────────────────
@@ -28,6 +31,23 @@ services:
     networks:
       - sistema_igreja_net
 
+  # ─── Nginx (reverse proxy + TLS termination) ──────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: sistema_igreja_nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Uncomment for HTTPS in production (mount your SSL certs here)
+      # - /path/to/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    networks:
+      - sistema_igreja_net
+
   # ─── API (produção) ───────────────────────────────────────────────────────
   api:
     build:
@@ -35,8 +55,6 @@ services:
       dockerfile: Dockerfile
     container_name: sistema_igreja_api
     restart: unless-stopped
-    ports:
-      - '3000:3000'
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
@@ -64,40 +82,40 @@ services:
 
   # ─── API dev (hot-reload) ─────────────────────────────────────────────────
   # Uso: docker compose --profile dev up api_dev
-  # api_dev:
-  #   build:
-  #     context: ./api
-  #     dockerfile: Dockerfile.dev
-  #   container_name: sistema_igreja_api_dev
-  #   restart: unless-stopped
-  #   ports:
-  #     - '3001:3000'
-  #   environment:
-  #     NODE_ENV: development
-  #     DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
-  #     JWT_SECRET: dev_secret_key_only_local
-  #     JWT_REFRESH_SECRET: dev_refresh_secret_key_only_local
-  #     JWT_EXPIRES_IN: 15m
-  #     JWT_REFRESH_EXPIRES_IN: 7d
-  #     PORT: 3000
-  #     ALLOWED_ORIGINS: '*'
-  #     MINIO_ENDPOINT: minio
-  #     MINIO_PORT: 9000
-  #     MINIO_ACCESS_KEY: minio_user
-  #     MINIO_SECRET_KEY: minio_password
-  #     MINIO_BUCKET: materiais
-  #     MINIO_USE_SSL: 'false'
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./api:/app
-  #     - /app/node_modules
-  #     - uploads:/app/uploads
-  #   networks:
-  #     - sistema_igreja_net
-  #   profiles:
-  #     - dev
+  api_dev:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    container_name: sistema_igreja_api_dev
+    restart: unless-stopped
+    ports:
+      - '3001:3000'
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
+      JWT_SECRET: dev_secret_key_only_local
+      JWT_REFRESH_SECRET: dev_refresh_secret_key_only_local
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT: 3000
+      ALLOWED_ORIGINS: '*'
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minio_user
+      MINIO_SECRET_KEY: minio_password
+      MINIO_BUCKET: materiais
+      MINIO_USE_SSL: 'false'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+      - /app/node_modules
+      - uploads:/app/uploads
+    networks:
+      - sistema_igreja_net
+    profiles:
+      - dev
 
   # ─── MinIO (armazenamento de objetos — materiais de célula) ──────────────
   minio:

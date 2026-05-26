@@ -44,6 +44,6 @@ export interface CreateCellData {
   readonly dayOfWeek: DayOfWeek;
   readonly time: string;
   readonly maxCapacity?: number;
-  readonly latitude?: number;
-  readonly longitude?: number;
+  readonly latitude?: number | null;
+  readonly longitude?: number | null;
 }

@@ -8,6 +8,7 @@ try {
 import { createApp } from './infrastructure/http/app';
 import { createContainer } from './shared/container';
 import { logger } from '@shared/logger/logger';
+import http from 'http';
 
 const PORT = Number(process.env['PORT'] ?? 3000);
 
@@ -15,7 +16,8 @@ async function bootstrap(): Promise<void> {
   const container = createContainer();
   const app = createApp(container);
 
-  const server = app.listen(PORT, () => {
+  // Only HTTP — TLS is handled by nginx/reverse-proxy in production
+  const server = http.createServer(app).listen(PORT, '0.0.0.0', () => {
     logger.info(`[API] Sistema Igreja rodando na porta ${PORT}`);
     logger.info(`[API] Health: http://localhost:${PORT}/health`);
     // Also print to stdout to ensure parent watcher's terminal shows messages
