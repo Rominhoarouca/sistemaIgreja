@@ -53,6 +53,9 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -60,8 +63,8 @@ class AppTextField extends StatelessWidget {
         if (label != null) ...[
           Text(
             label!,
-            style: AppTypography.labelMedium.copyWith(
-              color: AppColors.grey700,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurface,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -81,19 +84,25 @@ class AppTextField extends StatelessWidget {
           autofocus: autofocus,
           focusNode: focusNode,
           validator: validator,
-          style: AppTypography.bodyMedium.copyWith(
-            color: AppColors.textPrimary,
-          ),
+          style: theme.textTheme.bodyMedium,
           decoration: InputDecoration(
             hintText: hint,
             helperText: helperText,
             errorText: errorText,
             prefixIcon: prefixIcon != null
-                ? Icon(prefixIcon, size: 20, color: AppColors.grey400)
+                ? Icon(
+                    prefixIcon,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  )
                 : null,
             suffixIcon: suffixIcon != null
                 ? IconButton(
-                    icon: Icon(suffixIcon, size: 20, color: AppColors.grey400),
+                    icon: Icon(
+                      suffixIcon,
+                      size: 20,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     onPressed: onSuffixTap,
                   )
                 : null,

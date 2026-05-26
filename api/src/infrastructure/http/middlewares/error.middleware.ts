@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { AppError } from '@shared/errors/AppError';
 import { ZodError } from 'zod';
 
@@ -22,6 +23,26 @@ export function errorMiddleware(
       },
     });
     return;
+  }
+
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === 'P2002') {
+      const target = Array.isArray(err.meta?.target)
+        ? (err.meta.target as string[])
+        : [];
+
+      const isLeaderCellConflict = target.includes('leader_id') || target.includes('leaderId');
+
+      res.status(409).json({
+        error: {
+          code: 'CONFLICT',
+          message: isLeaderCellConflict
+            ? 'Este líder já possui uma célula cadastrada'
+            : 'Conflito de unicidade nos dados enviados',
+        },
+      });
+      return;
+    }
   }
 
   console.error('[Unhandled Error]', err);

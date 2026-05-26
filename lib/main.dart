@@ -6,10 +6,42 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'injection/injection.dart';
 import 'routing/app_router.dart';
 
+import 'dart:async';
+import 'dart:developer' as developer;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await setupInjection();
-  runApp(const SistemaIgrejaApp());
+
+  // Global error handling to capture initialization/runtime errors that
+  // otherwise cause the app to terminate when launched from the home screen.
+  FlutterError.onError = (details) {
+    developer.log(
+      'FlutterError',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+    // Forward to zone handler as well.
+    Zone.current.handleUncaughtError(
+      details.exception,
+      details.stack ?? StackTrace.current,
+    );
+  };
+
+  await runZonedGuarded(
+    () async {
+      try {
+        await setupInjection();
+      } catch (e, st) {
+        developer.log('setupInjection failed', error: e, stackTrace: st);
+        // Continue to run the app so we can show an error UI instead of crashing.
+      }
+
+      runApp(const SistemaIgrejaApp());
+    },
+    (error, stack) {
+      developer.log('Uncaught zone error', error: error, stackTrace: stack);
+    },
+  );
 }
 
 class SistemaIgrejaApp extends StatefulWidget {

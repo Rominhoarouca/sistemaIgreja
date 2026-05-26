@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,8 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/network/auth_storage.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -19,17 +23,28 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final _authStorage = AuthStorage();
+  late final Dio _dio;
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
 
   File? _photoFile;
+  String? _photoUrl;
   DateTime? _birthDate;
   bool _editing = false;
   bool _saving = false;
+  bool _loadingProfile = true;
 
   final List<Map<String, dynamic>> _children = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = DioClient(_authStorage).dio;
+    _loadProfile();
+  }
 
   @override
   void dispose() {
@@ -37,6 +52,58 @@ class _ProfilePageState extends State<ProfilePage> {
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    setState(() => _loadingProfile = true);
+    try {
+      final resp = await _dio.get('/users/me');
+      final user =
+          (resp.data as Map<String, dynamic>)['user'] as Map<String, dynamic>;
+
+      if (!mounted) return;
+      setState(() {
+        _nameCtrl.text = (user['name'] as String?) ?? '';
+        _phoneCtrl.text = (user['phone'] as String?) ?? '';
+        _addressCtrl.text = (user['address'] as String?) ?? '';
+        _photoUrl = user['photoUrl'] as String?;
+
+        final birthRaw = user['birthDate'] as String?;
+        _birthDate = birthRaw != null
+            ? DateTime.tryParse(birthRaw)?.toLocal()
+            : null;
+
+        _children
+          ..clear()
+          ..addAll(
+            ((user['children'] as List?) ?? const <dynamic>[]).map((raw) {
+              final c = raw as Map<String, dynamic>;
+              return <String, dynamic>{
+                if (c['id'] != null) 'id': c['id'] as String,
+                'name': (c['name'] as String?) ?? '',
+                if (c['birthDate'] != null)
+                  'birthDate': DateTime.parse(
+                    c['birthDate'] as String,
+                  ).toLocal(),
+              };
+            }),
+          );
+
+        _loadingProfile = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingProfile = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao carregar perfil',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _pickPhoto() async {
@@ -199,7 +266,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (nameCtrl.text.trim().isEmpty) return;
                 setState(() {
                   final entry = <String, dynamic>{
-                    if (existing?['id'] != null) 'id': existing!['id'],
+                    if (existing?['id'] case final id?) 'id': id,
                     'name': nameCtrl.text.trim(),
                     if (childDob != null) 'birthDate': childDob,
                   };
@@ -222,19 +289,78 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _saveProfile() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
-    // TODO: call API PATCH /v1/users/me
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
-    setState(() {
-      _saving = false;
-      _editing = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Perfil atualizado com sucesso!'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+
+    try {
+      final children = _children.map((c) {
+        final birthDate = c['birthDate'] as DateTime?;
+        return <String, dynamic>{
+          if (c['id'] != null) 'id': c['id'],
+          'name': c['name'] as String,
+          'birthDate': birthDate?.toUtc().toIso8601String(),
+        };
+      }).toList();
+
+      final formDataMap = <String, dynamic>{
+        'name': _nameCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+        'address': _addressCtrl.text.trim().isEmpty
+            ? null
+            : _addressCtrl.text.trim(),
+        'birthDate': _birthDate?.toUtc().toIso8601String(),
+        'children': jsonEncode(children),
+      };
+
+      if (_photoFile != null) {
+        formDataMap['photo'] = await MultipartFile.fromFile(
+          _photoFile!.path,
+          filename: _photoFile!.path.split('/').last,
+        );
+      }
+
+      await _dio.patch('/users/me', data: FormData.fromMap(formDataMap));
+
+      // Keep auth cache/state in sync so updated name/photo is reflected app-wide.
+      try {
+        final meResp = await _dio.get('/auth/me');
+        final authUser = (meResp.data as Map<String, dynamic>)['user'];
+        if (authUser != null) {
+          await _authStorage.saveUserProfile(jsonEncode(authUser));
+          if (mounted) {
+            context.read<AuthBloc>().add(const AuthCheckRequested());
+          }
+        }
+      } catch (_) {
+        // Non-fatal: profile update already succeeded.
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _editing = false;
+      });
+
+      await _loadProfile();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Perfil atualizado com sucesso!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao atualizar perfil',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   void _confirmLogout(BuildContext context) {
@@ -268,21 +394,33 @@ class _ProfilePageState extends State<ProfilePage> {
       },
       builder: (context, state) {
         final user = state is AuthAuthenticated ? state.user : null;
-        final initials = user != null
-            ? user.name.split(' ').map((e) => e[0]).take(2).join()
-            : 'US';
+        final displayName = _nameCtrl.text.trim().isNotEmpty
+            ? _nameCtrl.text.trim()
+            : (user?.name ?? 'Usuário');
+
+        final initials = displayName
+            .split(' ')
+            .where((e) => e.isNotEmpty)
+            .map((e) => e[0])
+            .take(2)
+            .join()
+            .toUpperCase();
+
         final roleLabel = user?.role.value == AppConstants.roleAdmin
             ? 'Administrador'
             : 'Líder';
 
-        if (_editing && _nameCtrl.text.isEmpty && user != null) {
-          _nameCtrl.text = user.name;
+        if (_loadingProfile) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
         }
 
         return Scaffold(
           appBar: AppBar(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.white,
+            elevation: 0,
             title: const Text('Meu Perfil'),
             actions: [
               if (!_editing)
@@ -328,8 +466,11 @@ class _ProfilePageState extends State<ProfilePage> {
                               backgroundColor: AppColors.primaryLight,
                               backgroundImage: _photoFile != null
                                   ? FileImage(_photoFile!)
-                                  : null,
-                              child: _photoFile == null
+                                  : (_photoUrl != null
+                                            ? NetworkImage(_photoUrl!)
+                                            : null)
+                                        as ImageProvider<Object>?,
+                              child: (_photoFile == null && _photoUrl == null)
                                   ? Text(
                                       initials,
                                       style: AppTypography.headlineMedium
@@ -368,7 +509,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         )
                       else ...[
                         Text(
-                          user?.name ?? 'Usuário',
+                          displayName,
                           style: AppTypography.headlineSmall.copyWith(
                             color: AppColors.white,
                           ),

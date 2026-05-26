@@ -22,7 +22,8 @@ class AppBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _colorsFor(variant);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = _colorsFor(variant, isDark);
     final isSmall = size == AppBadgeSize.sm;
 
     return Container(
@@ -55,30 +56,32 @@ class AppBadge extends StatelessWidget {
     );
   }
 
-  _BadgeColors _colorsFor(AppBadgeVariant v) => switch (v) {
-    AppBadgeVariant.info => const _BadgeColors(
-      background: AppColors.infoLight,
-      foreground: AppColors.info,
+  _BadgeColors _colorsFor(AppBadgeVariant v, bool isDark) => switch (v) {
+    AppBadgeVariant.info => _BadgeColors(
+      background: isDark ? AppColors.infoDarkBg : AppColors.infoLight,
+      foreground: isDark ? AppColors.infoDarkFg : AppColors.info,
     ),
-    AppBadgeVariant.success => const _BadgeColors(
-      background: AppColors.successLight,
-      foreground: AppColors.success,
+    AppBadgeVariant.success => _BadgeColors(
+      background: isDark ? AppColors.successDarkBg : AppColors.successLight,
+      foreground: isDark ? AppColors.successDarkFg : AppColors.success,
     ),
-    AppBadgeVariant.warning => const _BadgeColors(
-      background: AppColors.warningLight,
-      foreground: AppColors.warning,
+    AppBadgeVariant.warning => _BadgeColors(
+      background: isDark ? AppColors.warningDarkBg : AppColors.warningLight,
+      foreground: isDark ? AppColors.warningDarkFg : AppColors.warning,
     ),
-    AppBadgeVariant.error => const _BadgeColors(
-      background: AppColors.errorLight,
-      foreground: AppColors.error,
+    AppBadgeVariant.error => _BadgeColors(
+      background: isDark ? AppColors.errorDarkBg : AppColors.errorLight,
+      foreground: isDark ? AppColors.errorDarkFg : AppColors.error,
     ),
-    AppBadgeVariant.neutral => const _BadgeColors(
-      background: AppColors.grey100,
-      foreground: AppColors.grey600,
+    AppBadgeVariant.neutral => _BadgeColors(
+      background: isDark ? AppColors.neutralDarkBg : AppColors.grey100,
+      foreground: isDark ? AppColors.neutralDarkFg : AppColors.grey600,
     ),
-    AppBadgeVariant.primary => const _BadgeColors(
-      background: AppColors.primarySurface,
-      foreground: AppColors.primary,
+    AppBadgeVariant.primary => _BadgeColors(
+      background: isDark
+          ? AppColors.primaryDarkBadgeBg
+          : AppColors.primarySurface,
+      foreground: isDark ? AppColors.primaryDarkBadgeFg : AppColors.primary,
     ),
   };
 }

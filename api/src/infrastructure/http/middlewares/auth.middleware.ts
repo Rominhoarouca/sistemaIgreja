@@ -46,3 +46,17 @@ export function requireAdmin(req: Request, _res: Response, next: NextFunction): 
   }
   next();
 }
+
+export function requireSupervisor(req: Request, _res: Response, next: NextFunction): void {
+  if (req.userRole !== 'SUPERVISOR') {
+    throw AppError.forbidden('Acesso restrito a supervisores');
+  }
+  next();
+}
+
+export function requireSupervisorOrAdmin(req: Request, _res: Response, next: NextFunction): void {
+  if (req.userRole !== 'ADMIN' && req.userRole !== 'SUPERVISOR') {
+    throw AppError.forbidden('Acesso restrito a supervisores e administradores');
+  }
+  next();
+}

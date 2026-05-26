@@ -5,6 +5,7 @@ import { authMiddleware } from '../middlewares/auth.middleware';
 export function cellRoutes(controller: CellController): Router {
   const router = Router();
   router.get('/nearby', authMiddleware, controller.findNearby);
+  router.get('/my-cell', authMiddleware, controller.findByLeader);
   router.get('/', authMiddleware, controller.findAll);
   router.post('/', authMiddleware, controller.create);
   router.get('/:id', authMiddleware, controller.findById);

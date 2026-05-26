@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../colors/app_colors.dart';
 import '../../spacing/app_spacing.dart';
 import '../../typography/app_typography.dart';
 
@@ -172,12 +171,14 @@ class _PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        disabledBackgroundColor: AppColors.grey200,
+        backgroundColor: colorScheme.primary,
+        foregroundColor: colorScheme.onPrimary,
+        disabledBackgroundColor: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
@@ -185,7 +186,9 @@ class _PrimaryButton extends StatelessWidget {
       child: _ButtonContent(
         label: label,
         fontSize: fontSize,
-        color: onPressed == null ? AppColors.grey400 : AppColors.white,
+        color: onPressed == null
+            ? colorScheme.onSurfaceVariant
+            : colorScheme.onPrimary,
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         isLoading: isLoading,
@@ -213,11 +216,13 @@ class _SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primarySurface,
-        foregroundColor: AppColors.primary,
+        backgroundColor: colorScheme.secondaryContainer,
+        foregroundColor: colorScheme.onSecondaryContainer,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
@@ -225,7 +230,7 @@ class _SecondaryButton extends StatelessWidget {
       child: _ButtonContent(
         label: label,
         fontSize: fontSize,
-        color: AppColors.primary,
+        color: colorScheme.onSecondaryContainer,
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         isLoading: isLoading,
@@ -253,12 +258,14 @@ class _OutlineButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return OutlinedButton(
       onPressed: onPressed,
       child: _ButtonContent(
         label: label,
         fontSize: fontSize,
-        color: AppColors.primary,
+        color: colorScheme.primary,
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         isLoading: isLoading,
@@ -286,12 +293,14 @@ class _GhostButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return TextButton(
       onPressed: onPressed,
       child: _ButtonContent(
         label: label,
         fontSize: fontSize,
-        color: AppColors.primary,
+        color: colorScheme.primary,
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         isLoading: isLoading,
@@ -319,11 +328,13 @@ class _DangerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.error,
-        foregroundColor: AppColors.white,
+        backgroundColor: colorScheme.error,
+        foregroundColor: colorScheme.onError,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         ),
@@ -331,7 +342,7 @@ class _DangerButton extends StatelessWidget {
       child: _ButtonContent(
         label: label,
         fontSize: fontSize,
-        color: AppColors.white,
+        color: colorScheme.onError,
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         isLoading: isLoading,

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geocoding/geocoding.dart';
@@ -139,223 +140,257 @@ class _DashboardTab extends StatefulWidget {
 
 class _DashboardTabState extends State<_DashboardTab> {
   late final Dio _dio;
-  bool _loadingCells = true;
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic> _stats = {};
+  List<Map<String, dynamic>> _months = [];
   List<Map<String, dynamic>> _cells = [];
 
   @override
   void initState() {
     super.initState();
     _dio = DioClient(AuthStorage()).dio;
-    _loadCells();
+    _loadData();
   }
 
-  Future<void> _loadCells() async {
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final resp = await _dio.get('/cells');
-      final data = (resp.data as Map<String, dynamic>)['cells'] as List;
+      final results = await Future.wait([
+        _dio.get('/dashboard/stats'),
+        _dio.get('/dashboard/monthly-stats'),
+        _dio.get('/cells'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _cells = data.cast<Map<String, dynamic>>();
-        _loadingCells = false;
+        _stats =
+            (results[0].data as Map<String, dynamic>)['stats']
+                as Map<String, dynamic>;
+        _months = ((results[1].data as Map<String, dynamic>)['months'] as List)
+            .cast<Map<String, dynamic>>();
+        _cells = ((results[2].data as Map<String, dynamic>)['cells'] as List)
+            .cast<Map<String, dynamic>>();
+        _loading = false;
       });
-    } on DioException {
+    } on DioException catch (e) {
       if (!mounted) return;
-      setState(() => _loadingCells = false);
+      setState(() {
+        _error =
+            e.response?.data?['error']?['message'] as String? ??
+            'Erro ao carregar dashboard';
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final highlightedCells = _cells.take(3).toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-      children: [
-        // ── Stat Cards ───────────────────────────────────────────
-        GridView.custom(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: AppSpacing.sm,
-            mainAxisSpacing: AppSpacing.sm,
-            mainAxisExtent: 148,
-          ),
-          childrenDelegate: SliverChildListDelegate(const [
-            StatCard(
-              label: 'Visitantes Cadastrados',
-              value: '340',
-              icon: Icons.people_outline,
-              color: AppColors.primary,
-              subtitle: '+12%',
-            ),
-            StatCard(
-              label: 'Encaminhamentos',
-              value: '120',
-              icon: Icons.send_outlined,
-              color: AppColors.secondary,
-              subtitle: '+8%',
-            ),
-            StatCard(
-              label: 'Visitantes Integrados',
-              value: '85',
-              icon: Icons.check_circle_outline,
-              color: AppColors.success,
-              subtitle: '+5%',
-            ),
-            StatCard(
-              label: 'Frequência nas Células',
-              value: '76%',
-              icon: Icons.bar_chart_outlined,
-              color: AppColors.accent,
-            ),
-          ]),
-        ),
-
-        const SizedBox(height: AppSpacing.xl),
-
-        // ── Integration Growth ───────────────────────────────────
-        AppSectionHeader(
-          title: 'Crescimento de Integração',
-          actionLabel: 'Ver relatório',
-          onAction: () => widget.onSwitchTab(3),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppCard(
-          child: SizedBox(
-            height: 160,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.show_chart_rounded,
-                    size: 48,
-                    color: AppColors.grey300,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Gráfico de integração',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    'conecte fl_chart para renderizar',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.grey400,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: AppSpacing.xl),
-
-        // ── Active Cells ─────────────────────────────────────────
-        AppSectionHeader(
-          title: 'Células Ativas',
-          actionLabel: 'Gerenciar',
-          onAction: () => widget.onSwitchTab(2),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: _loadingCells
-              ? const Padding(
-                  padding: EdgeInsets.all(AppSpacing.base),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : highlightedCells.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(AppSpacing.base),
-                  child: Text(
-                    'Nenhuma célula cadastrada.',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                )
-              : Column(
-                  children: List.generate(highlightedCells.length, (index) {
-                    final cell = highlightedCells[index];
-                    return Column(
-                      children: [
-                        _CellRow(
-                          name: (cell['name'] as String?) ?? 'Célula',
-                          leader:
-                              (cell['leaderName'] as String?) ?? 'Sem líder',
-                          day: _dayLabel((cell['dayOfWeek'] as String?) ?? ''),
-                          status: 'Ativa',
-                        ),
-                        if (index < highlightedCells.length - 1)
-                          const Divider(height: 1),
-                      ],
-                    );
-                  }),
-                ),
-        ),
-
-        const SizedBox(height: AppSpacing.xl),
-
-        // ── Quick Actions ────────────────────────────────────────
-        AppSectionHeader(title: 'Ações Rápidas'),
-        const SizedBox(height: AppSpacing.sm),
-        Row(
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: AppButton(
-                label: 'Nova Célula',
-                variant: AppButtonVariant.secondary,
-                prefixIcon: Icons.add_circle_outline,
-                onPressed: () => _showSheet(
-                  context,
-                  _NewCellSheet(dio: DioClient(AuthStorage()).dio),
-                ),
-              ),
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: AppButton(
-                label: 'Novo Líder',
-                variant: AppButtonVariant.secondary,
-                prefixIcon: Icons.person_add_outlined,
-                onPressed: () => _showSheet(
-                  context,
-                  _NewLeaderSheet(dio: DioClient(AuthStorage()).dio),
-                ),
-              ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadData,
             ),
           ],
         ),
+      );
+    }
 
-        const SizedBox(height: AppSpacing.sm),
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: ListTile(
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppSpacing.sm),
-              ),
-              child: const Icon(
-                Icons.folder_outlined,
+    final highlightedCells = _cells.take(3).toList();
+    final totalVisitors = _stats['totalVisitors'] as int? ?? 0;
+    final forwarded = _stats['forwardedVisitors'] as int? ?? 0;
+    final integrated = _stats['integratedVisitors'] as int? ?? 0;
+    final avgAttendance = _stats['averageAttendanceRate'] as num? ?? 0;
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        children: [
+          // ── Stat Cards ─────────────────────────────────────────
+          GridView.custom(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: AppSpacing.sm,
+              mainAxisSpacing: AppSpacing.sm,
+              mainAxisExtent: 148,
+            ),
+            childrenDelegate: SliverChildListDelegate([
+              StatCard(
+                label: 'Visitantes Cadastrados',
+                value: '$totalVisitors',
+                icon: Icons.people_outline,
                 color: AppColors.primary,
               ),
-            ),
-            title: const Text('Gerenciar Materiais'),
-            subtitle: const Text('Enviar e organizar materiais para líderes'),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.grey400),
-            onTap: () => context.push('/admin/materials'),
+              StatCard(
+                label: 'Encaminhamentos',
+                value: '$forwarded',
+                icon: Icons.send_outlined,
+                color: AppColors.secondary,
+              ),
+              StatCard(
+                label: 'Visitantes Integrados',
+                value: '$integrated',
+                icon: Icons.check_circle_outline,
+                color: AppColors.success,
+              ),
+              StatCard(
+                label: 'Frequência nas Células',
+                value: '${avgAttendance.toStringAsFixed(1)}%',
+                icon: Icons.bar_chart_outlined,
+                color: AppColors.accent,
+              ),
+            ]),
           ),
-        ),
 
-        const SizedBox(height: AppSpacing.xl2),
-      ],
+          const SizedBox(height: AppSpacing.xl),
+
+          // ── Integration Growth Chart ────────────────────────────
+          AppSectionHeader(
+            title: 'Crescimento de Integração',
+            actionLabel: 'Ver relatório',
+            onAction: () => widget.onSwitchTab(3),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            child: _months.isEmpty
+                ? SizedBox(
+                    height: 160,
+                    child: Center(
+                      child: Text(
+                        'Sem dados de visitantes ainda.',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                : _IntegrationLineChart(months: _months),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          // ── Active Cells ───────────────────────────────────────
+          AppSectionHeader(
+            title: 'Células Ativas',
+            actionLabel: 'Gerenciar',
+            onAction: () => widget.onSwitchTab(2),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: highlightedCells.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(AppSpacing.base),
+                    child: Text(
+                      'Nenhuma célula cadastrada.',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: List.generate(highlightedCells.length, (index) {
+                      final cell = highlightedCells[index];
+                      return Column(
+                        children: [
+                          _CellRow(
+                            name: (cell['name'] as String?) ?? 'Célula',
+                            leader:
+                                (cell['leaderName'] as String?) ?? 'Sem líder',
+                            day: _dayLabel(
+                              (cell['dayOfWeek'] as String?) ?? '',
+                            ),
+                            status: 'Ativa',
+                          ),
+                          if (index < highlightedCells.length - 1)
+                            const Divider(height: 1),
+                        ],
+                      );
+                    }),
+                  ),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          // ── Quick Actions ──────────────────────────────────────
+          AppSectionHeader(title: 'Ações Rápidas'),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Nova Célula',
+                  variant: AppButtonVariant.secondary,
+                  prefixIcon: Icons.add_circle_outline,
+                  onPressed: () => _showSheet(
+                    context,
+                    _NewCellSheet(dio: DioClient(AuthStorage()).dio),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: AppButton(
+                  label: 'Novo Líder',
+                  variant: AppButtonVariant.secondary,
+                  prefixIcon: Icons.person_add_outlined,
+                  onPressed: () => _showSheet(
+                    context,
+                    _NewLeaderSheet(dio: DioClient(AuthStorage()).dio),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppSpacing.sm),
+                ),
+                child: const Icon(
+                  Icons.folder_outlined,
+                  color: AppColors.primary,
+                ),
+              ),
+              title: const Text('Gerenciar Materiais'),
+              subtitle: const Text('Enviar e organizar materiais para líderes'),
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.grey400,
+              ),
+              onTap: () => context.push('/admin/materials'),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.xl2),
+        ],
+      ),
     );
   }
 
@@ -385,6 +420,229 @@ class _DashboardTabState extends State<_DashboardTab> {
 }
 
 // ── Tab 1: Visitors Admin ────────────────────────────────────────────────────
+
+/// Line chart that renders total visitors (blue) vs integrated (green) by month.
+class _IntegrationLineChart extends StatelessWidget {
+  const _IntegrationLineChart({required this.months});
+
+  final List<Map<String, dynamic>> months;
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = <FlSpot>[];
+    final intSpots = <FlSpot>[];
+    for (var i = 0; i < months.length; i++) {
+      spots.add(FlSpot(i.toDouble(), (months[i]['total'] as num).toDouble()));
+      intSpots.add(
+        FlSpot(i.toDouble(), (months[i]['integrated'] as num).toDouble()),
+      );
+    }
+    final maxY = spots.isEmpty
+        ? 10.0
+        : (spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.2)
+              .ceilToDouble();
+
+    return SizedBox(
+      height: 180,
+      child: Padding(
+        padding: const EdgeInsets.only(
+          top: AppSpacing.base,
+          right: AppSpacing.base,
+          bottom: AppSpacing.sm,
+        ),
+        child: LineChart(
+          LineChartData(
+            minY: 0,
+            maxY: maxY,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: AppColors.grey300, strokeWidth: 0.5),
+            ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  getTitlesWidget: (value, _) => Text(
+                    '${value.toInt()}',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 9,
+                    ),
+                  ),
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: 1,
+                  getTitlesWidget: (value, _) {
+                    final idx = value.toInt();
+                    if (idx < 0 || idx >= months.length) {
+                      return const SizedBox.shrink();
+                    }
+                    final label = (months[idx]['month'] as String).substring(5);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        label,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 9,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+            ),
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                color: AppColors.primary,
+                barWidth: 2.5,
+                dotData: const FlDotData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                ),
+              ),
+              LineChartBarData(
+                spots: intSpots,
+                isCurved: true,
+                color: AppColors.success,
+                barWidth: 2,
+                dotData: const FlDotData(show: false),
+                dashArray: [4, 3],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bar chart for monthly new visitors (reports tab).
+class _MonthlyBarChart extends StatelessWidget {
+  const _MonthlyBarChart({required this.months});
+
+  final List<Map<String, dynamic>> months;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxY = months.isEmpty
+        ? 10.0
+        : (months
+                      .map((m) => (m['total'] as num).toDouble())
+                      .reduce((a, b) => a > b ? a : b) *
+                  1.2)
+              .ceilToDouble();
+
+    return SizedBox(
+      height: 200,
+      child: Padding(
+        padding: const EdgeInsets.only(
+          top: AppSpacing.base,
+          right: AppSpacing.base,
+          bottom: AppSpacing.sm,
+        ),
+        child: BarChart(
+          BarChartData(
+            maxY: maxY,
+            barTouchData: BarTouchData(enabled: true),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: AppColors.grey300, strokeWidth: 0.5),
+            ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  getTitlesWidget: (value, _) => Text(
+                    '${value.toInt()}',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 9,
+                    ),
+                  ),
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    final idx = value.toInt();
+                    if (idx < 0 || idx >= months.length) {
+                      return const SizedBox.shrink();
+                    }
+                    final label = (months[idx]['month'] as String).substring(5);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        label,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 9,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+            ),
+            barGroups: List.generate(months.length, (i) {
+              final total = (months[i]['total'] as num).toDouble();
+              final integrated = (months[i]['integrated'] as num).toDouble();
+              return BarChartGroupData(
+                x: i,
+                barRods: [
+                  BarChartRodData(
+                    toY: total,
+                    color: AppColors.primary,
+                    width: 10,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(3),
+                    ),
+                  ),
+                  BarChartRodData(
+                    toY: integrated,
+                    color: AppColors.success,
+                    width: 10,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(3),
+                    ),
+                  ),
+                ],
+                barsSpace: 3,
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _VisitorsAdminTab extends StatefulWidget {
   const _VisitorsAdminTab();
@@ -485,46 +743,50 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                   ],
                 ),
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.pagePaddingH,
-                  AppSpacing.pagePaddingH,
-                  AppSpacing.pagePaddingH,
-                  88,
-                ),
-                children: [
-                  AppSearchField(
-                    hint: 'Pesquisar visitante...',
-                    controller: _searchCtrl,
-                    onChanged: (v) => setState(() => _query = v),
+            : RefreshIndicator(
+                onRefresh: _loadVisitors,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pagePaddingH,
+                    AppSpacing.pagePaddingH,
+                    AppSpacing.pagePaddingH,
+                    88,
                   ),
-                  const SizedBox(height: AppSpacing.base),
-                  AppSectionHeader(
-                    title: 'Todos os Visitantes (${_visitors.length})',
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  if (_filtered.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.xl2),
-                      child: Center(
-                        child: Text(
-                          'Nenhum visitante encontrado',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                  children: [
+                    AppSearchField(
+                      hint: 'Pesquisar visitante...',
+                      controller: _searchCtrl,
+                      onChanged: (v) => setState(() => _query = v),
+                    ),
+                    const SizedBox(height: AppSpacing.base),
+                    AppSectionHeader(
+                      title: 'Todos os Visitantes (${_visitors.length})',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (_filtered.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xl2),
+                        child: Center(
+                          child: Text(
+                            'Nenhum visitante encontrado',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
+                      )
+                    else
+                      ..._filtered.map(
+                        (v) => _VisitorAdminTile(
+                          name: v['name'] as String,
+                          status: v['status'] as String? ?? 'novo',
+                          time: _relativeTime(v['createdAt'] as String),
+                          onTap: () => _openVisitorDetails(v['id'] as String),
+                        ),
                       ),
-                    )
-                  else
-                    ..._filtered.map(
-                      (v) => _VisitorAdminTile(
-                        name: v['name'] as String,
-                        status: v['status'] as String? ?? 'novo',
-                        time: _relativeTime(v['createdAt'] as String),
-                        onTap: () => _openVisitorDetails(v['id'] as String),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
         Positioned(
           bottom: AppSpacing.xl,
@@ -888,74 +1150,78 @@ class _CellsAdminTabState extends State<_CellsAdminTab> {
                   ],
                 ),
               )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.pagePaddingH,
-                  AppSpacing.pagePaddingH,
-                  AppSpacing.pagePaddingH,
-                  88,
-                ),
-                children: [
-                  AppSearchField(
-                    hint: 'Pesquisar célula...',
-                    controller: _searchCtrl,
-                    onChanged: (v) => setState(() => _query = v),
+            : RefreshIndicator(
+                onRefresh: _loadCells,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.pagePaddingH,
+                    AppSpacing.pagePaddingH,
+                    AppSpacing.pagePaddingH,
+                    88,
                   ),
-                  const SizedBox(height: AppSpacing.base),
-                  AppSectionHeader(
-                    title: 'Células Cadastradas (${_cells.length})',
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  if (_filtered.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.xl2),
-                      child: Center(
-                        child: Text(
-                          'Nenhuma célula encontrada',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                  children: [
+                    AppSearchField(
+                      hint: 'Pesquisar célula...',
+                      controller: _searchCtrl,
+                      onChanged: (v) => setState(() => _query = v),
+                    ),
+                    const SizedBox(height: AppSpacing.base),
+                    AppSectionHeader(
+                      title: 'Células Cadastradas (${_cells.length})',
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (_filtered.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xl2),
+                        child: Center(
+                          child: Text(
+                            'Nenhuma célula encontrada',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                  else
-                    ..._filtered.map((c) {
-                      final id = c['id'] as String;
-                      final name = c['name'] as String;
-                      final leader = c['leaderName'] as String? ?? '—';
-                      final day =
-                          _dayLabels[c['dayOfWeek'] as String] ??
-                          c['dayOfWeek'] as String;
-                      final members =
-                          '${c['currentCount']}/${c['maxCapacity']}';
-                      final address =
-                          (c['address'] as String?) ?? 'Não informado';
-                      return _CellAdminCard(
-                        id: id,
-                        name: name,
-                        leader: leader,
-                        day: day,
-                        members: members,
-                        address: address,
-                        onTap: () async {
-                          final changed = await Navigator.of(context)
-                              .push<bool>(
-                                MaterialPageRoute<bool>(
-                                  builder: (_) => _CellDetailsPage(
-                                    id: id,
-                                    name: name,
-                                    leader: leader,
-                                    day: day,
-                                    members: members,
-                                    address: address,
+                      )
+                    else
+                      ..._filtered.map((c) {
+                        final id = c['id'] as String;
+                        final name = c['name'] as String;
+                        final leader = c['leaderName'] as String? ?? '—';
+                        final day =
+                            _dayLabels[c['dayOfWeek'] as String] ??
+                            c['dayOfWeek'] as String;
+                        final members =
+                            '${c['currentCount']}/${c['maxCapacity']}';
+                        final address =
+                            (c['address'] as String?) ?? 'Não informado';
+                        return _CellAdminCard(
+                          id: id,
+                          name: name,
+                          leader: leader,
+                          day: day,
+                          members: members,
+                          address: address,
+                          onTap: () async {
+                            final changed = await Navigator.of(context)
+                                .push<bool>(
+                                  MaterialPageRoute<bool>(
+                                    builder: (_) => _CellDetailsPage(
+                                      id: id,
+                                      name: name,
+                                      leader: leader,
+                                      day: day,
+                                      members: members,
+                                      address: address,
+                                    ),
                                   ),
-                                ),
-                              );
-                          if (changed == true) _loadCells();
-                        },
-                      );
-                    }),
-                ],
+                                );
+                            if (changed == true) _loadCells();
+                          },
+                        );
+                      }),
+                  ],
+                ),
               ),
         Positioned(
           bottom: AppSpacing.xl,
@@ -1061,109 +1327,225 @@ class _CellAdminCard extends StatelessWidget {
 
 // ── Tab 3: Reports ───────────────────────────────────────────────────────────
 
-class _ReportsTab extends StatelessWidget {
+class _ReportsTab extends StatefulWidget {
   const _ReportsTab();
 
   @override
+  State<_ReportsTab> createState() => _ReportsTabState();
+}
+
+class _ReportsTabState extends State<_ReportsTab> {
+  late final Dio _dio;
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic> _stats = {};
+  List<Map<String, dynamic>> _months = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = DioClient(AuthStorage()).dio;
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        _dio.get('/dashboard/stats'),
+        _dio.get('/dashboard/monthly-stats'),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _stats =
+            (results[0].data as Map<String, dynamic>)['stats']
+                as Map<String, dynamic>;
+        _months = ((results[1].data as Map<String, dynamic>)['months'] as List)
+            .cast<Map<String, dynamic>>();
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            e.response?.data?['error']?['message'] as String? ??
+            'Erro ao carregar relatórios';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-      children: [
-        const SizedBox(height: AppSpacing.base),
-        GridView.custom(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: AppSpacing.sm,
-            mainAxisSpacing: AppSpacing.sm,
-            mainAxisExtent: 148,
-          ),
-          childrenDelegate: SliverChildListDelegate(const [
-            StatCard(
-              label: 'Taxa de Integração',
-              value: '25%',
-              icon: Icons.trending_up,
-              color: AppColors.success,
-              subtitle: '+3%',
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
             ),
-            StatCard(
-              label: 'Líderes Ativos',
-              value: '14',
-              icon: Icons.people,
-              color: AppColors.primary,
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadData,
             ),
-            StatCard(
-              label: 'Visitantes (mês)',
-              value: '47',
-              icon: Icons.calendar_month_outlined,
-              color: AppColors.accent,
-              subtitle: '+18%',
-            ),
-            StatCard(
-              label: 'Média Frequência',
-              value: '76%',
-              icon: Icons.bar_chart,
-              color: AppColors.secondary,
-            ),
-          ]),
+          ],
         ),
+      );
+    }
 
-        const SizedBox(height: AppSpacing.xl),
+    final totalVisitors = _stats['totalVisitors'] as int? ?? 0;
+    final integrated = _stats['integratedVisitors'] as int? ?? 0;
+    final leaders = _stats['totalLeaders'] as int? ?? 0;
+    final newThisMonth = _stats['newVisitorsThisMonth'] as int? ?? 0;
+    final avgAttendance = _stats['averageAttendanceRate'] as num? ?? 0;
+    final integrationRate = totalVisitors == 0
+        ? '0%'
+        : '${(integrated / totalVisitors * 100).toStringAsFixed(1)}%';
 
-        AppSectionHeader(title: 'Relatório Mensal'),
-        const SizedBox(height: AppSpacing.sm),
-        AppCard(
-          child: SizedBox(
-            height: 200,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.bar_chart_outlined,
-                    size: 64,
-                    color: AppColors.grey300,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Gráfico de visitantes por mês',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Integre fl_chart para visualizar',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.grey400,
-                    ),
-                  ),
-                ],
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        children: [
+          const SizedBox(height: AppSpacing.base),
+          GridView.custom(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: AppSpacing.sm,
+              mainAxisSpacing: AppSpacing.sm,
+              mainAxisExtent: 148,
+            ),
+            childrenDelegate: SliverChildListDelegate([
+              StatCard(
+                label: 'Taxa de Integração',
+                value: integrationRate,
+                icon: Icons.trending_up,
+                color: AppColors.success,
               ),
-            ),
+              StatCard(
+                label: 'Líderes Ativos',
+                value: '$leaders',
+                icon: Icons.people,
+                color: AppColors.primary,
+              ),
+              StatCard(
+                label: 'Visitantes (mês)',
+                value: '$newThisMonth',
+                icon: Icons.calendar_month_outlined,
+                color: AppColors.accent,
+              ),
+              StatCard(
+                label: 'Média Frequência',
+                value: '${avgAttendance.toStringAsFixed(1)}%',
+                icon: Icons.bar_chart,
+                color: AppColors.secondary,
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          AppSectionHeader(title: 'Visitantes por Mês (últ. 6 meses)'),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            child: _months.isEmpty
+                ? SizedBox(
+                    height: 200,
+                    child: Center(
+                      child: Text(
+                        'Sem dados de visitantes ainda.',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _MonthlyBarChart(months: _months),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        children: [
+                          _ChartLegend(
+                            color: AppColors.primary,
+                            label: 'Total',
+                          ),
+                          const SizedBox(width: AppSpacing.base),
+                          _ChartLegend(
+                            color: AppColors.success,
+                            label: 'Integrados',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          AppSectionHeader(title: 'Exportar Relatório'),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'Exportar em PDF',
+            variant: AppButtonVariant.outline,
+            prefixIcon: Icons.picture_as_pdf_outlined,
+            onPressed: () {},
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton(
+            label: 'Exportar em Excel',
+            variant: AppButtonVariant.outline,
+            prefixIcon: Icons.table_chart_outlined,
+            onPressed: () {},
+          ),
+
+          const SizedBox(height: AppSpacing.xl2),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChartLegend extends StatelessWidget {
+  const _ChartLegend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
-
-        const SizedBox(height: AppSpacing.xl),
-
-        AppSectionHeader(title: 'Exportar Relatório'),
-        const SizedBox(height: AppSpacing.sm),
-        AppButton(
-          label: 'Exportar em PDF',
-          variant: AppButtonVariant.outline,
-          prefixIcon: Icons.picture_as_pdf_outlined,
-          onPressed: () {},
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: AppTypography.labelSmall.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        AppButton(
-          label: 'Exportar em Excel',
-          variant: AppButtonVariant.outline,
-          prefixIcon: Icons.table_chart_outlined,
-          onPressed: () {},
-        ),
-
-        const SizedBox(height: AppSpacing.xl2),
       ],
     );
   }

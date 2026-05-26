@@ -120,4 +120,9 @@ export class CellController {
 
     res.status(201).json({ member });
   };
+
+  findByLeader = async (req: Request, res: Response): Promise<void> => {
+    const cells = await this.cellRepo.findByLeaderId(req.userId);
+    res.json({ cells });
+  };
 }

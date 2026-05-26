@@ -7,5 +7,6 @@ export function spiritualHistoryRoutes(controller: SpiritualHistoryController): 
   router.use(authMiddleware);
   router.post('/', controller.addEvent);
   router.get('/visitor/:visitorId', controller.findByVisitor);
+  router.get('/cell/:cellId', controller.findByCell);
   return router;
 }

@@ -26,6 +26,10 @@ const statusSchema = z.object({
   cellId: z.string().uuid().optional(),
 });
 
+const assignCellSchema = z.object({
+  cellId: z.string().uuid().nullable(),
+});
+
 const querySchema = z.object({
   leaderId: z.string().uuid().optional(),
   cellId: z.string().uuid().optional(),
@@ -81,5 +85,17 @@ export class VisitorController {
     const visitor = await this.visitorRepo.findById(id);
     if (!visitor) throw AppError.notFound('Visitante não encontrado');
     res.json({ member, visitor });
+  };
+
+  assignCell = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params as { id: string };
+    const { cellId } = assignCellSchema.parse(req.body);
+    const visitor = await this.visitorRepo.findById(id);
+    if (!visitor) throw AppError.notFound('Visitante não encontrado');
+    const updated = await this.visitorRepo.updateStatus(id, {
+      status: visitor.status,
+      cellId: cellId ?? undefined,
+    });
+    res.json({ visitor: updated });
   };
 }

@@ -107,6 +107,28 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     });
   }
 
+  async countByMonth(
+    months: number,
+  ): Promise<Array<{ month: string; total: number; integrated: number }>> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ month: string; total: bigint; integrated: bigint }>
+    >`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+        COUNT(*)::bigint AS total,
+        SUM(CASE WHEN status = 'integrado' THEN 1 ELSE 0 END)::bigint AS integrated
+      FROM visitors
+      WHERE created_at >= DATE_TRUNC('month', NOW() - (${months - 1} || ' months')::interval)
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY DATE_TRUNC('month', created_at)
+    `;
+    return rows.map((r) => ({
+      month: r.month,
+      total: Number(r.total),
+      integrated: Number(r.integrated),
+    }));
+  }
+
   private mapRow(row: {
     id: string;
     name: string;

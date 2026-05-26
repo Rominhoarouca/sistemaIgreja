@@ -13,4 +13,5 @@ export interface IVisitorRepository {
   updateStatus(id: string, data: UpdateVisitorStatusData): Promise<Visitor>;
   countByStatus(): Promise<Record<string, number>>;
   countNewThisMonth(): Promise<number>;
+  countByMonth(months: number): Promise<Array<{ month: string; total: number; integrated: number }>>;
 }

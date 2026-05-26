@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { UserController } from '../controllers/UserController';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, requireAdmin, requireSupervisorOrAdmin } from '../middlewares/auth.middleware';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -12,19 +12,12 @@ export function userRoutes(controller: UserController): Router {
   const router = Router();
   router.use(authMiddleware);
 
-  /**
-   * @openapi
-   * /v1/users/me:
-   *   get:
-   *     summary: Retorna o perfil do usuário autenticado
-   *     tags: [Users]
-   *   patch:
-   *     summary: Atualiza o perfil (com foto opcional)
-   *     tags: [Users]
-   */
   router.get('/me', controller.getProfile);
-  router.get('/leaders', controller.findLeaders);
   router.patch('/me', upload.single('photo'), controller.updateProfile);
+  router.get('/leaders', requireSupervisorOrAdmin, controller.findLeaders);
+  router.get('/supervisors', requireAdmin, controller.findSupervisors);
+  router.get('/my-leaders', requireSupervisorOrAdmin, controller.getMyLeaders);
+  router.patch('/leaders/:leaderId/supervisor', requireAdmin, controller.assignLeaderSupervisor);
 
   return router;
 }

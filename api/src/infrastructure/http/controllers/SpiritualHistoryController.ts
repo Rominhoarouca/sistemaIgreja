@@ -37,4 +37,10 @@ export class SpiritualHistoryController {
     const history = await this.spiritualHistoryRepo.findByVisitor(visitorId);
     res.json({ history });
   };
+
+  findByCell = async (req: Request, res: Response): Promise<void> => {
+    const { cellId } = req.params as { cellId: string };
+    const history = await this.spiritualHistoryRepo.findByCellId(cellId);
+    res.json({ history });
+  };
 }

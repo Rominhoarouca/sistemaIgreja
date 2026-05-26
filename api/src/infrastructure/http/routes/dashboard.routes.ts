@@ -6,5 +6,6 @@ export function dashboardRoutes(controller: DashboardController): Router {
   const router = Router();
   router.use(authMiddleware, requireAdmin);
   router.get('/stats', controller.getStats);
+  router.get('/monthly-stats', controller.getMonthlyStats);
   return router;
 }

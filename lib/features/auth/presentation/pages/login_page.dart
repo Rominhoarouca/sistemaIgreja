@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
 import '../bloc/auth_bloc.dart';
@@ -19,12 +20,21 @@ class _LoginPageState extends State<LoginPage> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
+    _loadVersion();
     if (kDebugMode) {
       _fillDevCredentials();
+    }
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _appVersion = 'v${info.version}');
     }
   }
 
@@ -44,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthBloc>().add(
       AuthLoginRequested(
-        email: _emailCtrl.text.trim(),
+        email: _emailCtrl.text.trim().toLowerCase(),
         password: _passwordCtrl.text,
       ),
     );
@@ -52,6 +62,9 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthAuthenticated) {
@@ -74,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
         builder: (context, state) {
           final isLoading = state is AuthLoading;
           return Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: theme.scaffoldBackgroundColor,
             body: SafeArea(
               child: SingleChildScrollView(
                 child: Column(
@@ -120,6 +133,15 @@ class _LoginPageState extends State<LoginPage> {
                                 color: AppColors.white.withValues(alpha: 0.75),
                               ),
                             ),
+                            if (_appVersion.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                _appVersion,
+                                style: AppTypography.labelSmall.copyWith(
+                                  color: AppColors.white.withValues(alpha: 0.5),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -134,11 +156,14 @@ class _LoginPageState extends State<LoginPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: AppSpacing.base),
-                            Text('Entrar', style: AppTypography.headlineSmall),
+                            Text(
+                              'Entrar',
+                              style: theme.textTheme.headlineSmall,
+                            ),
                             Text(
                               'Acesse sua conta para continuar',
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: AppColors.textSecondary,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                             const SizedBox(height: AppSpacing.xl),
@@ -150,20 +175,22 @@ class _LoginPageState extends State<LoginPage> {
                                   children: [
                                     Text(
                                       'Credenciais de desenvolvimento',
-                                      style: AppTypography.titleSmall,
+                                      style: theme.textTheme.titleSmall,
                                     ),
                                     const SizedBox(height: AppSpacing.xs),
                                     Text(
                                       'E-mail: admin@sistemaigreja.com.br',
-                                      style: AppTypography.bodySmall.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
                                     ),
                                     Text(
                                       'Senha: admin123',
-                                      style: AppTypography.bodySmall.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
                                     ),
                                     const SizedBox(height: AppSpacing.sm),
                                     Align(
@@ -246,8 +273,8 @@ class _LoginPageState extends State<LoginPage> {
                                 children: [
                                   Text(
                                     'Novo por aqui?',
-                                    style: AppTypography.bodyMedium.copyWith(
-                                      color: AppColors.textSecondary,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                   const SizedBox(height: AppSpacing.xs),

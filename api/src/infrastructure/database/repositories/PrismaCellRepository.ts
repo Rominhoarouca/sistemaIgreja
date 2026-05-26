@@ -150,6 +150,15 @@ export class PrismaCellRepository implements ICellRepository {
     return this.prisma.cell.count();
   }
 
+  async findByLeaderId(leaderId: string): Promise<Cell[]> {
+    const rows = await this.prisma.cell.findMany({
+      where: { leaderId },
+      include: { leader: { select: { name: true } }, _count: { select: { members: true } } },
+      orderBy: { name: 'asc' },
+    });
+    return rows.map((r) => this.mapRow(r));
+  }
+
   private mapRow(row: {
     id: string;
     name: string;
@@ -171,7 +180,7 @@ export class PrismaCellRepository implements ICellRepository {
       id: row.id,
       name: row.name,
       leaderId: row.leaderId,
-      leaderName: row.leader?.name,
+      ...(row.leader?.name !== undefined && { leaderName: row.leader.name }),
       address: row.address,
       neighborhood: row.neighborhood,
       city: row.city,

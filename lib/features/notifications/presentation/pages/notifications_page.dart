@@ -61,6 +61,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
+        elevation: 0,
         title: const Text('Notificações'),
         actions: [
           if (unreadCount > 0)

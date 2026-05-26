@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import 'auth_storage.dart';
 
@@ -15,6 +19,8 @@ class DioClient {
   void Function()? onForceLogout;
 
   DioClient(this._storage) {
+    final logLevel = _DioLogLevelX.fromEnvironment();
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConstants.baseUrl,
@@ -23,10 +29,143 @@ class DioClient {
         headers: {'Content-Type': 'application/json'},
       ),
     );
+
+    if (!kReleaseMode && logLevel != _DioLogLevel.none) {
+      _dio.interceptors.add(_DevLoggingInterceptor(level: logLevel));
+    }
+
     _dio.interceptors.add(_AuthInterceptor(_dio, _storage, this));
   }
 
   Dio get dio => _dio;
+}
+
+enum _DioLogLevel { none, basic, verbose }
+
+extension _DioLogLevelX on _DioLogLevel {
+  static _DioLogLevel fromEnvironment() {
+    const raw = String.fromEnvironment('DIO_LOG_LEVEL', defaultValue: 'basic');
+    switch (raw.toLowerCase()) {
+      case 'none':
+        return _DioLogLevel.none;
+      case 'verbose':
+        return _DioLogLevel.verbose;
+      case 'basic':
+      default:
+        return _DioLogLevel.basic;
+    }
+  }
+}
+
+class _DevLoggingInterceptor extends Interceptor {
+  static const _startedAtKey = '__startedAtMicros';
+
+  final _DioLogLevel level;
+
+  _DevLoggingInterceptor({required this.level});
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra[_startedAtKey] = DateTime.now().microsecondsSinceEpoch;
+
+    _log('[DIO][REQ] ${options.method.toUpperCase()} ${options.uri}');
+
+    if (level == _DioLogLevel.verbose) {
+      _log('[DIO][REQ][HEADERS] ${_formatHeaders(options.headers)}');
+      _log('[DIO][REQ][QUERY] ${_formatData(options.queryParameters)}');
+      _log('[DIO][REQ][BODY] ${_formatData(options.data)}');
+    }
+
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final elapsed = _elapsedMs(response.requestOptions.extra[_startedAtKey]);
+    _log(
+      '[DIO][RES] ${response.statusCode} ${response.requestOptions.method.toUpperCase()} ${response.requestOptions.uri} (${elapsed}ms)',
+    );
+
+    if (level == _DioLogLevel.verbose) {
+      _log('[DIO][RES][HEADERS] ${_formatHeaders(response.headers.map)}');
+      _log('[DIO][RES][BODY] ${_formatData(response.data)}');
+    }
+
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final elapsed = _elapsedMs(err.requestOptions.extra[_startedAtKey]);
+    _log(
+      '[DIO][ERR] ${err.response?.statusCode ?? 'NO_STATUS'} ${err.requestOptions.method.toUpperCase()} ${err.requestOptions.uri} (${elapsed}ms) ${err.message ?? ''}',
+    );
+
+    if (level == _DioLogLevel.verbose) {
+      _log('[DIO][ERR][HEADERS] ${_formatHeaders(err.requestOptions.headers)}');
+      _log('[DIO][ERR][REQ_BODY] ${_formatData(err.requestOptions.data)}');
+      _log('[DIO][ERR][RES_BODY] ${_formatData(err.response?.data)}');
+    }
+
+    handler.next(err);
+  }
+
+  int _elapsedMs(Object? startedAtMicros) {
+    if (startedAtMicros is! int) return 0;
+    final nowMicros = DateTime.now().microsecondsSinceEpoch;
+    return ((nowMicros - startedAtMicros) / 1000).round();
+  }
+
+  String _formatHeaders(Map<dynamic, dynamic>? headers) {
+    if (headers == null || headers.isEmpty) return '{}';
+
+    final sanitized = <String, dynamic>{};
+    headers.forEach((key, value) {
+      final keyStr = key.toString();
+      if (keyStr.toLowerCase() == 'authorization') {
+        sanitized[keyStr] = _maskToken(value?.toString() ?? '');
+      } else {
+        sanitized[keyStr] = value;
+      }
+    });
+
+    return _formatData(sanitized);
+  }
+
+  String _maskToken(String token) {
+    if (token.isEmpty) return token;
+    if (token.length <= 14) return '***';
+    return '${token.substring(0, 10)}...${token.substring(token.length - 4)}';
+  }
+
+  String _formatData(Object? data) {
+    if (data == null) return 'null';
+    try {
+      if (data is String) {
+        return data.length > 4000
+            ? '${data.substring(0, 4000)}...<truncated>'
+            : data;
+      }
+      const encoder = JsonEncoder.withIndent('  ');
+      final encoded = encoder.convert(data);
+      return encoded.length > 4000
+          ? '${encoded.substring(0, 4000)}...<truncated>'
+          : encoded;
+    } catch (_) {
+      final fallback = data.toString();
+      return fallback.length > 4000
+          ? '${fallback.substring(0, 4000)}...<truncated>'
+          : fallback;
+    }
+  }
+
+  void _log(String message) {
+    if (kDebugMode) {
+      // Mirrors logs to Flutter console where developer.log may be filtered.
+      debugPrint(message);
+    }
+    developer.log(message, name: 'DIO');
+  }
 }
 
 class _AuthInterceptor extends Interceptor {

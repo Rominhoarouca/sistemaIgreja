@@ -6,9 +6,13 @@ import type { IAttendanceRepository } from '@domain/repositories/IAttendanceRepo
 const registerSchema = z.object({
   visitorId: z.string().uuid(),
   cellId: z.string().uuid(),
-  meetingDate: z.string().datetime({ offset: true }).or(z.string().date()),
+  meetingDate: z.coerce.date(),
   isPresent: z.boolean().default(true),
   notes: z.string().optional(),
+});
+
+const createMeetingSchema = z.object({
+  meetingDate: z.coerce.date(),
 });
 
 export class AttendanceController {
@@ -21,7 +25,7 @@ export class AttendanceController {
     const data = registerSchema.parse(req.body);
     const attendance = await this.registerUseCase.execute({
       ...data,
-      meetingDate: new Date(data.meetingDate),
+      meetingDate: data.meetingDate,
     });
     res.status(201).json({ attendance });
   };
@@ -32,5 +36,19 @@ export class AttendanceController {
     const meetingDate = date ? new Date(date) : new Date();
     const attendances = await this.attendanceRepo.findByCellAndDate(cellId, meetingDate);
     res.json({ attendances });
+  };
+
+  findMeetingsByCell = async (req: Request, res: Response): Promise<void> => {
+    const { cellId } = req.params as { cellId: string };
+    const meetings = await this.attendanceRepo.findMeetingsByCellId(cellId);
+    res.json({ meetings });
+  };
+
+  createMeeting = async (req: Request, res: Response): Promise<void> => {
+    const { cellId } = req.params as { cellId: string };
+    const { meetingDate } = createMeetingSchema.parse(req.body);
+    const createdById = req.userId!;
+    await this.attendanceRepo.createMeeting(cellId, meetingDate, createdById);
+    res.status(201).json({ message: 'Encontro criado com sucesso' });
   };
 }

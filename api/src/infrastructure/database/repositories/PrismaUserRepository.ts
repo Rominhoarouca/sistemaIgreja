@@ -40,6 +40,29 @@ export class PrismaUserRepository implements IUserRepository {
     return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
   }
 
+  async listSupervisors(): Promise<User[]> {
+    const supervisors = await this.prisma.user.findMany({
+      where: { role: 'SUPERVISOR' },
+      orderBy: { name: 'asc' },
+    });
+    return supervisors.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
+  async findLeadersBySupervisorId(supervisorId: string): Promise<User[]> {
+    const leaders = await this.prisma.user.findMany({
+      where: { role: 'LIDER', supervisorId },
+      orderBy: { name: 'asc' },
+    });
+    return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
+  async assignSupervisor(leaderId: string, supervisorId: string | null): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: leaderId },
+      data: { supervisorId },
+    });
+  }
+
   async getProfile(id: string): Promise<UserProfile | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },

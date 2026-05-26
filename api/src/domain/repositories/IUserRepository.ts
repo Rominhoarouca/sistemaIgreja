@@ -13,6 +13,9 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<UserWithPassword | null>;
   save(user: Omit<UserWithPassword, 'createdAt' | 'updatedAt'>): Promise<User>;
   listLeaders(): Promise<User[]>;
+  listSupervisors(): Promise<User[]>;
+  findLeadersBySupervisorId(supervisorId: string): Promise<User[]>;
+  assignSupervisor(leaderId: string, supervisorId: string | null): Promise<void>;
   getProfile(id: string): Promise<UserProfile | null>;
   updateProfile(id: string, data: UpdateProfileData): Promise<User>;
   upsertChildren(userId: string, children: Array<{ id?: string; name: string; birthDate?: Date | null }>): Promise<Child[]>;

@@ -35,10 +35,44 @@ export class UserController {
     res.json({ leaders });
   };
 
+  findSupervisors = async (_req: Request, res: Response): Promise<void> => {
+    const supervisors = await this.userRepo.listSupervisors();
+    res.json({ supervisors });
+  };
+
+  getMyLeaders = async (req: Request, res: Response): Promise<void> => {
+    const leaders = await this.userRepo.findLeadersBySupervisorId(req.userId);
+    res.json({ leaders });
+  };
+
+  assignLeaderSupervisor = async (req: Request, res: Response): Promise<void> => {
+    const { leaderId } = req.params as { leaderId: string };
+    const { supervisorId } = z.object({ supervisorId: z.string().uuid().nullable() }).parse(req.body);
+    await this.userRepo.assignSupervisor(leaderId, supervisorId);
+    res.status(204).send();
+  };
+
   updateProfile = async (req: Request, res: Response): Promise<void> => {
-    const body = updateProfileSchema.parse(
-      typeof req.body === 'string' ? JSON.parse(req.body) : req.body,
-    );
+    const rawBody = typeof req.body === 'string'
+      ? JSON.parse(req.body)
+      : (req.body ?? {});
+
+    const toNullable = (value: unknown): unknown => {
+      if (value === '' || value === 'null' || value === 'undefined') return null;
+      return value;
+    };
+
+    const normalizedBody = {
+      ...rawBody,
+      ...(rawBody.phone !== undefined ? { phone: toNullable(rawBody.phone) } : {}),
+      ...(rawBody.address !== undefined ? { address: toNullable(rawBody.address) } : {}),
+      ...(rawBody.birthDate !== undefined ? { birthDate: toNullable(rawBody.birthDate) } : {}),
+      ...(typeof rawBody.children === 'string'
+        ? { children: JSON.parse(rawBody.children) }
+        : {}),
+    };
+
+    const body = updateProfileSchema.parse(normalizedBody);
 
     const file = req.file;
 

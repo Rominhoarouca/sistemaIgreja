@@ -23,7 +23,8 @@ export class LoginUseCase {
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
-    const userWithPassword = await this.userRepo.findByEmail(input.email);
+    const normalizedEmail = input.email.toLowerCase().trim();
+    const userWithPassword = await this.userRepo.findByEmail(normalizedEmail);
     if (!userWithPassword) {
       throw AppError.unauthorized('Credenciais inválidas');
     }

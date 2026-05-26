@@ -22,6 +22,7 @@ class UserEntity extends Equatable {
 
   bool get isAdmin => role == UserRole.admin;
   bool get isLeader => role == UserRole.leader;
+  bool get isSupervisor => role == UserRole.supervisor;
 
   @override
   List<Object?> get props => [id, email, role];
@@ -29,15 +30,18 @@ class UserEntity extends Equatable {
 
 enum UserRole {
   admin,
-  leader;
+  leader,
+  supervisor;
 
   static UserRole fromString(String value) => switch (value.toUpperCase()) {
     'ADMIN' => admin,
+    'SUPERVISOR' => supervisor,
     _ => leader,
   };
 
   String get value => switch (this) {
     UserRole.admin => 'ADMIN',
     UserRole.leader => 'LIDER',
+    UserRole.supervisor => 'SUPERVISOR',
   };
 }

@@ -9,6 +9,7 @@ export function visitorRoutes(controller: VisitorController): Router {
   router.get('/', controller.findAll);
   router.get('/:id', controller.findById);
   router.patch('/:id/status', controller.updateStatus);
+  router.patch('/:id/assign-cell', controller.assignCell);
   router.patch('/:id/convert-member', controller.convertToMember);
   return router;
 }

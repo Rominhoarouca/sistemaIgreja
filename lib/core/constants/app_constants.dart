@@ -5,7 +5,8 @@ abstract final class AppConstants {
   // Produção: passe --dart-define=API_BASE_URL=https://seu-dominio.com/v1
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:3000/v1',
+    defaultValue: 'http://192.168.0.191:3000/v1',
+    //defaultValue: 'http://127.0.0.1:3000/v1',
   );
 
   static const Duration connectTimeout = Duration(seconds: 10);
@@ -23,6 +24,7 @@ abstract final class AppConstants {
   // ── User roles ────────────────────────────────────────────────────────────
   static const String roleAdmin = 'ADMIN';
   static const String roleLeader = 'LIDER';
+  static const String roleSupervisor = 'SUPERVISOR';
   static const String roleVisitor = 'VISITANTE';
 
   // ── Visitor statuses ──────────────────────────────────────────────────────
@@ -68,6 +70,9 @@ abstract final class AppRoutes {
   static const String visitorDetail = '/leader/visitors/:id';
   static const String attendance = '/leader/attendance';
   static const String materials = '/leader/materials';
+
+  // Supervisor
+  static const String supervisorHome = '/supervisor';
 
   // Admin
   static const String adminDashboard = '/admin';

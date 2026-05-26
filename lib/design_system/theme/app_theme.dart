@@ -62,10 +62,14 @@ abstract final class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor: AppColors.primary,
+          backgroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
           foregroundColor: AppColors.white,
-          disabledBackgroundColor: AppColors.grey200,
-          disabledForegroundColor: AppColors.grey400,
+          disabledBackgroundColor: isDark
+              ? AppColors.grey700
+              : AppColors.grey200,
+          disabledForegroundColor: isDark
+              ? AppColors.grey500
+              : AppColors.grey400,
           minimumSize: const Size.fromHeight(AppSpacing.buttonHeightMd),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -81,9 +85,12 @@ abstract final class AppTheme {
       // ── Outlined Button ─────────────────────────────────────────────────
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
           minimumSize: const Size.fromHeight(AppSpacing.buttonHeightMd),
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
+          side: BorderSide(
+            color: isDark ? AppColors.primaryLight : AppColors.primary,
+            width: 1.5,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           ),
@@ -98,7 +105,7 @@ abstract final class AppTheme {
       // ── Text Button ─────────────────────────────────────────────────────
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
+          foregroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
           textStyle: AppTypography.buttonLabel,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -128,7 +135,10 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(
+            color: isDark ? AppColors.primaryLight : AppColors.primary,
+            width: 2,
+          ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -159,7 +169,9 @@ abstract final class AppTheme {
         elevation: 8,
         height: AppSpacing.bottomNavHeight,
         backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surface,
-        indicatorColor: AppColors.primarySurface,
+        indicatorColor: isDark
+            ? AppColors.primaryDarkBadgeBg
+            : AppColors.primarySurface,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const IconThemeData(
@@ -190,7 +202,9 @@ abstract final class AppTheme {
         backgroundColor: isDark
             ? AppColors.surfaceVariantDark
             : AppColors.grey100,
-        selectedColor: AppColors.primarySurface,
+        selectedColor: isDark
+            ? AppColors.primaryDarkBadgeBg
+            : AppColors.primarySurface,
         labelStyle: AppTypography.labelMedium,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
@@ -226,10 +240,14 @@ abstract final class AppTheme {
       ),
 
       // ── Progress Indicator ───────────────────────────────────────────────
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        color: AppColors.primary,
-        linearTrackColor: AppColors.primarySurface,
-        circularTrackColor: AppColors.primarySurface,
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: isDark ? AppColors.primaryLight : AppColors.primary,
+        linearTrackColor: isDark
+            ? AppColors.surfaceVariantDark
+            : AppColors.primarySurface,
+        circularTrackColor: isDark
+            ? AppColors.surfaceVariantDark
+            : AppColors.primarySurface,
       ),
 
       // ── Text Theme ──────────────────────────────────────────────────────

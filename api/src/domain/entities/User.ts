@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'LIDER';
+export type UserRole = 'ADMIN' | 'LIDER' | 'SUPERVISOR';
 
 export interface User {
   readonly id: string;
@@ -9,6 +9,7 @@ export interface User {
   readonly phone: string | null;
   readonly address: string | null;
   readonly birthDate: Date | null;
+  readonly supervisorId: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

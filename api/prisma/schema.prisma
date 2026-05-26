@@ -14,6 +14,7 @@ datasource db {
 enum UserRole {
   ADMIN
   LIDER
+  SUPERVISOR
 }
 
 enum VisitorStatus {
@@ -55,21 +56,25 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      UserRole @default(LIDER)
-  photoKey  String?  @map("photo_key")
-  phone     String?
-  address   String?
-  birthDate DateTime? @map("birth_date")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  role         UserRole @default(LIDER)
+  photoKey     String?  @map("photo_key")
+  phone        String?
+  address      String?
+  birthDate    DateTime? @map("birth_date")
+  supervisorId String?  @map("supervisor_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  cell               Cell?              @relation("CellLeader")
+  cells              Cell[]             @relation("CellLeader")
+  supervisor         User?              @relation("SupervisorLeaders", fields: [supervisorId], references: [id])
+  subordinates       User[]             @relation("SupervisorLeaders")
   visitors           Visitor[]          @relation("LeaderVisitors")
   spiritualHistories SpiritualHistory[] @relation("RecordedBy")
   materials          Material[]         @relation("UploadedBy")
   refreshTokens      RefreshToken[]
   children           Child[]
   cellMembers        CellMember[]
+  cellMeetings       CellMeeting[]      @relation("CreatedMeetings")
 
   @@map("users")
 }
@@ -102,7 +107,7 @@ model RefreshToken {
 model Cell {
   id          String    @id @default(uuid())
   name        String
-  leaderId    String    @unique @map("leader_id")
+  leaderId    String    @map("leader_id")
   address     String
   neighborhood String
   city        String
@@ -119,6 +124,7 @@ model Cell {
   visitors   Visitor[]
   attendances Attendance[]
   materials  Material[]
+  meetings   CellMeeting[]
 
   @@map("cells")
 }
@@ -173,6 +179,21 @@ model CellMember {
   @@index([cellId])
   @@index([leaderId])
   @@map("cell_members")
+}
+
+// ── Cell Meetings ─────────────────────────────────────────────────────────────
+model CellMeeting {
+  id          String   @id @default(uuid())
+  cellId      String   @map("cell_id")
+  meetingDate DateTime @map("meeting_date") @db.Date
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  cell      Cell @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  createdBy User @relation("CreatedMeetings", fields: [createdById], references: [id])
+
+  @@unique([cellId, meetingDate])
+  @@map("cell_meetings")
 }
 
 // ── Attendance ────────────────────────────────────────────────────────────────

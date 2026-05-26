@@ -10,3 +10,4 @@
 - [07. Diagrama de Classes](07-diagrama-classes.md)
 - [08. Execucao e Operacao](08-execucao-operacao.md)
 - [09. Galeria do App](09-galeria-app.md)
+- [10. Indicadores e Gráficos](10-indicadores.md)

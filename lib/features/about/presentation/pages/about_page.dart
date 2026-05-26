@@ -14,6 +14,7 @@ class AboutPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
+        elevation: 0,
         title: const Text('Sobre o App'),
       ),
       body: ListView(

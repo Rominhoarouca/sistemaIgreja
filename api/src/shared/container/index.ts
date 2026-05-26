@@ -120,8 +120,8 @@ export function createContainer(): Container {
   const cellController = new CellController(getNearbyCellsUseCase, cellRepo, cellMemberRepo);
   const attendanceController = new AttendanceController(registerAttendanceUseCase, attendanceRepo);
   const spiritualHistoryController = new SpiritualHistoryController(addSpiritualEventUseCase, spiritualHistoryRepo);
-  const dashboardController = new DashboardController(getDashboardStatsUseCase);
-  const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService);
+  const dashboardController = new DashboardController(getDashboardStatsUseCase, visitorRepo);
+  const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo);
   const userController = new UserController(getProfileUseCase, updateProfileUseCase, userRepo);
 
   return {

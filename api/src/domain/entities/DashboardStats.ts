@@ -3,6 +3,7 @@ export interface DashboardStats {
   readonly totalCells: number;
   readonly totalLeaders: number;
   readonly integratedVisitors: number;
+  readonly forwardedVisitors: number;
   readonly newVisitorsThisMonth: number;
   readonly averageAttendanceRate: number;
   readonly activeCells: Array<{
@@ -12,4 +13,10 @@ export interface DashboardStats {
     readonly visitorCount: number;
     readonly attendanceRate: number;
   }>;
+}
+
+export interface MonthlyVisitorStat {
+  readonly month: string; // 'YYYY-MM'
+  readonly total: number;
+  readonly integrated: number;
 }

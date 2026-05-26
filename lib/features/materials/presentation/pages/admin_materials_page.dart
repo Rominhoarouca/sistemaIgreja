@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/auth_storage.dart';
@@ -56,7 +57,24 @@ class _CellOption {
   const _CellOption({required this.id, required this.name});
 }
 
-// ── State ───────────────────────────────────────────────────────────────────
+class _GroupedMaterial {
+  final String title;
+  final String type;
+  final int sizeBytes;
+  final DateTime uploadedAt;
+  final List<String> materialIds;
+  final List<String> cellIds;
+  const _GroupedMaterial({
+    required this.title,
+    required this.type,
+    required this.sizeBytes,
+    required this.uploadedAt,
+    required this.materialIds,
+    required this.cellIds,
+  });
+
+  bool isAllCells(int totalCells) => cellIds.length >= totalCells;
+}
 
 class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
   final _searchCtrl = TextEditingController();
@@ -120,10 +138,46 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
     }
   }
 
-  List<_MaterialData> get _filtered {
+  List<_GroupedMaterial> get _grouped {
+    final Map<String, _GroupedMaterial> map = {};
+    for (final m in _materials) {
+      // group by title + size + type to avoid naive duplicates
+      final key = '${m.title}|${m.sizeBytes}|${m.type}';
+      final existing = map[key];
+      if (existing == null) {
+        map[key] = _GroupedMaterial(
+          title: m.title,
+          type: m.type,
+          sizeBytes: m.sizeBytes,
+          uploadedAt: m.uploadedAt,
+          materialIds: [m.id],
+          cellIds: [m.cellId],
+        );
+      } else {
+        map[key] = _GroupedMaterial(
+          title: existing.title,
+          type: existing.type,
+          sizeBytes: existing.sizeBytes,
+          uploadedAt: existing.uploadedAt,
+          materialIds: [...existing.materialIds, m.id],
+          cellIds: [...existing.cellIds, m.cellId],
+        );
+      }
+    }
+    final list = map.values.toList();
+    // apply search query
     final q = _query.toLowerCase();
-    if (q.isEmpty) return _materials;
-    return _materials.where((m) => m.title.toLowerCase().contains(q)).toList();
+    if (q.isNotEmpty) {
+      return list.where((g) => g.title.toLowerCase().contains(q)).toList();
+    }
+    return list;
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / 1024).toStringAsFixed(0)} KB';
   }
 
   // ── Upload ────────────────────────────────────────────────────────────────
@@ -161,11 +215,16 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
     try {
       final bytes = file.bytes;
       if (bytes == null) throw Exception('Não foi possível ler o arquivo');
-      final formData = FormData.fromMap({
+      final Map<String, dynamic> map = {
         'file': MultipartFile.fromBytes(bytes, filename: file.name),
         'title': params.title,
-        'cellId': params.cellId,
-      });
+      };
+      if (params.allCells) {
+        map['allCells'] = 'true';
+      } else {
+        map['cellIds'] = jsonEncode(params.selectedCellIds);
+      }
+      final formData = FormData.fromMap(map);
       await _dio.post('/materials', data: formData);
       if (!mounted) return;
       setState(() => _isUploading = false);
@@ -296,6 +355,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
+        elevation: 0,
         title: const Text('Materiais'),
         actions: [
           IconButton(
@@ -356,7 +416,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
   }
 
   Widget _buildList() {
-    final filtered = _filtered;
+    final grouped = _grouped;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pagePaddingH,
@@ -393,7 +453,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
               ),
             ),
           ),
-        if (filtered.isEmpty)
+        if (grouped.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.xl2),
             child: Center(
@@ -416,20 +476,143 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
             ),
           )
         else
-          ...filtered.map(
-            (m) => Padding(
+          ...grouped.map((g) {
+            final representativeId = g.materialIds.first;
+            final isOpening = _opening[representativeId] == true;
+            return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: _AdminMaterialCard(
-                material: m,
-                typeIcon: _typeIcon(m.type),
-                typeColor: _typeColor(m.type),
-                isOpening: _opening[m.id] == true,
-                onView: () => _viewMaterial(m),
-                onDelete: () => _deleteMaterial(m),
+              child: GestureDetector(
+                onTap: () {
+                  // open a page that shows which cells this grouped material is available in
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => _MaterialTargetsPage(
+                        title: g.title,
+                        cells: _cells,
+                        selectedCellIds: g.cellIds,
+                      ),
+                    ),
+                  );
+                },
+                child: _AdminMaterialCard(
+                  title: g.title,
+                  subtitle:
+                      '${g.type.toUpperCase()} · ${_formatBytes(g.sizeBytes)}',
+                  typeIcon: _typeIcon(g.type),
+                  typeColor: _typeColor(g.type),
+                  isOpening: isOpening,
+                  onView: () async {
+                    // view uses the representative material id to obtain download url
+                    final fake = _MaterialData(
+                      id: representativeId,
+                      cellId: g.cellIds.first,
+                      title: g.title,
+                      type: g.type,
+                      sizeBytes: g.sizeBytes,
+                      uploadedAt: g.uploadedAt,
+                    );
+                    await _viewMaterial(fake);
+                  },
+                  onDelete: () async {
+                    // delete all underlying materials
+                    for (final id in g.materialIds) {
+                      await _deleteMaterial(
+                        _MaterialData(
+                          id: id,
+                          cellId: g.cellIds.first,
+                          title: g.title,
+                          type: g.type,
+                          sizeBytes: g.sizeBytes,
+                          uploadedAt: g.uploadedAt,
+                        ),
+                      );
+                    }
+                    // reload grouped list
+                    _loadData();
+                  },
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}
+
+class _MaterialTargetsPage extends StatelessWidget {
+  const _MaterialTargetsPage({
+    required this.title,
+    required this.cells,
+    required this.selectedCellIds,
+  });
+
+  final String title;
+  final List<_CellOption> cells;
+  final List<String> selectedCellIds;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedSet = selectedCellIds.toSet();
+    final allSelected = selectedSet.length >= cells.length;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Disponibilidade do material'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+      ),
+      backgroundColor: AppColors.background,
+      body: Padding(
+        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Título', style: AppTypography.labelMedium),
+            const SizedBox(height: AppSpacing.xs),
+            TextField(
+              controller: TextEditingController(text: title),
+              readOnly: true,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            SwitchListTile(
+              title: const Text('Disponível para todas as células'),
+              value: allSelected,
+              onChanged: null,
+              subtitle: Text(
+                allSelected ? 'Ativado' : 'Apenas células selecionadas',
               ),
             ),
-          ),
-      ],
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: cells.map((c) {
+                    final selected = selectedSet.contains(c.id);
+                    return FilterChip(
+                      label: Text(c.name, overflow: TextOverflow.ellipsis),
+                      selected: selected,
+                      onSelected: null,
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Fechar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -438,8 +621,13 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
 
 class _UploadParams {
   final String title;
-  final String cellId;
-  const _UploadParams({required this.title, required this.cellId});
+  final bool allCells;
+  final List<String> selectedCellIds;
+  const _UploadParams({
+    required this.title,
+    required this.allCells,
+    required this.selectedCellIds,
+  });
 }
 
 class _UploadDialog extends StatefulWidget {
@@ -453,19 +641,32 @@ class _UploadDialog extends StatefulWidget {
 
 class _UploadDialogState extends State<_UploadDialog> {
   late final TextEditingController _titleCtrl;
-  late String _selectedCellId;
+  bool _allCells = true;
+  late final Set<String> _selectedIds;
 
   @override
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController(text: widget.defaultTitle);
-    _selectedCellId = widget.cells.first.id;
+    _selectedIds = widget.cells
+        .map((c) => c.id)
+        .toSet(); // default: all selected
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleSelectAll(bool select) {
+    setState(() {
+      if (select) {
+        _selectedIds.addAll(widget.cells.map((c) => c.id));
+      } else {
+        _selectedIds.clear();
+      }
+    });
   }
 
   @override
@@ -483,22 +684,51 @@ class _UploadDialogState extends State<_UploadDialog> {
             ),
           ),
           const SizedBox(height: AppSpacing.base),
-          DropdownButtonFormField<String>(
-            value: _selectedCellId,
-            decoration: const InputDecoration(
-              labelText: 'Célula',
-              border: OutlineInputBorder(),
+          SwitchListTile(
+            title: const Text('Disponível para todas as células'),
+            value: _allCells,
+            onChanged: (v) => setState(() => _allCells = v),
+            subtitle: const Text(
+              'Se ativado, o material será disponibilizado para todas as células automaticamente.',
             ),
-            items: widget.cells
-                .map(
-                  (c) => DropdownMenuItem(
-                    value: c.id,
-                    child: Text(c.name, overflow: TextOverflow.ellipsis),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) => setState(() => _selectedCellId = v!),
           ),
+          if (!_allCells) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => _toggleSelectAll(true),
+                  child: const Text('Selecionar todos'),
+                ),
+                TextButton(
+                  onPressed: () => _toggleSelectAll(false),
+                  child: const Text('Limpar'),
+                ),
+              ],
+            ),
+            SizedBox(
+              height: 160,
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.cells.map((c) {
+                    final selected = _selectedIds.contains(c.id);
+                    return FilterChip(
+                      label: Text(c.name, overflow: TextOverflow.ellipsis),
+                      selected: selected,
+                      onSelected: (s) => setState(
+                        () => s
+                            ? _selectedIds.add(c.id)
+                            : _selectedIds.remove(c.id),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -510,9 +740,22 @@ class _UploadDialogState extends State<_UploadDialog> {
           onPressed: () {
             final title = _titleCtrl.text.trim();
             if (title.isEmpty) return;
+            if (!_allCells && _selectedIds.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Selecione ao menos uma célula'),
+                  backgroundColor: AppColors.warning,
+                ),
+              );
+              return;
+            }
             Navigator.pop(
               context,
-              _UploadParams(title: title, cellId: _selectedCellId),
+              _UploadParams(
+                title: title,
+                allCells: _allCells,
+                selectedCellIds: _selectedIds.toList(),
+              ),
             );
           },
           child: const Text('Enviar'),
@@ -526,15 +769,16 @@ class _UploadDialogState extends State<_UploadDialog> {
 
 class _AdminMaterialCard extends StatelessWidget {
   const _AdminMaterialCard({
-    required this.material,
+    this.title,
+    required this.subtitle,
     required this.typeIcon,
     required this.typeColor,
     required this.onView,
     required this.onDelete,
     required this.isOpening,
   });
-
-  final _MaterialData material;
+  final String? title;
+  final String subtitle;
   final IconData typeIcon;
   final Color typeColor;
   final bool isOpening;
@@ -544,56 +788,59 @@ class _AdminMaterialCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: typeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppSpacing.sm),
+      child: InkWell(
+        onTap: null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: typeColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppSpacing.sm),
+                  ),
+                  child: Icon(typeIcon, color: typeColor, size: 22),
                 ),
-                child: Icon(typeIcon, color: typeColor, size: 22),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(material.title, style: AppTypography.titleSmall),
-                    const SizedBox(height: AppSpacing.xs2),
-                    Text(
-                      '${material.type.toUpperCase()} · ${material.formattedSize}',
-                      style: AppTypography.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title ?? '', style: AppTypography.titleSmall),
+                      const SizedBox(height: AppSpacing.xs2),
+                      Text(
+                        subtitle,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: AppColors.error,
-                  size: 20,
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.error,
+                    size: 20,
+                  ),
+                  tooltip: 'Excluir',
+                  onPressed: onDelete,
                 ),
-                tooltip: 'Excluir',
-                onPressed: onDelete,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          AppButton(
-            label: isOpening ? 'Abrindo...' : 'Visualizar / Baixar',
-            variant: AppButtonVariant.outline,
-            size: AppButtonSize.sm,
-            prefixIcon: isOpening ? null : Icons.open_in_new_outlined,
-            onPressed: isOpening ? null : onView,
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AppButton(
+              label: isOpening ? 'Abrindo...' : 'Visualizar / Baixar',
+              variant: AppButtonVariant.outline,
+              size: AppButtonSize.sm,
+              prefixIcon: isOpening ? null : Icons.open_in_new_outlined,
+              onPressed: isOpening ? null : onView,
+            ),
+          ],
+        ),
       ),
     );
   }

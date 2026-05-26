@@ -13,27 +13,31 @@ export class GetDashboardStatsUseCase {
   ) {}
 
   async execute(): Promise<DashboardStats> {
-    const [byStatus, cells, avgRate, newThisMonth] = await Promise.all([
+    const [byStatus, cells, avgRate, newThisMonth, leaders] = await Promise.all([
       this.visitorRepo.countByStatus(),
       this.cellRepo.findAll(),
       this.attendanceRepo.getAverageAttendanceRate(),
       this.visitorRepo.countNewThisMonth(),
+      this.userRepo.listLeaders(),
     ]);
 
     const total = Object.values(byStatus).reduce((s, v) => s + v, 0);
     const integrated = byStatus['integrado'] ?? 0;
+    const forwarded =
+      (byStatus['em_acompanhamento'] ?? 0) + (byStatus['integrado'] ?? 0);
 
     return {
       totalVisitors: total,
       totalCells: cells.length,
-      totalLeaders: cells.length,
+      totalLeaders: leaders.length,
       integratedVisitors: integrated,
+      forwardedVisitors: forwarded,
       newVisitorsThisMonth: newThisMonth,
-      averageAttendanceRate: avgRate,
+      averageAttendanceRate: Math.round(avgRate * 10) / 10,
       activeCells: cells.map((c) => ({
         cellId: c.id,
         cellName: c.name,
-        leaderName: '',
+        leaderName: c.leaderName ?? '',
         visitorCount: c.currentCount,
         attendanceRate: 0,
       })),

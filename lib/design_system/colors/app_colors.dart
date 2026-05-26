@@ -55,7 +55,21 @@ abstract final class AppColors {
   static const Color backgroundDark = Color(0xFF0F172A);
   static const Color surfaceDark = Color(0xFF1E293B);
   static const Color surfaceVariantDark = Color(0xFF334155);
-  static const Color dividerDark = Color(0xFF334155);
+  static const Color dividerDark = Color(0xFF2D3748);
+
+  // ── Dark mode badge tokens ─────────────────────────────────────────────────
+  static const Color infoDarkBg = Color(0xFF1E3A5F);
+  static const Color infoDarkFg = Color(0xFF93C5FD);
+  static const Color successDarkBg = Color(0xFF064E3B);
+  static const Color successDarkFg = Color(0xFF6EE7B7);
+  static const Color warningDarkBg = Color(0xFF78350F);
+  static const Color warningDarkFg = Color(0xFFFCD34D);
+  static const Color errorDarkBg = Color(0xFF7F1D1D);
+  static const Color errorDarkFg = Color(0xFFFCA5A5);
+  static const Color neutralDarkBg = Color(0xFF374151);
+  static const Color neutralDarkFg = Color(0xFFD1D5DB);
+  static const Color primaryDarkBadgeBg = Color(0xFF1E3A8A);
+  static const Color primaryDarkBadgeFg = Color(0xFF93C5FD);
 
   // ── Text ───────────────────────────────────────────────────────────────────
   static const Color textPrimary = Color(0xFF111827);

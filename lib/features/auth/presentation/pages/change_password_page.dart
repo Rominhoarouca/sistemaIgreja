@@ -54,6 +54,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
+        elevation: 0,
         title: const Text('Alterar Senha'),
       ),
       body: SafeArea(

@@ -15,6 +15,7 @@ import '../features/notifications/presentation/pages/notifications_page.dart';
 import '../features/about/presentation/pages/about_page.dart';
 import '../features/dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../features/materials/presentation/pages/admin_materials_page.dart';
+import '../features/supervisor/presentation/pages/supervisor_home_page.dart';
 
 /// Public routes that can be accessed without authentication.
 const _publicRoutes = {AppRoutes.login, AppRoutes.register, '/forgot-password'};
@@ -43,9 +44,9 @@ GoRouter createRouter(AuthBloc authBloc) {
       if (!isAuthenticated && !isPublic) return AppRoutes.login;
 
       if (authState is AuthAuthenticated && isPublic) {
-        return authState.user.isAdmin
-            ? AppRoutes.adminDashboard
-            : AppRoutes.leaderHome;
+        if (authState.user.isAdmin) return AppRoutes.adminDashboard;
+        if (authState.user.isSupervisor) return AppRoutes.supervisorHome;
+        return AppRoutes.leaderHome;
       }
 
       return null;
@@ -70,6 +71,14 @@ GoRouter createRouter(AuthBloc authBloc) {
         name: 'forgot-password',
         pageBuilder: (context, state) =>
             const MaterialPage(child: ForgotPasswordPage()),
+      ),
+
+      // ── Supervisor ────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.supervisorHome,
+        name: 'supervisor-home',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SupervisorHomePage()),
       ),
 
       // ── Leader ────────────────────────────────────────────────────────

@@ -28,6 +28,11 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
       label: 'Visitantes',
     ),
     NavigationDestination(
+      icon: Icon(Icons.group_outlined),
+      selectedIcon: Icon(Icons.group),
+      label: 'Membros',
+    ),
+    NavigationDestination(
       icon: Icon(Icons.check_circle_outline),
       selectedIcon: Icon(Icons.check_circle),
       label: 'Presença',
@@ -65,6 +70,7 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
         index: _selectedTab,
         children: [
           const _LeaderVisitorsTab(),
+          const _CellMembersTab(),
           const _AttendanceTab(),
           const _MaterialsTab(),
           const _SpiritualHistoryTab(),
@@ -94,16 +100,19 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
   late final Dio _dio;
   final _searchCtrl = TextEditingController();
   String _query = '';
-  bool _showAll = true;
   bool _loading = true;
   String? _error;
+  // Primary cell id (first cell of leader) for assigning visitors
+  String? _cellId;
+  // All cell ids this leader manages
+  List<String> _myCellIds = [];
   List<_VisitorData> _allVisitors = [];
 
   @override
   void initState() {
     super.initState();
     _dio = DioClient(AuthStorage()).dio;
-    _loadVisitors();
+    _loadData();
   }
 
   @override
@@ -112,17 +121,29 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
     super.dispose();
   }
 
-  Future<void> _loadVisitors() async {
+  Future<void> _loadData() async {
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
-      final resp = await _dio.get('/visitors');
-      final data = (resp.data as Map<String, dynamic>)['data'] as List;
+      final results = await Future.wait([
+        _dio.get('/cells/my-cell'),
+        _dio.get('/visitors'),
+      ]);
+      final cellResp = results[0];
+      final visitorsResp = results[1];
+      // Backend now returns { cells: [...] }
+      final cellsRaw = (cellResp.data as Map<String, dynamic>)['cells'];
+      final List<dynamic> cellList = cellsRaw is List ? cellsRaw : <dynamic>[];
+      final myCellIds = cellList
+          .map((c) => (c as Map<String, dynamic>)['id'] as String)
+          .toList();
+      final data = (visitorsResp.data as Map<String, dynamic>)['data'] as List;
       if (!mounted) return;
       setState(() {
+        _myCellIds = myCellIds;
+        _cellId = myCellIds.isNotEmpty ? myCellIds.first : null;
         _allVisitors = data
             .map((e) => _VisitorData.fromJson(e as Map<String, dynamic>))
             .toList();
@@ -139,15 +160,46 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
     }
   }
 
-  List<_VisitorData> get _filtered {
+  List<_VisitorData> get _myCellVisitors {
+    if (_myCellIds.isEmpty) return [];
     final q = _query.toLowerCase();
-    final list = _allVisitors.where((v) {
+    return _allVisitors.where((v) {
+      if (!_myCellIds.contains(v.cellId)) return false;
       if (q.isEmpty) return true;
-      return v.name.toLowerCase().contains(q) ||
-          v.phone.contains(q) ||
-          v.neighborhood.toLowerCase().contains(q);
+      return v.name.toLowerCase().contains(q) || v.phone.contains(q);
     }).toList();
-    return _showAll ? list : list.take(5).toList();
+  }
+
+  List<_VisitorData> get _otherVisitors {
+    final q = _query.toLowerCase();
+    return _allVisitors.where((v) {
+      if (_myCellIds.contains(v.cellId)) return false;
+      if (q.isEmpty) return true;
+      return v.name.toLowerCase().contains(q) || v.phone.contains(q);
+    }).toList();
+  }
+
+  Future<void> _assignToCell(_VisitorData visitor) async {
+    final cid = _cellId;
+    if (cid == null) return;
+    try {
+      await _dio.patch(
+        '/visitors/${visitor.id}/assign-cell',
+        data: {'cellId': cid},
+      );
+      _loadData();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao vincular visitante',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -170,67 +222,127 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
               label: 'Tentar novamente',
               variant: AppButtonVariant.outline,
               isFullWidth: false,
-              onPressed: _loadVisitors,
+              onPressed: _loadData,
             ),
           ],
         ),
       );
     }
 
-    final filtered = _filtered;
+    final myCellList = _myCellVisitors;
+    final otherList = _otherVisitors;
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              AppSearchField(
-                hint: 'Pesquisar visitante...',
-                controller: _searchCtrl,
-                onChanged: (v) => setState(() => _query = v),
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  AppSearchField(
+                    hint: 'Pesquisar visitante...',
+                    controller: _searchCtrl,
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
+                  const SizedBox(height: AppSpacing.base),
+                  AppSectionHeader(title: 'Visitantes da Minha Célula'),
+                  const SizedBox(height: AppSpacing.sm),
+                ]),
               ),
-              const SizedBox(height: AppSpacing.base),
-              AppSectionHeader(
-                title: 'Visitantes Encaminhados',
-                actionLabel: _showAll ? 'Mostrar menos' : 'Ver todos',
-                onAction: () => setState(() => _showAll = !_showAll),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pagePaddingH,
               ),
-              const SizedBox(height: AppSpacing.sm),
-            ]),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.pagePaddingH,
-          ),
-          sliver: filtered.isEmpty
-              ? SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.xl),
-                    child: Center(
-                      child: Text(
-                        'Nenhum visitante encontrado',
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+              sliver: myCellList.isEmpty
+                  ? SliverToBoxAdapter(
+                      child: AppEmptyState(
+                        title: 'Nenhum visitante na célula',
+                        subtitle:
+                            'Cadastre um novo visitante ou vincule um visitante já cadastrado.',
+                        icon: Icons.people_outline,
+                        actionLabel: 'Novo visitante',
+                        action: () => _showNewVisitorSheet(context),
+                      ),
+                    )
+                  : SliverList.separated(
+                      itemCount: myCellList.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, i) => _VisitorListTile(
+                        visitor: myCellList[i],
+                        onOpenDetails: () => _openVisitorDetails(myCellList[i]),
                       ),
                     ),
-                  ),
-                )
-              : SliverList.separated(
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.sm),
-                  itemBuilder: (context, i) => _VisitorListTile(
-                    visitor: filtered[i],
-                    onOpenDetails: () => _openVisitorDetails(filtered[i]),
-                  ),
-                ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.pagePaddingH,
+                AppSpacing.xl,
+                AppSpacing.pagePaddingH,
+                AppSpacing.sm,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: AppSectionHeader(title: 'Outros Visitantes'),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pagePaddingH,
+              ),
+              sliver: otherList.isEmpty
+                  ? SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          top: AppSpacing.base,
+                          bottom: AppSpacing.xl,
+                        ),
+                        child: Text(
+                          'Nenhum outro visitante encontrado',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    )
+                  : SliverList.separated(
+                      itemCount: otherList.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, i) => _VisitorListTile(
+                        visitor: otherList[i],
+                        showAssignButton: true,
+                        onOpenDetails: () => _openVisitorDetails(otherList[i]),
+                        onAssign: () => _assignToCell(otherList[i]),
+                      ),
+                    ),
+            ),
+            const SliverPadding(
+              padding: EdgeInsets.only(bottom: AppSpacing.xl2),
+            ),
+          ],
         ),
-        const SliverPadding(padding: EdgeInsets.only(bottom: AppSpacing.xl)),
-      ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showNewVisitorSheet(context),
+        icon: const Icon(Icons.person_add_outlined),
+        label: const Text('Novo visitante'),
+      ),
     );
+  }
+
+  Future<void> _showNewVisitorSheet(BuildContext context) async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _NewVisitorSheet(dio: _dio, cellId: _cellId),
+    );
+    if (created == true) _loadData();
   }
 
   Future<void> _openVisitorDetails(_VisitorData visitor) async {
@@ -240,11 +352,12 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _VisitorDetailSheet(visitor: visitor, dio: _dio),
+      builder: (_) =>
+          _VisitorDetailSheet(visitor: visitor, dio: _dio, cellId: _cellId),
     );
 
     if (changed == true) {
-      _loadVisitors();
+      _loadData();
     }
   }
 }
@@ -299,10 +412,17 @@ class _VisitorData {
 }
 
 class _VisitorListTile extends StatelessWidget {
-  const _VisitorListTile({required this.visitor, required this.onOpenDetails});
+  const _VisitorListTile({
+    required this.visitor,
+    required this.onOpenDetails,
+    this.showAssignButton = false,
+    this.onAssign,
+  });
 
   final _VisitorData visitor;
   final VoidCallback onOpenDetails;
+  final bool showAssignButton;
+  final VoidCallback? onAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -324,25 +444,202 @@ class _VisitorListTile extends StatelessWidget {
               ],
             ),
           ),
-          AppButton(
-            label: 'Ver detalhes',
-            variant: AppButtonVariant.ghost,
-            size: AppButtonSize.sm,
-            isFullWidth: false,
-            suffixIcon: Icons.chevron_right,
-            onPressed: onOpenDetails,
-          ),
+          if (showAssignButton && onAssign != null)
+            AppButton(
+              label: 'Vincular',
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
+              isFullWidth: false,
+              prefixIcon: Icons.link_outlined,
+              onPressed: onAssign,
+            )
+          else
+            AppButton(
+              label: 'Ver detalhes',
+              variant: AppButtonVariant.ghost,
+              size: AppButtonSize.sm,
+              isFullWidth: false,
+              suffixIcon: Icons.chevron_right,
+              onPressed: onOpenDetails,
+            ),
         ],
       ),
     );
   }
 }
 
+// ── New Visitor Sheet ──────────────────────────────────────────────────────
+
+class _NewVisitorSheet extends StatefulWidget {
+  const _NewVisitorSheet({required this.dio, this.cellId});
+
+  final Dio dio;
+  final String? cellId;
+
+  @override
+  State<_NewVisitorSheet> createState() => _NewVisitorSheetState();
+}
+
+class _NewVisitorSheetState extends State<_NewVisitorSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _neighborhoodCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _neighborhoodCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _saving = true);
+    try {
+      await widget.dio.post(
+        '/visitors',
+        data: {
+          'name': _nameCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
+          if (_neighborhoodCtrl.text.trim().isNotEmpty)
+            'neighborhood': _neighborhoodCtrl.text.trim(),
+          if (_addressCtrl.text.trim().isNotEmpty)
+            'address': _addressCtrl.text.trim(),
+          if (widget.cellId != null) 'cellId': widget.cellId,
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao cadastrar visitante',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, controller) => SingleChildScrollView(
+          controller: controller,
+          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.grey300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                Text('Novo Visitante', style: AppTypography.headlineSmall),
+                if (widget.cellId != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'O visitante será vinculado automaticamente à sua célula.',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                TextFormField(
+                  controller: _nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome completo *',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (v) => (v == null || v.trim().length < 2)
+                      ? 'Informe o nome'
+                      : null,
+                ),
+                const SizedBox(height: AppSpacing.base),
+                TextFormField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Telefone *',
+                    prefixIcon: Icon(Icons.phone_outlined),
+                  ),
+                  validator: (v) => (v == null || v.trim().length < 8)
+                      ? 'Informe o telefone'
+                      : null,
+                ),
+                const SizedBox(height: AppSpacing.base),
+                TextFormField(
+                  controller: _neighborhoodCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Bairro',
+                    prefixIcon: Icon(Icons.location_city_outlined),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.base),
+                TextFormField(
+                  controller: _addressCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Endereço',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                AppButton(
+                  label: _saving ? 'Salvando...' : 'Cadastrar visitante',
+                  prefixIcon: Icons.check,
+                  onPressed: _saving ? null : _save,
+                ),
+                const SizedBox(height: AppSpacing.xl2),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Visitor Detail Sheet ───────────────────────────────────────────────────
+
 class _VisitorDetailSheet extends StatefulWidget {
-  const _VisitorDetailSheet({required this.visitor, required this.dio});
+  const _VisitorDetailSheet({
+    required this.visitor,
+    required this.dio,
+    this.cellId,
+  });
 
   final _VisitorData visitor;
   final Dio dio;
+  final String? cellId;
 
   @override
   State<_VisitorDetailSheet> createState() => _VisitorDetailSheetState();
@@ -352,11 +649,37 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
   late String _status;
   bool _updatingStatus = false;
   bool _converting = false;
+  bool _assigningCell = false;
 
   @override
   void initState() {
     super.initState();
     _status = widget.visitor.status;
+  }
+
+  Future<void> _assignCell(String? cellId) async {
+    setState(() => _assigningCell = true);
+    try {
+      await widget.dio.patch(
+        '/visitors/${widget.visitor.id}/assign-cell',
+        data: {'cellId': cellId},
+      );
+      if (!mounted) return;
+      setState(() => _assigningCell = false);
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _assigningCell = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao atualizar célula',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _updateStatus(String status) async {
@@ -517,6 +840,30 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
               ),
 
               const SizedBox(height: AppSpacing.base),
+
+              if (widget.cellId != null) ...[
+                if (widget.visitor.cellId == widget.cellId)
+                  AppButton(
+                    label: _assigningCell
+                        ? 'Removendo...'
+                        : 'Remover da minha célula',
+                    variant: AppButtonVariant.outline,
+                    prefixIcon: Icons.link_off_outlined,
+                    onPressed: _assigningCell ? null : () => _assignCell(null),
+                  )
+                else
+                  AppButton(
+                    label: _assigningCell
+                        ? 'Vinculando...'
+                        : 'Vincular à minha célula',
+                    variant: AppButtonVariant.secondary,
+                    prefixIcon: Icons.link_outlined,
+                    onPressed: _assigningCell
+                        ? null
+                        : () => _assignCell(widget.cellId),
+                  ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
 
               AppButton(
                 label: widget.visitor.memberId != null
@@ -840,7 +1187,403 @@ class _StatusChip extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAB 2: ATTENDANCE
+// TAB 2: CELL MEMBERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _CellMembersTab extends StatefulWidget {
+  const _CellMembersTab();
+
+  @override
+  State<_CellMembersTab> createState() => _CellMembersTabState();
+}
+
+class _CellMember {
+  final String id;
+  final String name;
+  final String phone;
+  final String cellId;
+  final String cellName;
+
+  const _CellMember({
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.cellId,
+    required this.cellName,
+  });
+
+  factory _CellMember.fromJson(
+    Map<String, dynamic> json,
+    String cellId,
+    String cellName,
+  ) => _CellMember(
+    id: json['id'] as String,
+    name: json['name'] as String? ?? '',
+    phone: json['phone'] as String? ?? '',
+    cellId: cellId,
+    cellName: cellName,
+  );
+}
+
+class _CellInfo {
+  final String id;
+  final String name;
+
+  const _CellInfo({required this.id, required this.name});
+}
+
+class _CellMembersTabState extends State<_CellMembersTab> {
+  late final Dio _dio;
+  bool _loading = true;
+  String? _error;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  List<_CellInfo> _cells = [];
+  List<_CellMember> _members = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = DioClient(AuthStorage()).dio;
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final cellResp = await _dio.get('/cells/my-cell');
+      final cellsRaw =
+          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
+      final cells = cellsRaw
+          .map(
+            (c) => _CellInfo(
+              id: (c as Map<String, dynamic>)['id'] as String,
+              name: c['name'] as String? ?? '',
+            ),
+          )
+          .toList();
+
+      final allMembers = <_CellMember>[];
+      for (final cell in cells) {
+        final membResp = await _dio.get('/cells/${cell.id}/members');
+        final membList =
+            (membResp.data as Map<String, dynamic>)['members'] as List? ?? [];
+        allMembers.addAll(
+          membList.map(
+            (m) => _CellMember.fromJson(
+              m as Map<String, dynamic>,
+              cell.id,
+              cell.name,
+            ),
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _cells = cells;
+        _members = allMembers;
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            e.response?.data?['error']?['message'] as String? ??
+            'Erro ao carregar membros';
+        _loading = false;
+      });
+    }
+  }
+
+  List<_CellMember> get _filtered {
+    final q = _query.toLowerCase();
+    if (q.isEmpty) return _members;
+    return _members
+        .where((m) => m.name.toLowerCase().contains(q) || m.phone.contains(q))
+        .toList();
+  }
+
+  Future<void> _addMember(String cellId) async {
+    final added = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _AddMemberSheet(dio: _dio, cellId: cellId),
+    );
+    if (added == true) _loadData();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadData,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final filtered = _filtered;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+          children: [
+            AppSearchField(
+              hint: 'Pesquisar membro...',
+              controller: _searchCtrl,
+              onChanged: (v) => setState(() => _query = v),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppSectionHeader(title: 'Membros (${filtered.length})'),
+            const SizedBox(height: AppSpacing.sm),
+            if (filtered.isEmpty)
+              AppEmptyState(
+                title: 'Nenhum membro cadastrado',
+                subtitle:
+                    'Adicione membros à sua célula usando o botão abaixo.',
+                icon: Icons.group_outlined,
+              )
+            else
+              ...filtered.map(
+                (m) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: AppCard(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Row(
+                      children: [
+                        AppAvatar(
+                          initials: m.name
+                              .split(' ')
+                              .map((e) => e[0])
+                              .take(2)
+                              .join(),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(m.name, style: AppTypography.titleSmall),
+                              const SizedBox(height: AppSpacing.xs2),
+                              Text(
+                                m.phone,
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              if (_cells.length > 1)
+                                Text(
+                                  m.cellName,
+                                  style: AppTypography.bodySmall.copyWith(
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      floatingActionButton: _cells.isEmpty
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _cells.length == 1
+                  ? _addMember(_cells.first.id)
+                  : _showCellPicker(context),
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Adicionar membro'),
+            ),
+    );
+  }
+
+  Future<void> _showCellPicker(BuildContext context) async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('Selecionar célula'),
+        children: _cells
+            .map(
+              (c) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, c.id),
+                child: Text(c.name),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (picked != null) _addMember(picked);
+  }
+}
+
+// ── Add member sheet ────────────────────────────────────────────────────────
+
+class _AddMemberSheet extends StatefulWidget {
+  const _AddMemberSheet({required this.dio, required this.cellId});
+
+  final Dio dio;
+  final String cellId;
+
+  @override
+  State<_AddMemberSheet> createState() => _AddMemberSheetState();
+}
+
+class _AddMemberSheetState extends State<_AddMemberSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _saving = true);
+    try {
+      await widget.dio.post(
+        '/cells/${widget.cellId}/members',
+        data: {
+          'name': _nameCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
+          if (_emailCtrl.text.trim().isNotEmpty)
+            'email': _emailCtrl.text.trim(),
+          if (_addressCtrl.text.trim().isNotEmpty)
+            'address': _addressCtrl.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao adicionar membro',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.pagePaddingH,
+        AppSpacing.md,
+        AppSpacing.pagePaddingH,
+        MediaQuery.of(context).viewInsets.bottom + AppSpacing.xl,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppSpacing.base),
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text('Adicionar Membro', style: AppTypography.titleMedium),
+            const SizedBox(height: AppSpacing.base),
+            AppTextField(
+              label: 'Nome completo',
+              controller: _nameCtrl,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Informe o nome' : null,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppTextField(
+              label: 'Telefone',
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              validator: (v) => (v == null || v.trim().length < 8)
+                  ? 'Informe o telefone'
+                  : null,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppTextField(
+              label: 'E-mail (opcional)',
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppTextField(
+              label: 'Endereço (opcional)',
+              controller: _addressCtrl,
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Salvar',
+              onPressed: _saving ? null : _save,
+              isLoading: _saving,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB 3: ATTENDANCE
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _AttendanceTab extends StatefulWidget {
@@ -851,129 +1594,178 @@ class _AttendanceTab extends StatefulWidget {
 }
 
 class _AttendanceTabState extends State<_AttendanceTab> {
-  final List<_MeetingData> _meetings = [
-    _MeetingData(
-      date: DateTime.now(),
-      attendees: ['Maria Fernandes', 'Paulo Santos', 'Ana Lima'],
-      total: 5,
-    ),
-    _MeetingData(
-      date: DateTime.now().subtract(const Duration(days: 7)),
-      attendees: [
-        'Maria Fernandes',
-        'Carlos Souza',
-        'Beatriz Costa',
-        'Rodrigo Alves',
-      ],
-      total: 5,
-    ),
-  ];
+  late final Dio _dio;
+  bool _loading = true;
+  String? _error;
+  String? _cellId;
+  List<Map<String, dynamic>> _meetings = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = DioClient(AuthStorage()).dio;
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final cellResp = await _dio.get('/cells/my-cell');
+      final cell =
+          (cellResp.data as Map<String, dynamic>)['cell']
+              as Map<String, dynamic>;
+      final cellId = cell['id'] as String;
+      final meetingsResp = await _dio.get('/attendance/cell/$cellId/meetings');
+      final meetings =
+          ((meetingsResp.data as Map<String, dynamic>)['meetings'] as List)
+              .cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      setState(() {
+        _cellId = cellId;
+        _meetings = meetings;
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            e.response?.data?['error']?['message'] as String? ??
+            'Erro ao carregar presenças';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              AppSectionHeader(
-                title: 'Registro de Presença',
-                actionLabel: 'Novo encontro',
-                onAction: () => _showNewMeetingSheet(context),
-              ),
-              const SizedBox(height: AppSpacing.base),
-              ..._meetings.map(
-                (m) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _AttendanceMeetingCard(
-                    meeting: m,
-                    onRegister: () => _showRegisterSheet(context, m),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-            ]),
-          ),
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadData,
+            ),
+          ],
         ),
-      ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                AppSectionHeader(
+                  title: 'Registro de Presença',
+                  actionLabel: 'Novo encontro',
+                  onAction: () => _showNewMeetingSheet(context),
+                ),
+                const SizedBox(height: AppSpacing.base),
+                if (_meetings.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xl),
+                    child: Center(
+                      child: Text(
+                        'Nenhum encontro registrado ainda.',
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ..._meetings.map(
+                    (m) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: _MeetingSummaryCard(
+                        meeting: m,
+                        onTap: () => _openMeetingDetails(m),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: AppSpacing.xl),
+              ]),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   void _showNewMeetingSheet(BuildContext context) {
-    showModalBottomSheet<void>(
+    final cid = _cellId;
+    if (cid == null) return;
+    showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _NewMeetingSheet(
-        onConfirm: (date) {
-          setState(() {
-            _meetings.insert(
-              0,
-              _MeetingData(date: date, attendees: [], total: 5),
-            );
-          });
-        },
-      ),
-    );
+      builder: (_) => _NewMeetingSheet(dio: _dio, cellId: cid),
+    ).then((created) {
+      if (created == true) _loadData();
+    });
   }
 
-  void _showRegisterSheet(BuildContext context, _MeetingData meeting) {
-    showModalBottomSheet<void>(
+  Future<void> _openMeetingDetails(Map<String, dynamic> meeting) async {
+    final cid = _cellId;
+    if (cid == null) return;
+    final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _RegisterAttendanceSheet(
-        meeting: meeting,
-        onSave: (attendees) {
-          setState(() => meeting.attendees = attendees);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Presença registrada: ${attendees.length} membros'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        },
+      builder: (_) => _MeetingAttendanceSheet(
+        dio: _dio,
+        cellId: cid,
+        meetingDateIso: meeting['meetingDate'] as String,
       ),
     );
+
+    if (changed == true) {
+      _loadData();
+    }
   }
 }
 
-class _MeetingData {
-  final DateTime date;
-  List<String> attendees;
-  final int total;
+/// Card that shows real meeting summary data from the API.
+class _MeetingSummaryCard extends StatelessWidget {
+  const _MeetingSummaryCard({required this.meeting, this.onTap});
 
-  _MeetingData({
-    required this.date,
-    required this.attendees,
-    required this.total,
-  });
-}
-
-class _AttendanceMeetingCard extends StatelessWidget {
-  const _AttendanceMeetingCard({
-    required this.meeting,
-    required this.onRegister,
-  });
-
-  final _MeetingData meeting;
-  final VoidCallback onRegister;
+  final Map<String, dynamic> meeting;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final d = meeting.date;
+    final d = DateTime.parse(meeting['meetingDate'] as String).toLocal();
     final label =
         'Encontro de ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    final present = meeting.attendees.length;
-    final pct = meeting.total > 0 ? (present / meeting.total * 100).round() : 0;
+    final total = (meeting['total'] as num).toInt();
+    final present = (meeting['present'] as num).toInt();
+    final pct = total > 0 ? (present / total * 100).round() : 0;
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -985,29 +1777,20 @@ class _AttendanceMeetingCard extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(child: Text(label, style: AppTypography.titleSmall)),
-              AppButton(
-                label: 'Registrar',
-                size: AppButtonSize.sm,
-                isFullWidth: false,
-                variant: AppButtonVariant.secondary,
-                onPressed: onRegister,
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              const SizedBox(width: 36),
+              Text(
+                '$present de $total presentes ($pct%)',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
-          if (present > 0) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                const SizedBox(width: 36),
-                Text(
-                  '$present de ${meeting.total} presentes ($pct%)',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
@@ -1015,9 +1798,10 @@ class _AttendanceMeetingCard extends StatelessWidget {
 }
 
 class _NewMeetingSheet extends StatefulWidget {
-  const _NewMeetingSheet({required this.onConfirm});
+  const _NewMeetingSheet({required this.dio, required this.cellId});
 
-  final void Function(DateTime) onConfirm;
+  final Dio dio;
+  final String cellId;
 
   @override
   State<_NewMeetingSheet> createState() => _NewMeetingSheetState();
@@ -1025,6 +1809,31 @@ class _NewMeetingSheet extends StatefulWidget {
 
 class _NewMeetingSheetState extends State<_NewMeetingSheet> {
   DateTime _selectedDate = DateTime.now();
+  bool _saving = false;
+
+  Future<void> _create() async {
+    setState(() => _saving = true);
+    try {
+      await widget.dio.post(
+        '/attendance/cell/${widget.cellId}/meetings',
+        data: {'meetingDate': _selectedDate.toIso8601String()},
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao criar encontro',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1087,10 +1896,8 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
             AppButton(
               label: 'Criar encontro',
               prefixIcon: Icons.add,
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onConfirm(_selectedDate);
-              },
+              isLoading: _saving,
+              onPressed: _saving ? null : _create,
             ),
             const SizedBox(height: AppSpacing.base),
           ],
@@ -1100,51 +1907,202 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
   }
 }
 
-class _RegisterAttendanceSheet extends StatefulWidget {
-  const _RegisterAttendanceSheet({required this.meeting, required this.onSave});
+class _MeetingAttendanceSheet extends StatefulWidget {
+  const _MeetingAttendanceSheet({
+    required this.dio,
+    required this.cellId,
+    required this.meetingDateIso,
+  });
 
-  final _MeetingData meeting;
-  final void Function(List<String>) onSave;
+  final Dio dio;
+  final String cellId;
+  final String meetingDateIso;
 
   @override
-  State<_RegisterAttendanceSheet> createState() =>
-      _RegisterAttendanceSheetState();
+  State<_MeetingAttendanceSheet> createState() =>
+      _MeetingAttendanceSheetState();
 }
 
-class _RegisterAttendanceSheetState extends State<_RegisterAttendanceSheet> {
-  static const _members = [
-    'Maria Fernandes',
-    'Paulo Santos',
-    'Ana Lima',
-    'Carlos Souza',
-    'Beatriz Costa',
-  ];
+class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
 
-  late Set<String> _present;
+  List<Map<String, dynamic>> _visitors = [];
+  Set<String> _presentVisitorIds = <String>{};
+  Set<String> _initialPresentVisitorIds = <String>{};
 
   @override
   void initState() {
     super.initState();
-    _present = Set.from(widget.meeting.attendees);
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        widget.dio.get(
+          '/visitors',
+          queryParameters: {'cellId': widget.cellId, 'pageSize': 100},
+        ),
+        widget.dio.get(
+          '/attendance/cell/${widget.cellId}',
+          queryParameters: {'date': widget.meetingDateIso},
+        ),
+      ]);
+
+      final visitorsResp = results[0];
+      final attendanceResp = results[1];
+
+      final visitorsData = visitorsResp.data as Map<String, dynamic>;
+      final rawVisitors =
+          (visitorsData['data'] ?? visitorsData['visitors'] ?? []) as List;
+      final visitors = rawVisitors.cast<Map<String, dynamic>>();
+
+      final attendances =
+          ((attendanceResp.data as Map<String, dynamic>)['attendances'] as List)
+              .cast<Map<String, dynamic>>();
+
+      final presentIds = attendances
+          .where((a) => (a['isPresent'] as bool?) ?? false)
+          .map((a) => a['visitorId'] as String)
+          .toSet();
+
+      if (!mounted) return;
+      setState(() {
+        _visitors = visitors;
+        _presentVisitorIds = presentIds;
+        _initialPresentVisitorIds = Set<String>.from(presentIds);
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            e.response?.data?['error']?['message'] as String? ??
+            'Erro ao carregar participantes';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _reloadVisitorsOnly() async {
+    try {
+      final resp = await widget.dio.get(
+        '/visitors',
+        queryParameters: {'cellId': widget.cellId, 'pageSize': 100},
+      );
+      final body = resp.data as Map<String, dynamic>;
+      final rawVisitors = (body['data'] ?? body['visitors'] ?? []) as List;
+      final visitors = rawVisitors.cast<Map<String, dynamic>>();
+      final visitorIds = visitors.map((v) => v['id'] as String).toSet();
+
+      if (!mounted) return;
+      setState(() {
+        _visitors = visitors;
+        _presentVisitorIds = _presentVisitorIds
+            .where(visitorIds.contains)
+            .toSet();
+        _initialPresentVisitorIds = _initialPresentVisitorIds
+            .where(visitorIds.contains)
+            .toSet();
+      });
+    } catch (_) {
+      // Keep current list if refresh fails after creating visitor.
+    }
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+
+    final changedVisitorIds = _visitors
+        .map((v) => v['id'] as String)
+        .where(
+          (id) =>
+              _presentVisitorIds.contains(id) !=
+              _initialPresentVisitorIds.contains(id),
+        )
+        .toList();
+
+    if (changedVisitorIds.isEmpty) {
+      if (!mounted) return;
+      Navigator.of(context).pop(false);
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await Future.wait(
+        changedVisitorIds.map(
+          (visitorId) => widget.dio.post(
+            '/attendance',
+            data: {
+              'visitorId': visitorId,
+              'cellId': widget.cellId,
+              'meetingDate': widget.meetingDateIso,
+              'isPresent': _presentVisitorIds.contains(visitorId),
+            },
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao salvar presenças',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showAddVisitorSheet() async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _NewVisitorSheet(dio: widget.dio, cellId: widget.cellId),
+    );
+
+    if (created == true) {
+      _reloadVisitorsOnly();
+    }
+  }
+
+  String _formatMeetingDate() {
+    final d = DateTime.parse(widget.meetingDateIso).toLocal();
+    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final d = widget.meeting.date;
-    final label =
-        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (_, controller) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.pagePaddingH,
-              vertical: AppSpacing.base,
-            ),
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.45,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, controller) => SingleChildScrollView(
+            controller: controller,
+            padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1159,63 +2117,109 @@ class _RegisterAttendanceSheetState extends State<_RegisterAttendanceSheet> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.base),
-                Text('Registrar Presença', style: AppTypography.headlineSmall),
+                Text('Participantes', style: AppTypography.headlineSmall),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Encontro de $label',
+                  'Encontro de ${_formatMeetingDate()}',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 ),
+                const SizedBox(height: AppSpacing.base),
+                AppButton(
+                  label: 'Incluir visitante',
+                  variant: AppButtonVariant.outline,
+                  isFullWidth: false,
+                  prefixIcon: Icons.person_add_outlined,
+                  onPressed: _showAddVisitorSheet,
+                ),
+                const SizedBox(height: AppSpacing.base),
+                if (_loading)
+                  const Center(child: CircularProgressIndicator())
+                else if (_error != null)
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _error!,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.base),
+                        AppButton(
+                          label: 'Tentar novamente',
+                          variant: AppButtonVariant.outline,
+                          isFullWidth: false,
+                          onPressed: _loadInitialData,
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_visitors.isEmpty)
+                  AppEmptyState(
+                    title: 'Nenhum visitante na célula',
+                    subtitle: 'Use o botão acima para incluir visitante.',
+                    icon: Icons.people_outline,
+                  )
+                else
+                  Column(
+                    children: _visitors.map((visitor) {
+                      final visitorId = visitor['id'] as String;
+                      final name = (visitor['name'] as String?) ?? 'Sem nome';
+                      final checked = _presentVisitorIds.contains(visitorId);
+
+                      return AppCard(
+                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        onTap: () {
+                          setState(() {
+                            if (checked) {
+                              _presentVisitorIds.remove(visitorId);
+                            } else {
+                              _presentVisitorIds.add(visitorId);
+                            }
+                          });
+                        },
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: AppTypography.titleSmall,
+                              ),
+                            ),
+                            Checkbox(
+                              value: checked,
+                              onChanged: (v) {
+                                setState(() {
+                                  if (v ?? false) {
+                                    _presentVisitorIds.add(visitorId);
+                                  } else {
+                                    _presentVisitorIds.remove(visitorId);
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                const SizedBox(height: AppSpacing.xl),
+                AppButton(
+                  label: 'Salvar presença',
+                  prefixIcon: Icons.check_circle_outline,
+                  isLoading: _saving,
+                  onPressed: (_loading || _saving || _error != null)
+                      ? null
+                      : _save,
+                ),
+                const SizedBox(height: AppSpacing.base),
               ],
             ),
           ),
-          Expanded(
-            child: ListView.separated(
-              controller: controller,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pagePaddingH,
-              ),
-              itemCount: _members.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, i) {
-                final member = _members[i];
-                final present = _present.contains(member);
-                return CheckboxListTile(
-                  value: present,
-                  onChanged: (v) => setState(() {
-                    if (v!) {
-                      _present.add(member);
-                    } else {
-                      _present.remove(member);
-                    }
-                  }),
-                  title: Text(member, style: AppTypography.titleSmall),
-                  secondary: AppAvatar(
-                    initials: member.split(' ').map((e) => e[0]).take(2).join(),
-                    size: 36,
-                  ),
-                  activeColor: AppColors.primary,
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.pagePaddingH,
-              AppSpacing.base,
-              AppSpacing.pagePaddingH,
-              AppSpacing.pagePaddingH + MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: AppButton(
-              label: 'Salvar presença (${_present.length}/${_members.length})',
-              prefixIcon: Icons.save_outlined,
-              onPressed: () {
-                Navigator.of(context).pop();
-                widget.onSave(_present.toList());
-              },
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1288,13 +2292,31 @@ class _MaterialsTabState extends State<_MaterialsTab> {
       _error = null;
     });
     try {
-      final resp = await _dio.get('/materials');
-      final data = (resp.data as Map<String, dynamic>)['materials'] as List;
+      // Get leader's cells first
+      final cellResp = await _dio.get('/cells/my-cell');
+      final cellsRaw =
+          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
+      final cellIds = cellsRaw
+          .map((c) => (c as Map<String, dynamic>)['id'] as String)
+          .toList();
+
+      // Load materials for each cell
+      final allMaterials = <_MaterialData>[];
+      for (final cellId in cellIds) {
+        final resp = await _dio.get(
+          '/materials',
+          queryParameters: {'cellId': cellId},
+        );
+        final data =
+            (resp.data as Map<String, dynamic>)['materials'] as List? ?? [];
+        allMaterials.addAll(
+          data.map((e) => _MaterialData.fromJson(e as Map<String, dynamic>)),
+        );
+      }
+
       if (!mounted) return;
       setState(() {
-        _materials = data
-            .map((e) => _MaterialData.fromJson(e as Map<String, dynamic>))
-            .toList();
+        _materials = allMaterials;
         _loading = false;
       });
     } on DioException catch (e) {
@@ -1501,134 +2523,178 @@ class _SpiritualHistoryTab extends StatefulWidget {
 }
 
 class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
-  final List<_HistoryEvent> _events = [
-    _HistoryEvent(
-      visitor: 'Maria Fernandes',
-      type: 'enviado_batismo',
-      date: DateTime.now().subtract(const Duration(days: 10)),
-      description: 'Encaminhada para batismo em água.',
-    ),
-    _HistoryEvent(
-      visitor: 'Paulo Santos',
-      type: 'enviado_treinamento_lider',
-      date: DateTime.now().subtract(const Duration(days: 30)),
-      description: 'Em treinamento de líderes.',
-    ),
-    _HistoryEvent(
-      visitor: 'Ana Lima',
-      type: 'concluiu_treinamento',
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      description: '',
-    ),
-  ];
+  late final Dio _dio;
+  bool _loading = true;
+  String? _error;
+  String? _cellId;
+  List<Map<String, dynamic>> _events = [];
+
+  static const _typeLabels = {
+    'enviado_batismo': 'Enviado p/ Batismo',
+    'batizado': 'Batizado',
+    'enviado_treinamento_lider': 'Em Treinamento Líder',
+    'concluiu_treinamento': 'Concluiu Treinamento',
+    'tornou_se_lider': 'Tornou-se Líder',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = DioClient(AuthStorage()).dio;
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final cellResp = await _dio.get('/cells/my-cell');
+      final cell =
+          (cellResp.data as Map<String, dynamic>)['cell']
+              as Map<String, dynamic>;
+      final cellId = cell['id'] as String;
+      final histResp = await _dio.get('/spiritual-history/cell/$cellId');
+      final history =
+          ((histResp.data as Map<String, dynamic>)['history'] as List)
+              .cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      setState(() {
+        _cellId = cellId;
+        _events = history;
+        _loading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            e.response?.data?['error']?['message'] as String? ??
+            'Erro ao carregar histórico';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-      children: [
-        AppSectionHeader(
-          title: 'Histórico Espiritual',
-          actionLabel: 'Adicionar',
-          onAction: () => _showAddSheet(context),
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadData,
+            ),
+          ],
         ),
-        const SizedBox(height: AppSpacing.base),
-        if (_events.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xl),
-            child: Center(
-              child: Text(
-                'Nenhum evento registrado',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        children: [
+          AppSectionHeader(
+            title: 'Histórico Espiritual',
+            actionLabel: 'Adicionar',
+            onAction: () => _showAddSheet(context),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          if (_events.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xl),
+              child: Center(
+                child: Text(
+                  'Nenhum evento registrado',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
+            )
+          else
+            ..._events.map(
+              (e) => _HistoryEventCard(
+                event: e,
+                typeLabels: _typeLabels,
+                onTap: () => _showDetail(context, e),
+              ),
             ),
-          )
-        else
-          ..._events.map(
-            (e) => _HistoryEventCard(
-              event: e,
-              onTap: () => _showDetail(context, e),
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
   void _showAddSheet(BuildContext context) {
-    showModalBottomSheet<void>(
+    final cid = _cellId;
+    if (cid == null) return;
+    showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AddHistoryEventSheet(
-        onAdd: (event) => setState(() => _events.insert(0, event)),
-      ),
-    );
+      builder: (_) => _AddHistoryEventSheet(dio: _dio, cellId: cid),
+    ).then((added) {
+      if (added == true) _loadData();
+    });
   }
 
-  void _showDetail(BuildContext context, _HistoryEvent event) {
+  void _showDetail(BuildContext context, Map<String, dynamic> event) {
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _HistoryDetailSheet(event: event),
+      builder: (_) =>
+          _HistoryDetailSheet(event: event, typeLabels: _typeLabels),
     );
   }
 }
 
-class _HistoryEvent {
-  final String visitor;
-  final String type;
-  final DateTime date;
-  final String description;
-
-  const _HistoryEvent({
-    required this.visitor,
-    required this.type,
-    required this.date,
-    required this.description,
-  });
-}
-
 class _HistoryEventCard extends StatelessWidget {
-  const _HistoryEventCard({required this.event, required this.onTap});
+  const _HistoryEventCard({
+    required this.event,
+    required this.typeLabels,
+    required this.onTap,
+  });
 
-  final _HistoryEvent event;
+  final Map<String, dynamic> event;
+  final Map<String, String> typeLabels;
   final VoidCallback onTap;
 
-  static const _typeInfo = {
-    'enviado_batismo': (
-      Icons.water_outlined,
-      AppColors.primary,
-      'Enviado p/ Batismo',
-    ),
-    'batizado': (Icons.water_drop_outlined, AppColors.info, 'Batizado'),
-    'enviado_treinamento_lider': (
-      Icons.school_outlined,
-      AppColors.accent,
-      'Em Treinamento Líder',
-    ),
+  static const _typeIcons = {
+    'enviado_batismo': (Icons.water_outlined, AppColors.primary),
+    'batizado': (Icons.water_drop_outlined, AppColors.info),
+    'enviado_treinamento_lider': (Icons.school_outlined, AppColors.accent),
     'concluiu_treinamento': (
       Icons.workspace_premium_outlined,
       AppColors.success,
-      'Concluiu Treinamento',
     ),
-    'tornou_se_lider': (
-      Icons.star_outline,
-      AppColors.warning,
-      'Tornou-se Líder',
-    ),
+    'tornou_se_lider': (Icons.star_outline, AppColors.warning),
   };
 
   @override
   Widget build(BuildContext context) {
-    final info =
-        _typeInfo[event.type] ??
-        (Icons.history_outlined, AppColors.grey500, event.type);
+    final type = event['eventType'] as String? ?? '';
+    final visitorName = event['visitorName'] as String? ?? 'Visitante';
+    final label = typeLabels[type] ?? type.replaceAll('_', ' ');
+    final iconData =
+        _typeIcons[type] ?? (Icons.history_outlined, AppColors.grey500);
+    final d = DateTime.parse(event['date'] as String).toLocal();
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -1638,19 +2704,19 @@ class _HistoryEventCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
-              color: info.$2.withValues(alpha: 0.1),
+              color: iconData.$2.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
             ),
-            child: Icon(info.$1, color: info.$2, size: 20),
+            child: Icon(iconData.$1, color: iconData.$2, size: 20),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(info.$3, style: AppTypography.titleSmall),
+                Text(label, style: AppTypography.titleSmall),
                 Text(
-                  event.visitor,
+                  visitorName,
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -1662,7 +2728,7 @@ class _HistoryEventCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${event.date.day.toString().padLeft(2, '0')}/${event.date.month.toString().padLeft(2, '0')}',
+                '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}',
                 style: AppTypography.labelSmall.copyWith(
                   color: AppColors.grey400,
                 ),
@@ -1677,9 +2743,10 @@ class _HistoryEventCard extends StatelessWidget {
 }
 
 class _HistoryDetailSheet extends StatelessWidget {
-  const _HistoryDetailSheet({required this.event});
+  const _HistoryDetailSheet({required this.event, required this.typeLabels});
 
-  final _HistoryEvent event;
+  final Map<String, dynamic> event;
+  final Map<String, String> typeLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -1702,51 +2769,61 @@ class _HistoryDetailSheet extends StatelessWidget {
           const SizedBox(height: AppSpacing.xl),
           Text('Detalhe do Evento', style: AppTypography.headlineSmall),
           const SizedBox(height: AppSpacing.xl),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: const Icon(
-                    Icons.person_outline,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Visitante'),
-                  subtitle: Text(event.visitor),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    Icons.category_outlined,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Tipo de evento'),
-                  subtitle: Text(event.type.replaceAll('_', ' ')),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    Icons.calendar_today_outlined,
-                    color: AppColors.primary,
-                  ),
-                  title: const Text('Data'),
-                  subtitle: Text(
-                    '${event.date.day.toString().padLeft(2, '0')}/${event.date.month.toString().padLeft(2, '0')}/${event.date.year}',
-                  ),
-                ),
-                if (event.description.isNotEmpty) ...[
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.notes_outlined,
-                      color: AppColors.primary,
+          Builder(
+            builder: (context) {
+              final type = event['eventType'] as String? ?? '';
+              final visitorName =
+                  event['visitorName'] as String? ?? 'Visitante';
+              final label = typeLabels[type] ?? type.replaceAll('_', ' ');
+              final d = DateTime.parse(event['date'] as String).toLocal();
+              final description = event['description'] as String? ?? '';
+              return AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.person_outline,
+                        color: AppColors.primary,
+                      ),
+                      title: const Text('Visitante'),
+                      subtitle: Text(visitorName),
                     ),
-                    title: const Text('Descrição'),
-                    subtitle: Text(event.description),
-                  ),
-                ],
-              ],
-            ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.category_outlined,
+                        color: AppColors.primary,
+                      ),
+                      title: const Text('Tipo de evento'),
+                      subtitle: Text(label),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today_outlined,
+                        color: AppColors.primary,
+                      ),
+                      title: const Text('Data'),
+                      subtitle: Text(
+                        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}',
+                      ),
+                    ),
+                    if (description.isNotEmpty) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.notes_outlined,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text('Descrição'),
+                        subtitle: Text(description),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.xl2),
         ],
@@ -1756,9 +2833,10 @@ class _HistoryDetailSheet extends StatelessWidget {
 }
 
 class _AddHistoryEventSheet extends StatefulWidget {
-  const _AddHistoryEventSheet({required this.onAdd});
+  const _AddHistoryEventSheet({required this.dio, required this.cellId});
 
-  final void Function(_HistoryEvent) onAdd;
+  final Dio dio;
+  final String cellId;
 
   @override
   State<_AddHistoryEventSheet> createState() => _AddHistoryEventSheetState();
@@ -1766,17 +2844,11 @@ class _AddHistoryEventSheet extends StatefulWidget {
 
 class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
   final _descCtrl = TextEditingController();
-  String _selectedVisitor = 'Maria Fernandes';
+  String? _selectedVisitorId;
   String _selectedType = 'enviado_batismo';
-  DateTime _date = DateTime.now();
-
-  static const _visitors = [
-    'Maria Fernandes',
-    'Paulo Santos',
-    'Ana Lima',
-    'Carlos Souza',
-    'Beatriz Costa',
-  ];
+  bool _loadingVisitors = true;
+  bool _saving = false;
+  List<Map<String, dynamic>> _visitors = [];
 
   static const _types = [
     ('enviado_batismo', 'Enviado para Batismo'),
@@ -1785,6 +2857,65 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
     ('concluiu_treinamento', 'Concluiu Treinamento'),
     ('tornou_se_lider', 'Tornou-se Líder'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVisitors();
+  }
+
+  Future<void> _loadVisitors() async {
+    try {
+      final resp = await widget.dio.get(
+        '/visitors',
+        queryParameters: {'cellId': widget.cellId},
+      );
+      final visitors = ((resp.data as Map<String, dynamic>)['visitors'] as List)
+          .cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      setState(() {
+        _visitors = visitors;
+        _loadingVisitors = false;
+        if (visitors.isNotEmpty) {
+          _selectedVisitorId = visitors.first['id'] as String;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingVisitors = false);
+    }
+  }
+
+  Future<void> _save() async {
+    final visitorId = _selectedVisitorId;
+    if (visitorId == null) return;
+    setState(() => _saving = true);
+    try {
+      await widget.dio.post(
+        '/spiritual-history',
+        data: {
+          'visitorId': visitorId,
+          'eventType': _selectedType,
+          'description': _descCtrl.text,
+          'date': DateTime.now().toIso8601String(),
+        },
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao registrar evento',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -1826,23 +2957,38 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              DropdownButtonFormField<String>(
-                value: _selectedVisitor,
-                items: _visitors
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedVisitor = v!),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    borderSide: const BorderSide(color: AppColors.grey300),
+              if (_loadingVisitors)
+                const LinearProgressIndicator()
+              else if (_visitors.isEmpty)
+                Text(
+                  'Nenhum visitante na célula',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.base,
-                    vertical: AppSpacing.md,
+                )
+              else
+                DropdownButtonFormField<String>(
+                  value: _selectedVisitorId,
+                  items: _visitors
+                      .map(
+                        (v) => DropdownMenuItem(
+                          value: v['id'] as String,
+                          child: Text(v['name'] as String),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedVisitorId = v),
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      borderSide: const BorderSide(color: AppColors.grey300),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.base,
+                      vertical: AppSpacing.md,
+                    ),
                   ),
                 ),
-              ),
 
               const SizedBox(height: AppSpacing.base),
 
@@ -1890,17 +3036,11 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
               AppButton(
                 label: 'Registrar evento',
                 prefixIcon: Icons.add_circle_outline,
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  widget.onAdd(
-                    _HistoryEvent(
-                      visitor: _selectedVisitor,
-                      type: _selectedType,
-                      date: _date,
-                      description: _descCtrl.text,
-                    ),
-                  );
-                },
+                isLoading: _saving,
+                onPressed:
+                    (_saving || _loadingVisitors || _selectedVisitorId == null)
+                    ? null
+                    : _save,
               ),
               const SizedBox(height: AppSpacing.base),
             ],
