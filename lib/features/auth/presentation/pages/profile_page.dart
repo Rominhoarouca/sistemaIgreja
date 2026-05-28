@@ -1,6 +1,7 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -30,7 +31,8 @@ class _ProfilePageState extends State<ProfilePage> {
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
 
-  File? _photoFile;
+  XFile? _pickedPhoto;
+  Uint8List? _photoBytes;
   String? _photoUrl;
   DateTime? _birthDate;
   bool _editing = false;
@@ -132,11 +134,17 @@ class _ProfilePageState extends State<ProfilePage> {
           rotateButtonsHidden: false,
           resetButtonHidden: false,
         ),
+        if (kIsWeb) WebUiSettings(context: context),
       ],
     );
 
-    if (cropped != null && mounted) {
-      setState(() => _photoFile = File(cropped.path));
+    final file = cropped != null ? XFile(cropped.path) : picked;
+    final bytes = await file.readAsBytes();
+    if (mounted) {
+      setState(() {
+        _pickedPhoto = file;
+        _photoBytes = bytes;
+      });
     }
   }
 
@@ -310,10 +318,13 @@ class _ProfilePageState extends State<ProfilePage> {
         'children': jsonEncode(children),
       };
 
-      if (_photoFile != null) {
-        formDataMap['photo'] = await MultipartFile.fromFile(
-          _photoFile!.path,
-          filename: _photoFile!.path.split('/').last,
+      if (_photoBytes != null && _pickedPhoto != null) {
+        final filename = _pickedPhoto!.name.isNotEmpty
+            ? _pickedPhoto!.name
+            : _pickedPhoto!.path.split('/').last;
+        formDataMap['photo'] = MultipartFile.fromBytes(
+          _photoBytes!,
+          filename: filename,
         );
       }
 
@@ -464,13 +475,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             CircleAvatar(
                               radius: 44,
                               backgroundColor: AppColors.primaryLight,
-                              backgroundImage: _photoFile != null
-                                  ? FileImage(_photoFile!)
+                              backgroundImage: _photoBytes != null
+                                  ? MemoryImage(_photoBytes!)
                                   : (_photoUrl != null
                                             ? NetworkImage(_photoUrl!)
                                             : null)
                                         as ImageProvider<Object>?,
-                              child: (_photoFile == null && _photoUrl == null)
+                              child: (_photoBytes == null && _photoUrl == null)
                                   ? Text(
                                       initials,
                                       style: AppTypography.headlineMedium

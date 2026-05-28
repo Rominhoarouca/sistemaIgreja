@@ -1614,10 +1614,11 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     });
     try {
       final cellResp = await _dio.get('/cells/my-cell');
-      final cell =
-          (cellResp.data as Map<String, dynamic>)['cell']
-              as Map<String, dynamic>;
-      final cellId = cell['id'] as String;
+      final cellsRaw =
+          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
+      if (cellsRaw.isEmpty)
+        throw Exception('Nenhuma célula vinculada ao líder');
+      final cellId = (cellsRaw.first as Map<String, dynamic>)['id'] as String;
       final meetingsResp = await _dio.get('/attendance/cell/$cellId/meetings');
       final meetings =
           ((meetingsResp.data as Map<String, dynamic>)['meetings'] as List)
@@ -1628,12 +1629,21 @@ class _AttendanceTabState extends State<_AttendanceTab> {
         _meetings = meetings;
         _loading = false;
       });
-    } on DioException catch (e) {
+    } catch (e, st) {
+      debugPrint('[Presença] Erro: $e\n$st');
       if (!mounted) return;
+      final String detail;
+      if (e is DioException) {
+        final apiMsg = e.response?.data?['error']?['message'] as String?;
+        final status = e.response?.statusCode;
+        detail = apiMsg != null
+            ? 'HTTP $status: $apiMsg'
+            : 'HTTP $status — ${e.message ?? e.type.name}';
+      } else {
+        detail = e.toString();
+      }
       setState(() {
-        _error =
-            e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar presenças';
+        _error = 'Erro ao carregar presenças:\n$detail';
         _loading = false;
       });
     }
@@ -1652,6 +1662,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
             Text(
               _error!,
               style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.base),
             AppButton(
@@ -1928,9 +1939,11 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
   bool _saving = false;
   String? _error;
 
-  List<Map<String, dynamic>> _visitors = [];
-  Set<String> _presentVisitorIds = <String>{};
-  Set<String> _initialPresentVisitorIds = <String>{};
+  /// Unified list of participants (visitors + cell members).
+  /// Each map has: id, name, _type ('visitor' | 'member')
+  List<Map<String, dynamic>> _participants = [];
+  Set<String> _presentIds = <String>{};
+  Set<String> _initialPresentIds = <String>{};
 
   @override
   void initState() {
@@ -1950,6 +1963,7 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
           '/visitors',
           queryParameters: {'cellId': widget.cellId, 'pageSize': 100},
         ),
+        widget.dio.get('/cells/${widget.cellId}/members'),
         widget.dio.get(
           '/attendance/cell/${widget.cellId}',
           queryParameters: {'date': widget.meetingDateIso},
@@ -1957,27 +1971,57 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
       ]);
 
       final visitorsResp = results[0];
-      final attendanceResp = results[1];
+      final membersResp = results[1];
+      final attendanceResp = results[2];
 
       final visitorsData = visitorsResp.data as Map<String, dynamic>;
       final rawVisitors =
           (visitorsData['data'] ?? visitorsData['visitors'] ?? []) as List;
-      final visitors = rawVisitors.cast<Map<String, dynamic>>();
+
+      final membersData = membersResp.data as Map<String, dynamic>;
+      final rawMembers = (membersData['members'] ?? []) as List;
 
       final attendances =
           ((attendanceResp.data as Map<String, dynamic>)['attendances'] as List)
               .cast<Map<String, dynamic>>();
 
-      final presentIds = attendances
-          .where((a) => (a['isPresent'] as bool?) ?? false)
-          .map((a) => a['visitorId'] as String)
+      // Build unified participant list: visitors first, then members not yet
+      // represented as visitors (i.e. without a sourceVisitorId that is
+      // already in the visitors list).
+      final visitorIds = rawVisitors
+          .cast<Map<String, dynamic>>()
+          .map((v) => v['id'] as String)
           .toSet();
+
+      final participants = <Map<String, dynamic>>[];
+
+      for (final v in rawVisitors.cast<Map<String, dynamic>>()) {
+        participants.add({...v, '_type': 'visitor'});
+      }
+
+      for (final m in rawMembers.cast<Map<String, dynamic>>()) {
+        final sourceId = m['sourceVisitorId'] as String?;
+        // Skip members whose source visitor is already in the list
+        if (sourceId != null && visitorIds.contains(sourceId)) continue;
+        participants.add({...m, '_type': 'member'});
+      }
+
+      // Collect which IDs are present (visitors by visitorId, members by memberId)
+      final presentIds = <String>{};
+      for (final a in attendances) {
+        if ((a['isPresent'] as bool?) ?? false) {
+          final vid = a['visitorId'] as String?;
+          final mid = a['memberId'] as String?;
+          if (vid != null) presentIds.add(vid);
+          if (mid != null) presentIds.add(mid);
+        }
+      }
 
       if (!mounted) return;
       setState(() {
-        _visitors = visitors;
-        _presentVisitorIds = presentIds;
-        _initialPresentVisitorIds = Set<String>.from(presentIds);
+        _participants = participants;
+        _presentIds = presentIds;
+        _initialPresentIds = Set<String>.from(presentIds);
         _loading = false;
       });
     } on DioException catch (e) {
@@ -1993,24 +2037,43 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
 
   Future<void> _reloadVisitorsOnly() async {
     try {
-      final resp = await widget.dio.get(
-        '/visitors',
-        queryParameters: {'cellId': widget.cellId, 'pageSize': 100},
-      );
-      final body = resp.data as Map<String, dynamic>;
-      final rawVisitors = (body['data'] ?? body['visitors'] ?? []) as List;
-      final visitors = rawVisitors.cast<Map<String, dynamic>>();
-      final visitorIds = visitors.map((v) => v['id'] as String).toSet();
+      final results = await Future.wait([
+        widget.dio.get(
+          '/visitors',
+          queryParameters: {'cellId': widget.cellId, 'pageSize': 100},
+        ),
+        widget.dio.get('/cells/${widget.cellId}/members'),
+      ]);
+
+      final visitorsData = results[0].data as Map<String, dynamic>;
+      final rawVisitors =
+          (visitorsData['data'] ?? visitorsData['visitors'] ?? []) as List;
+
+      final membersData = results[1].data as Map<String, dynamic>;
+      final rawMembers = (membersData['members'] ?? []) as List;
+
+      final visitorIds = rawVisitors
+          .cast<Map<String, dynamic>>()
+          .map((v) => v['id'] as String)
+          .toSet();
+
+      final participants = <Map<String, dynamic>>[];
+      for (final v in rawVisitors.cast<Map<String, dynamic>>()) {
+        participants.add({...v, '_type': 'visitor'});
+      }
+      for (final m in rawMembers.cast<Map<String, dynamic>>()) {
+        final sourceId = m['sourceVisitorId'] as String?;
+        if (sourceId != null && visitorIds.contains(sourceId)) continue;
+        participants.add({...m, '_type': 'member'});
+      }
+
+      final allIds = participants.map((p) => p['id'] as String).toSet();
 
       if (!mounted) return;
       setState(() {
-        _visitors = visitors;
-        _presentVisitorIds = _presentVisitorIds
-            .where(visitorIds.contains)
-            .toSet();
-        _initialPresentVisitorIds = _initialPresentVisitorIds
-            .where(visitorIds.contains)
-            .toSet();
+        _participants = participants;
+        _presentIds = _presentIds.where(allIds.contains).toSet();
+        _initialPresentIds = _initialPresentIds.where(allIds.contains).toSet();
       });
     } catch (_) {
       // Keep current list if refresh fails after creating visitor.
@@ -2020,16 +2083,12 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
   Future<void> _save() async {
     if (_saving) return;
 
-    final changedVisitorIds = _visitors
-        .map((v) => v['id'] as String)
-        .where(
-          (id) =>
-              _presentVisitorIds.contains(id) !=
-              _initialPresentVisitorIds.contains(id),
-        )
-        .toList();
+    final changedParticipants = _participants.where((p) {
+      final id = p['id'] as String;
+      return _presentIds.contains(id) != _initialPresentIds.contains(id);
+    }).toList();
 
-    if (changedVisitorIds.isEmpty) {
+    if (changedParticipants.isEmpty) {
       if (!mounted) return;
       Navigator.of(context).pop(false);
       return;
@@ -2038,17 +2097,19 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
     setState(() => _saving = true);
     try {
       await Future.wait(
-        changedVisitorIds.map(
-          (visitorId) => widget.dio.post(
+        changedParticipants.map((p) {
+          final id = p['id'] as String;
+          final isMember = (p['_type'] as String?) == 'member';
+          return widget.dio.post(
             '/attendance',
             data: {
-              'visitorId': visitorId,
+              if (isMember) 'memberId': id else 'visitorId': id,
               'cellId': widget.cellId,
               'meetingDate': widget.meetingDateIso,
-              'isPresent': _presentVisitorIds.contains(visitorId),
+              'isPresent': _presentIds.contains(id),
             },
-          ),
-        ),
+          );
+        }),
       );
 
       if (!mounted) return;
@@ -2157,36 +2218,49 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
                       ],
                     ),
                   )
-                else if (_visitors.isEmpty)
+                else if (_participants.isEmpty)
                   AppEmptyState(
-                    title: 'Nenhum visitante na célula',
+                    title: 'Nenhum participante na célula',
                     subtitle: 'Use o botão acima para incluir visitante.',
                     icon: Icons.people_outline,
                   )
                 else
                   Column(
-                    children: _visitors.map((visitor) {
-                      final visitorId = visitor['id'] as String;
-                      final name = (visitor['name'] as String?) ?? 'Sem nome';
-                      final checked = _presentVisitorIds.contains(visitorId);
+                    children: _participants.map((participant) {
+                      final participantId = participant['id'] as String;
+                      final name =
+                          (participant['name'] as String?) ?? 'Sem nome';
+                      final isMember =
+                          (participant['_type'] as String?) == 'member';
+                      final checked = _presentIds.contains(participantId);
 
                       return AppCard(
                         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                         onTap: () {
                           setState(() {
                             if (checked) {
-                              _presentVisitorIds.remove(visitorId);
+                              _presentIds.remove(participantId);
                             } else {
-                              _presentVisitorIds.add(visitorId);
+                              _presentIds.add(participantId);
                             }
                           });
                         },
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                name,
-                                style: AppTypography.titleSmall,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(name, style: AppTypography.titleSmall),
+                                  if (isMember)
+                                    Text(
+                                      'Membro',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             Checkbox(
@@ -2194,9 +2268,9 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
                               onChanged: (v) {
                                 setState(() {
                                   if (v ?? false) {
-                                    _presentVisitorIds.add(visitorId);
+                                    _presentIds.add(participantId);
                                   } else {
-                                    _presentVisitorIds.remove(visitorId);
+                                    _presentIds.remove(participantId);
                                   }
                                 });
                               },
@@ -2551,10 +2625,11 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
     });
     try {
       final cellResp = await _dio.get('/cells/my-cell');
-      final cell =
-          (cellResp.data as Map<String, dynamic>)['cell']
-              as Map<String, dynamic>;
-      final cellId = cell['id'] as String;
+      final cellsRaw =
+          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
+      if (cellsRaw.isEmpty)
+        throw Exception('Nenhuma célula vinculada ao líder');
+      final cellId = (cellsRaw.first as Map<String, dynamic>)['id'] as String;
       final histResp = await _dio.get('/spiritual-history/cell/$cellId');
       final history =
           ((histResp.data as Map<String, dynamic>)['history'] as List)
@@ -2565,12 +2640,21 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
         _events = history;
         _loading = false;
       });
-    } on DioException catch (e) {
+    } catch (e, st) {
+      debugPrint('[Histórico] Erro: $e\n$st');
       if (!mounted) return;
+      final String detail;
+      if (e is DioException) {
+        final apiMsg = e.response?.data?['error']?['message'] as String?;
+        final status = e.response?.statusCode;
+        detail = apiMsg != null
+            ? 'HTTP $status: $apiMsg'
+            : 'HTTP $status — ${e.message ?? e.type.name}';
+      } else {
+        detail = e.toString();
+      }
       setState(() {
-        _error =
-            e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar histórico';
+        _error = 'Erro ao carregar histórico:\n$detail';
         _loading = false;
       });
     }
@@ -2589,6 +2673,7 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
             Text(
               _error!,
               style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.base),
             AppButton(
@@ -2870,8 +2955,10 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
         '/visitors',
         queryParameters: {'cellId': widget.cellId},
       );
-      final visitors = ((resp.data as Map<String, dynamic>)['visitors'] as List)
-          .cast<Map<String, dynamic>>();
+      final body = resp.data as Map<String, dynamic>;
+      // API returns paginated response: { data: [...], total, page, ... }
+      final rawList = (body['data'] ?? body['visitors'] ?? []) as List;
+      final visitors = rawList.cast<Map<String, dynamic>>();
       if (!mounted) return;
       setState(() {
         _visitors = visitors;
@@ -2880,7 +2967,8 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
           _selectedVisitorId = visitors.first['id'] as String;
         }
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AddHistorySheet] Erro ao carregar visitantes: $e');
       if (!mounted) return;
       setState(() => _loadingVisitors = false);
     }
@@ -2897,7 +2985,7 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
           'visitorId': visitorId,
           'eventType': _selectedType,
           'description': _descCtrl.text,
-          'date': DateTime.now().toIso8601String(),
+          'date': DateTime.now().toIso8601String().substring(0, 10),
         },
       );
       if (!mounted) return;

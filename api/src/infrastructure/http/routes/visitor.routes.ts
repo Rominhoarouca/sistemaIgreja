@@ -4,6 +4,9 @@ import { authMiddleware } from '../middlewares/auth.middleware';
 
 export function visitorRoutes(controller: VisitorController): Router {
   const router = Router();
+  // Public endpoint — no auth required
+  router.post('/self-register', controller.selfRegister);
+  // All other routes require authentication
   router.use(authMiddleware);
   router.post('/', controller.create);
   router.get('/', controller.findAll);

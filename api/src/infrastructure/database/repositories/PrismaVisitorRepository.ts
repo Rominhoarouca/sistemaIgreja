@@ -68,6 +68,11 @@ export class PrismaVisitorRepository implements IVisitorRepository {
         ...(data.neighborhood !== undefined ? { neighborhood: data.neighborhood } : {}),
         ...(data.city !== undefined ? { city: data.city } : {}),
         ...(data.originChurch !== undefined ? { originChurch: data.originChurch } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
+        ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
+        ...(data.isBaptized !== undefined ? { isBaptized: data.isBaptized } : {}),
+        ...(data.knownPersonName !== undefined ? { knownPersonName: data.knownPersonName } : {}),
+        ...(data.interests !== undefined ? { interests: data.interests } : {}),
         ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
         ...(data.cellId !== undefined ? { cellId: data.cellId } : {}),
         ...(data.referredById !== undefined ? { referredById: data.referredById } : {}),
@@ -138,6 +143,11 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     neighborhood: string | null;
     city: string | null;
     originChurch: string | null;
+    birthDate?: Date | null;
+    maritalStatus?: string | null;
+    isBaptized?: boolean;
+    knownPersonName?: string | null;
+    interests?: string[];
     status: string;
     leaderId: string | null;
     cellId: string | null;
@@ -155,6 +165,11 @@ export class PrismaVisitorRepository implements IVisitorRepository {
       neighborhood: row.neighborhood,
       city: row.city,
       originChurch: row.originChurch,
+      birthDate: row.birthDate ?? null,
+      maritalStatus: row.maritalStatus ?? null,
+      isBaptized: row.isBaptized ?? false,
+      knownPersonName: row.knownPersonName ?? null,
+      interests: row.interests ?? [],
       status: row.status as Visitor['status'],
       leaderId: row.leaderId,
       cellId: row.cellId,

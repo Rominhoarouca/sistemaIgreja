@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
 
 void _showTopSnackBar(
@@ -385,6 +386,32 @@ class _DashboardTabState extends State<_DashboardTab> {
                 color: AppColors.grey400,
               ),
               onTap: () => context.push('/admin/materials'),
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppSpacing.sm),
+                ),
+                child: const Icon(
+                  Icons.people_outlined,
+                  color: AppColors.primary,
+                ),
+              ),
+              title: const Text('Líderes'),
+              subtitle: const Text('Visualizar líderes, células e frequências'),
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.grey400,
+              ),
+              onTap: () => context.push(AppRoutes.adminLeaders),
             ),
           ),
 

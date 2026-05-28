@@ -54,10 +54,18 @@ export class MinioService {
 
   /**
    * Generate a presigned download URL valid for 1 hour.
+   * Rewrites the internal minio hostname to the public URL routed via nginx (/storage/).
    */
   async presignedDownloadUrl(objectName: string, expireSeconds = 3600): Promise<string> {
     try {
-      return await this.client.presignedGetObject(this.bucket, objectName, expireSeconds);
+      const url = await this.client.presignedGetObject(this.bucket, objectName, expireSeconds);
+      const publicUrl = process.env['MINIO_PUBLIC_URL'];
+      if (publicUrl) {
+        // Replace "http://minio:9000/" with "{publicUrl}/storage/" so browsers
+        // can reach the file via the nginx reverse proxy at /storage/
+        return url.replace(/^https?:\/\/[^/]+\//, `${publicUrl}/storage/`);
+      }
+      return url;
     } catch (err) {
       throw AppError.internal(`MinIO presign error: ${String(err)}`);
     }

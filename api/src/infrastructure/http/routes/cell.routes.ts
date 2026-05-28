@@ -4,6 +4,9 @@ import { authMiddleware } from '../middlewares/auth.middleware';
 
 export function cellRoutes(controller: CellController): Router {
   const router = Router();
+  // Public endpoint — no auth required (used by visitor self-registration form)
+  router.get('/public', controller.findAll);
+  // All other routes require authentication
   router.get('/nearby', authMiddleware, controller.findNearby);
   router.get('/my-cell', authMiddleware, controller.findByLeader);
   router.get('/', authMiddleware, controller.findAll);

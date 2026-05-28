@@ -2,13 +2,28 @@ import type { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { AppError } from '@shared/errors/AppError';
 import { ZodError } from 'zod';
+import { logger } from '@shared/logger/logger';
+
+const isVerbose = () =>
+  ['verbose', 'debug', 'silly'].includes(
+    (process.env['LOG_LEVEL'] ?? '').toLowerCase(),
+  );
 
 export function errorMiddleware(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ): void {
+  // Always log errors; include stacktrace on verbose
+  if (isVerbose()) {
+    logger.error(`[Error] ${req.method} ${req.originalUrl}`, {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+      reqBody: req.body as unknown,
+    });
+  }
+
   if (err instanceof AppError) {
     res.status(err.statusCode).json({ error: { code: err.code, message: err.message } });
     return;
@@ -45,6 +60,8 @@ export function errorMiddleware(
     }
   }
 
-  console.error('[Unhandled Error]', err);
+  if (!isVerbose()) {
+    console.error('[Unhandled Error]', err);
+  }
   res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Erro interno do servidor' } });
 }

@@ -20,6 +20,21 @@ const createSchema = z.object({
   referredById: z.string().uuid().optional(),
 });
 
+const selfRegisterSchema = z.object({
+  name: z.string().min(2),
+  phone: z.string().min(8),
+  address: z.string().min(3),
+  neighborhood: z.string().min(2),
+  city: z.string().min(2),
+  birthDate: z.string().datetime({ local: true, offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
+  maritalStatus: z.string().optional(),
+  isBaptized: z.boolean().default(false),
+  knownPersonName: z.string().optional(),
+  interests: z.array(z.string()).default([]),
+  cellId: z.string().uuid().optional(),
+  customCellName: z.string().optional(),
+});
+
 const statusSchema = z.object({
   status: z.enum(['novo', 'em_acompanhamento', 'integrado', 'inativo']),
   leaderId: z.string().uuid().optional(),
@@ -55,6 +70,28 @@ export class VisitorController {
   create = async (req: Request, res: Response): Promise<void> => {
     const data = createSchema.parse(req.body);
     const visitor = await this.registerUseCase.execute(data);
+    res.status(201).json({ visitor });
+  };
+
+  selfRegister = async (req: Request, res: Response): Promise<void> => {
+    const data = selfRegisterSchema.parse(req.body);
+    const birthDate = data.birthDate ? new Date(data.birthDate) : undefined;
+    // Store custom cell name in originChurch when not linked to a known cell
+    const originChurch = !data.cellId && data.customCellName ? data.customCellName : undefined;
+    const visitor = await this.registerUseCase.execute({
+      name: data.name,
+      phone: data.phone,
+      address: data.address,
+      neighborhood: data.neighborhood,
+      city: data.city,
+      birthDate,
+      maritalStatus: data.maritalStatus,
+      isBaptized: data.isBaptized,
+      knownPersonName: data.knownPersonName,
+      interests: data.interests,
+      cellId: data.cellId,
+      originChurch,
+    });
     res.status(201).json({ visitor });
   };
 

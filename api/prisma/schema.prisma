@@ -62,6 +62,7 @@ model User {
   address      String?
   birthDate    DateTime? @map("birth_date")
   supervisorId String?  @map("supervisor_id")
+  description  String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -139,6 +140,11 @@ model Visitor {
   neighborhood   String?
   city           String?
   originChurch   String?       @map("origin_church")
+  birthDate      DateTime?     @map("birth_date")
+  maritalStatus  String?       @map("marital_status")
+  isBaptized     Boolean       @default(false) @map("is_baptized")
+  knownPersonName String?      @map("known_person_name")
+  interests      String[]      @default([]) @map("interests")
   status         VisitorStatus @default(novo)
   leaderId       String?       @map("leader_id")
   cellId         String?       @map("cell_id")
@@ -172,9 +178,10 @@ model CellMember {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  cell          Cell     @relation(fields: [cellId], references: [id], onDelete: Cascade)
-  leader        User?    @relation(fields: [leaderId], references: [id])
-  sourceVisitor Visitor? @relation("VisitorConvertedMember", fields: [sourceVisitorId], references: [id])
+  cell          Cell         @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  leader        User?        @relation(fields: [leaderId], references: [id])
+  sourceVisitor Visitor?     @relation("VisitorConvertedMember", fields: [sourceVisitorId], references: [id])
+  attendances   Attendance[] @relation("MemberAttendances")
 
   @@index([cellId])
   @@index([leaderId])
@@ -199,17 +206,20 @@ model CellMeeting {
 // ── Attendance ────────────────────────────────────────────────────────────────
 model Attendance {
   id          String   @id @default(uuid())
-  visitorId   String   @map("visitor_id")
+  visitorId   String?  @map("visitor_id")
+  memberId    String?  @map("member_id")
   cellId      String   @map("cell_id")
   meetingDate DateTime @map("meeting_date") @db.Date
   isPresent   Boolean  @default(true) @map("is_present")
   notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  visitor Visitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  cell    Cell    @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  visitor Visitor?    @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  member  CellMember? @relation("MemberAttendances", fields: [memberId], references: [id], onDelete: Cascade)
+  cell    Cell        @relation(fields: [cellId], references: [id], onDelete: Cascade)
 
-  @@unique([visitorId, cellId, meetingDate])
+  @@index([visitorId, cellId, meetingDate])
+  @@index([memberId, cellId, meetingDate])
   @@map("attendances")
 }
 

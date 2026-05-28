@@ -5,7 +5,7 @@ abstract final class AppConstants {
   // Produção: passe --dart-define=API_BASE_URL=https://seu-dominio.com/v1
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.0.191:3000/v1',
+    defaultValue: 'http://192.168.0.190/v1',
     //defaultValue: 'http://127.0.0.1:3000/v1',
   );
 
@@ -61,6 +61,7 @@ abstract final class AppRoutes {
 
   // Visitor
   static const String visitorRegister = '/visitor/register';
+  static const String visitorSelfRegister = '/cadastro';
   static const String nearbyCells = '/visitor/cells';
   static const String cellDetail = '/cells/:id';
 

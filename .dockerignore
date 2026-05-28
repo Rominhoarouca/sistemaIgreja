@@ -1,0 +1,29 @@
+# ── Version control ──────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── API (not needed for Flutter web build) ───────────────────────────────
+api/
+
+# ── Build outputs ─────────────────────────────────────────────────────────
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# ── Native platform dirs (not needed for web build) ───────────────────────
+android/
+ios/
+macos/
+windows/
+linux/
+
+# ── Docs & IDE ────────────────────────────────────────────────────────────
+docs/
+.idea/
+.vscode/
+*.iml
+
+# ── Other Docker files (prevent recursive context) ───────────────────────
+Dockerfile*
+docker-compose*

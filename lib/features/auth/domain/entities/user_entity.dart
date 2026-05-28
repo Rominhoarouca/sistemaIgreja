@@ -10,6 +10,7 @@ class UserEntity extends Equatable {
     required this.role,
     required this.isActive,
     this.createdAt,
+    this.description,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class UserEntity extends Equatable {
   final UserRole role;
   final bool isActive;
   final DateTime? createdAt;
+  final String? description;
 
   bool get isAdmin => role == UserRole.admin;
   bool get isLeader => role == UserRole.leader;

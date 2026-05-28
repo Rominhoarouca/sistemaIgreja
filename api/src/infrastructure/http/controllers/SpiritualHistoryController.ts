@@ -13,7 +13,8 @@ const addEventSchema = z.object({
     'tornou_se_lider',
   ]),
   description: z.string().optional(),
-  date: z.string().date(),
+  // Accept both "YYYY-MM-DD" and full ISO datetime strings
+  date: z.string().transform((val) => val.substring(0, 10)).pipe(z.string().date()),
 });
 
 export class SpiritualHistoryController {

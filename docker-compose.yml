@@ -1,13 +1,17 @@
-# docker compose up -d              → sobe postgres + api + nginx (produção)
+# docker compose up -d              → sobe postgres + api + app + nginx (produção)
 # docker compose --profile dev up -d → sobe postgres + api_dev + nginx (hot-reload)
 # docker compose --profile tools up  → sobe pgadmin (admin DB via browser)
 #
 # Nginx expõe portas 80 (HTTP) e 443 (HTTPS, após configurar SSL)
-# API Health: http://localhost/health
-# Swagger UI: http://localhost/docs (produção)
-#             http://localhost:3001/docs (api_dev direto, sem nginx)
-# PgAdmin:    http://localhost:5050 (apenas profile tools)
-# MinIO:      http://localhost:9001 (console web, sem nginx exposto)
+# Flutter PWA:  http://localhost/              (produção)
+# API Health:   http://localhost/health
+# Swagger UI:   http://localhost/docs
+# PgAdmin:      http://localhost:5050          (apenas profile tools)
+# MinIO:        http://localhost:9001          (console web, sem nginx exposto)
+#
+# Para publicar as imagens no Docker Hub:
+#   npm --prefix api run publishDocker      → API
+#   npm --prefix api run publishDockerApp   → Flutter Web PWA
 
 services:
   # ─── Banco de dados ──────────────────────────────────────────────────────
@@ -45,6 +49,22 @@ services:
       # - /path/to/ssl:/etc/nginx/ssl:ro
     depends_on:
       - api
+      - app
+    networks:
+      - sistema_igreja_net
+
+  # ─── Flutter Web PWA ──────────────────────────────────────────────────────
+  # Build: docker compose build app
+  # Publish: npm --prefix api run publishDockerApp
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    # image: rominhoarouca/sistema-igreja-app:latest
+    container_name: sistema_igreja_app
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: ${API_BASE_URL}
     networks:
       - sistema_igreja_net
 
@@ -53,11 +73,14 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+    image: rominhoarouca/sistema-igreja-api:latest
     container_name: sistema_igreja_api
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
+      NODE_ENV: development
+      LOG_LEVEL: verbose
+      # DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@15.204.255.173:5432/sistema_igreja
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/sistema_igreja
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_secret_key_256bits}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh_secret_key_256bits}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
@@ -70,6 +93,9 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_password}
       MINIO_BUCKET: ${MINIO_BUCKET:-materiais}
       MINIO_USE_SSL: 'false'
+      # URL pública do MinIO (roteada pelo nginx em /storage/)
+      # Deve ser o mesmo host base que o browser usa para acessar o app
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://192.168.0.190}
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,40 +108,40 @@ services:
 
   # ─── API dev (hot-reload) ─────────────────────────────────────────────────
   # Uso: docker compose --profile dev up api_dev
-  api_dev:
-    build:
-      context: ./api
-      dockerfile: Dockerfile.dev
-    container_name: sistema_igreja_api_dev
-    restart: unless-stopped
-    ports:
-      - '3001:3000'
-    environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
-      JWT_SECRET: dev_secret_key_only_local
-      JWT_REFRESH_SECRET: dev_refresh_secret_key_only_local
-      JWT_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
-      PORT: 3000
-      ALLOWED_ORIGINS: '*'
-      MINIO_ENDPOINT: minio
-      MINIO_PORT: 9000
-      MINIO_ACCESS_KEY: minio_user
-      MINIO_SECRET_KEY: minio_password
-      MINIO_BUCKET: materiais
-      MINIO_USE_SSL: 'false'
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./api:/app
-      - /app/node_modules
-      - uploads:/app/uploads
-    networks:
-      - sistema_igreja_net
-    profiles:
-      - dev
+  # api_dev:
+  #   build:
+  #     context: ./api
+  #     dockerfile: Dockerfile.dev
+  #   container_name: sistema_igreja_api_dev
+  #   restart: unless-stopped
+  #   ports:
+  #     - '3001:3000'
+  #   environment:
+  #     NODE_ENV: development
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-igreja_user}:${POSTGRES_PASSWORD:-igreja_pass}@postgres:5432/sistema_igreja
+  #     JWT_SECRET: dev_secret_key_only_local
+  #     JWT_REFRESH_SECRET: dev_refresh_secret_key_only_local
+  #     JWT_EXPIRES_IN: 15m
+  #     JWT_REFRESH_EXPIRES_IN: 7d
+  #     PORT: 3000
+  #     ALLOWED_ORIGINS: '*'
+  #     MINIO_ENDPOINT: minio
+  #     MINIO_PORT: 9000
+  #     MINIO_ACCESS_KEY: minio_user
+  #     MINIO_SECRET_KEY: minio_password
+  #     MINIO_BUCKET: materiais
+  #     MINIO_USE_SSL: 'false'
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./api:/app
+  #     - /app/node_modules
+  #     - uploads:/app/uploads
+  #   networks:
+  #     - sistema_igreja_net
+  #   profiles:
+  #     - dev
 
   # ─── MinIO (armazenamento de objetos — materiais de célula) ──────────────
   minio:

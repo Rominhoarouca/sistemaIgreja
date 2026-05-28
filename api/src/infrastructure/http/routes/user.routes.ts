@@ -18,6 +18,7 @@ export function userRoutes(controller: UserController): Router {
   router.get('/supervisors', requireAdmin, controller.findSupervisors);
   router.get('/my-leaders', requireSupervisorOrAdmin, controller.getMyLeaders);
   router.patch('/leaders/:leaderId/supervisor', requireAdmin, controller.assignLeaderSupervisor);
+  router.patch('/leaders/:leaderId', requireAdmin, controller.updateLeaderDescription);
 
   return router;
 }

@@ -15,10 +15,17 @@ import '../features/notifications/presentation/pages/notifications_page.dart';
 import '../features/about/presentation/pages/about_page.dart';
 import '../features/dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../features/materials/presentation/pages/admin_materials_page.dart';
+import '../features/admin/presentation/pages/admin_leaders_page.dart';
+import '../features/visitor/presentation/pages/visitor_self_register_page.dart';
 import '../features/supervisor/presentation/pages/supervisor_home_page.dart';
 
 /// Public routes that can be accessed without authentication.
-const _publicRoutes = {AppRoutes.login, AppRoutes.register, '/forgot-password'};
+const _publicRoutes = {
+  AppRoutes.login,
+  AppRoutes.register,
+  '/forgot-password',
+  AppRoutes.visitorSelfRegister,
+};
 
 /// Creates a [GoRouter] that reacts to [AuthBloc] state changes.
 GoRouter createRouter(AuthBloc authBloc) {
@@ -136,12 +143,26 @@ GoRouter createRouter(AuthBloc authBloc) {
             const MaterialPage(child: AdminMaterialsPage()),
       ),
 
+      // ── Admin Leaders ─────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminLeaders,
+        name: 'admin-leaders',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminLeadersPage()),
+      ),
+
       // ── Visitor flow ──────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.visitorRegister,
         name: 'visitor-register',
         pageBuilder: (context, state) =>
             const MaterialPage(child: VisitorRegisterPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.visitorSelfRegister,
+        name: 'visitor-self-register',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: VisitorSelfRegisterPage()),
       ),
       GoRoute(
         path: AppRoutes.nearbyCells,

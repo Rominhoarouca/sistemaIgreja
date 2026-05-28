@@ -9,6 +9,11 @@ export interface Visitor {
   readonly neighborhood: string | null;
   readonly city: string | null;
   readonly originChurch: string | null;
+  readonly birthDate: Date | null;
+  readonly maritalStatus: string | null;
+  readonly isBaptized: boolean;
+  readonly knownPersonName: string | null;
+  readonly interests: string[];
   readonly status: VisitorStatus;
   readonly leaderId: string | null;
   readonly cellId: string | null;
@@ -26,6 +31,11 @@ export interface CreateVisitorData {
   readonly neighborhood?: string | undefined;
   readonly city?: string | undefined;
   readonly originChurch?: string | undefined;
+  readonly birthDate?: Date | undefined;
+  readonly maritalStatus?: string | undefined;
+  readonly isBaptized?: boolean | undefined;
+  readonly knownPersonName?: string | undefined;
+  readonly interests?: string[] | undefined;
   readonly leaderId?: string | undefined;
   readonly cellId?: string | undefined;
   readonly referredById?: string | undefined;

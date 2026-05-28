@@ -1,6 +1,7 @@
 export interface Attendance {
   readonly id: string;
-  readonly visitorId: string;
+  readonly visitorId: string | null;
+  readonly memberId: string | null;
   readonly cellId: string;
   readonly meetingDate: Date;
   readonly isPresent: boolean;
@@ -9,7 +10,8 @@ export interface Attendance {
 }
 
 export interface RegisterAttendanceData {
-  readonly visitorId: string;
+  readonly visitorId?: string | undefined;
+  readonly memberId?: string | undefined;
   readonly cellId: string;
   readonly meetingDate: Date;
   readonly isPresent: boolean;

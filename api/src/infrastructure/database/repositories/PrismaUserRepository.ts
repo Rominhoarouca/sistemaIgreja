@@ -63,6 +63,13 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
+  async updateLeaderDescription(leaderId: string, description: string | null): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: leaderId },
+      data: { description },
+    });
+  }
+
   async getProfile(id: string): Promise<UserProfile | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },

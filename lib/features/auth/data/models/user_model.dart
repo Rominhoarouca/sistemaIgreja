@@ -11,6 +11,7 @@ class UserModel extends UserEntity {
     super.phone = '',
     super.isActive = true,
     super.createdAt,
+    super.description,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,7 @@ class UserModel extends UserEntity {
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
+      description: json['description'] as String?,
     );
   }
 
@@ -35,6 +37,7 @@ class UserModel extends UserEntity {
     'role': role.value,
     'isActive': isActive,
     if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+    if (description != null) 'description': description,
   };
 
   String toJsonString() => jsonEncode(toJson());

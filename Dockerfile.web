@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Stage 1 — Build Flutter Web (PWA)
+# ═══════════════════════════════════════════════════════════════════════════
+FROM ghcr.io/cirruslabs/flutter:stable AS builder
+
+WORKDIR /app
+
+# Restore dependencies first (separate layer for caching)
+COPY pubspec.yaml pubspec.lock ./
+RUN flutter pub get
+
+# Copy source files needed for web build
+COPY lib/     lib/
+COPY web/     web/
+COPY assets/  assets/
+
+# Build web com placeholder — o valor real é injetado em runtime pelo entrypoint.sh
+# O docker-compose passa API_BASE_URL como variável de ambiente (não build arg)
+RUN flutter build web \
+      --release \
+      --pwa-strategy offline-first \
+      --dart-define=API_BASE_URL=__API_BASE_URL_PLACEHOLDER__
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Stage 2 — Serve static files with nginx
+# ═══════════════════════════════════════════════════════════════════════════
+FROM nginx:alpine AS runner
+
+COPY --from=builder /app/build/web /usr/share/nginx/html
+COPY nginx-app.conf /etc/nginx/conf.d/default.conf
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost/ || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

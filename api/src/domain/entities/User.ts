@@ -10,6 +10,7 @@ export interface User {
   readonly address: string | null;
   readonly birthDate: Date | null;
   readonly supervisorId: string | null;
+  readonly description: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

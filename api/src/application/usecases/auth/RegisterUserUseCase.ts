@@ -32,6 +32,7 @@ export class RegisterUserUseCase {
       address: null,
       birthDate: null,
       supervisorId: null,
+      description: null,
     });
 
     return user;

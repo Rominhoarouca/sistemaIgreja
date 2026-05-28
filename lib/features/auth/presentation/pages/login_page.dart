@@ -67,12 +67,9 @@ class _LoginPageState extends State<LoginPage> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthAuthenticated) {
-          final destination = state.user.isAdmin
-              ? AppRoutes.adminDashboard
-              : AppRoutes.leaderHome;
-          context.go(destination);
-        } else if (state is AuthError) {
+        // Navigation on AuthAuthenticated is handled by the GoRouter redirect.
+        // Only handle errors here to avoid double-navigation on web.
+        if (state is AuthError) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(

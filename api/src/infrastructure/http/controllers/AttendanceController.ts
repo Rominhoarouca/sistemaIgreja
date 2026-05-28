@@ -3,13 +3,18 @@ import { z } from 'zod';
 import type { RegisterAttendanceUseCase } from '@application/usecases/attendance/RegisterAttendanceUseCase';
 import type { IAttendanceRepository } from '@domain/repositories/IAttendanceRepository';
 
-const registerSchema = z.object({
-  visitorId: z.string().uuid(),
-  cellId: z.string().uuid(),
-  meetingDate: z.coerce.date(),
-  isPresent: z.boolean().default(true),
-  notes: z.string().optional(),
-});
+const registerSchema = z
+  .object({
+    visitorId: z.string().uuid().optional(),
+    memberId: z.string().uuid().optional(),
+    cellId: z.string().uuid(),
+    meetingDate: z.coerce.date(),
+    isPresent: z.boolean().default(true),
+    notes: z.string().optional(),
+  })
+  .refine((d) => d.visitorId !== undefined || d.memberId !== undefined, {
+    message: 'visitorId or memberId is required',
+  });
 
 const createMeetingSchema = z.object({
   meetingDate: z.coerce.date(),

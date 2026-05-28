@@ -52,6 +52,13 @@ export class UserController {
     res.status(204).send();
   };
 
+  updateLeaderDescription = async (req: Request, res: Response): Promise<void> => {
+    const { leaderId } = req.params as { leaderId: string };
+    const { description } = z.object({ description: z.string().max(1000).nullable() }).parse(req.body);
+    await this.userRepo.updateLeaderDescription(leaderId, description);
+    res.status(204).send();
+  };
+
   updateProfile = async (req: Request, res: Response): Promise<void> => {
     const rawBody = typeof req.body === 'string'
       ? JSON.parse(req.body)

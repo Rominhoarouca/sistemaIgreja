@@ -20,6 +20,10 @@ import type { Container } from '@shared/container';
 export function createApp(container: Container): Application {
   const app = express();
 
+  // Disable ETags — all API responses are dynamic/authenticated, 304 would
+  // return an empty body which breaks JSON parsing in clients.
+  app.set('etag', false);
+
   // Security — relax CSP only for Swagger UI
   app.use(
     helmet({
@@ -33,13 +37,26 @@ export function createApp(container: Container): Application {
       },
     }),
   );
-  app.use(
-    cors({
-      origin: process.env['ALLOWED_ORIGINS']?.split(',') ?? '*',
-      methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    }),
-  );
+  // Configure CORS. If ALLOWED_ORIGINS is a comma-separated list, enable
+  // credentials (cookies/authorization) only when a specific origin is used.
+  const allowedOrigins = process.env['ALLOWED_ORIGINS']?.split(',').map((s) => s.trim()) ?? ['*'];
+  const corsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (e.g. curl, mobile apps)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('CORS_NOT_ALLOWED'));
+    },
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: !allowedOrigins.includes('*'),
+    exposedHeaders: ['Authorization'],
+    optionsSuccessStatus: 200,
+  } as cors.CorsOptions;
+
+  app.use(cors(corsOptions));
+  // Ensure preflight requests are handled
+  app.options('*', cors(corsOptions));
 
   // Body parsing
   app.use(express.json({ limit: '10mb' }));
