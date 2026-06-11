@@ -6,7 +6,9 @@
 api/
 
 # ── Build outputs ─────────────────────────────────────────────────────────
-build/
+build/*
+!build/web/
+!build/web/**
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies

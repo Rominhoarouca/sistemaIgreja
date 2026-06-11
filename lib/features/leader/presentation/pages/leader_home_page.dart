@@ -51,31 +51,81 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width >= 720;
+
+    final appBar = AppBar(
+      title: const Text('Painel do Líder'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () => context.push('/notifications'),
+        ),
+        IconButton(
+          icon: const Icon(Icons.account_circle_outlined),
+          onPressed: () => context.push('/profile'),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+      ],
+    );
+
+    final tabContent = IndexedStack(
+      index: _selectedTab,
+      children: const [
+        _LeaderVisitorsTab(),
+        _CellMembersTab(),
+        _AttendanceTab(),
+        _MaterialsTab(),
+        _SpiritualHistoryTab(),
+      ],
+    );
+
+    if (isWide) {
+      return Scaffold(
+        appBar: appBar,
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _selectedTab,
+              onDestinationSelected: (i) => setState(() => _selectedTab = i),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.people_outline),
+                  selectedIcon: Icon(Icons.people),
+                  label: Text('Visitantes'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.group_outlined),
+                  selectedIcon: Icon(Icons.group),
+                  label: Text('Membros'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.check_circle_outline),
+                  selectedIcon: Icon(Icons.check_circle),
+                  label: Text('Presença'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.auto_stories_outlined),
+                  selectedIcon: Icon(Icons.auto_stories),
+                  label: Text('Materiais'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.trending_up_outlined),
+                  selectedIcon: Icon(Icons.trending_up),
+                  label: Text('Histórico'),
+                ),
+              ],
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(child: tabContent),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Painel do Líder'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => context.push('/notifications'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => context.push('/profile'),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-        ],
-      ),
-      body: IndexedStack(
-        index: _selectedTab,
-        children: [
-          const _LeaderVisitorsTab(),
-          const _CellMembersTab(),
-          const _AttendanceTab(),
-          const _MaterialsTab(),
-          const _SpiritualHistoryTab(),
-        ],
-      ),
+      appBar: appBar,
+      body: tabContent,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         onDestinationSelected: (i) => setState(() => _selectedTab = i),
@@ -148,6 +198,11 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
             .map((e) => _VisitorData.fromJson(e as Map<String, dynamic>))
             .toList();
         _loading = false;
+        if (myCellIds.isEmpty) {
+          _error =
+              'Nenhuma célula vinculada ao seu perfil.\n'
+              'Aguarde o supervisor vincular uma célula à sua conta.';
+        }
       });
     } on DioException catch (e) {
       if (!mounted) return;
@@ -1293,6 +1348,11 @@ class _CellMembersTabState extends State<_CellMembersTab> {
         _cells = cells;
         _members = allMembers;
         _loading = false;
+        if (cells.isEmpty) {
+          _error =
+              'Nenhuma célula vinculada ao seu perfil.\n'
+              'Aguarde o supervisor vincular uma célula à sua conta.';
+        }
       });
     } on DioException catch (e) {
       if (!mounted) return;
@@ -1616,8 +1676,16 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       final cellResp = await _dio.get('/cells/my-cell');
       final cellsRaw =
           (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-      if (cellsRaw.isEmpty)
-        throw Exception('Nenhuma célula vinculada ao líder');
+      if (cellsRaw.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _error =
+              'Nenhuma célula vinculada ao seu perfil.\n'
+              'Aguarde o supervisor vincular uma célula à sua conta.';
+          _loading = false;
+        });
+        return;
+      }
       final cellId = (cellsRaw.first as Map<String, dynamic>)['id'] as String;
       final meetingsResp = await _dio.get('/attendance/cell/$cellId/meetings');
       final meetings =
@@ -2392,6 +2460,11 @@ class _MaterialsTabState extends State<_MaterialsTab> {
       setState(() {
         _materials = allMaterials;
         _loading = false;
+        if (cellIds.isEmpty) {
+          _error =
+              'Nenhuma célula vinculada ao seu perfil.\n'
+              'Aguarde o supervisor vincular uma célula à sua conta.';
+        }
       });
     } on DioException catch (e) {
       if (!mounted) return;
@@ -2627,8 +2700,16 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
       final cellResp = await _dio.get('/cells/my-cell');
       final cellsRaw =
           (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-      if (cellsRaw.isEmpty)
-        throw Exception('Nenhuma célula vinculada ao líder');
+      if (cellsRaw.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _error =
+              'Nenhuma célula vinculada ao seu perfil.\n'
+              'Aguarde o supervisor vincular uma célula à sua conta.';
+          _loading = false;
+        });
+        return;
+      }
       final cellId = (cellsRaw.first as Map<String, dynamic>)['id'] as String;
       final histResp = await _dio.get('/spiritual-history/cell/$cellId');
       final history =

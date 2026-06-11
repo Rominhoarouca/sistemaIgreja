@@ -57,10 +57,10 @@ services:
   # Build: docker compose build app
   # Publish: npm --prefix api run publishDockerApp
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-    # image: rominhoarouca/sistema-igreja-app:latest
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.web
+    image: rominhoarouca/sistema-igreja-app:latest
     container_name: sistema_igreja_app
     restart: unless-stopped
     environment:

@@ -38,4 +38,7 @@ Future<void> setupInjection() async {
     final bloc = getIt<AuthBloc>();
     if (!bloc.isClosed) bloc.add(const AuthForceLogout());
   };
+  // Also expose as static fallback so non-singleton DioClient instances
+  // (created directly in feature pages) can still trigger force-logout.
+  DioClient.globalOnForceLogout = dioClient.onForceLogout;
 }

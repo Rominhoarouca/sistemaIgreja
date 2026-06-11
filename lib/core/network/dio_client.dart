@@ -12,6 +12,11 @@ import 'auth_storage.dart';
 /// On 401 response (non-auth endpoints): attempts a silent token refresh and
 /// retries the original request once. If refresh fails, [onForceLogout] is called.
 class DioClient {
+  /// Global fallback for force-logout, set once by the singleton registered
+  /// in DI. Non-singleton clients (created directly in pages) will use this
+  /// when their own [onForceLogout] is null.
+  static void Function()? globalOnForceLogout;
+
   late final Dio _dio;
   final AuthStorage _storage;
 
@@ -244,5 +249,7 @@ class _AuthInterceptor extends Interceptor {
     }
   }
 
-  void _triggerLogout() => _client.onForceLogout?.call();
+  void _triggerLogout() {
+    (_client.onForceLogout ?? DioClient.globalOnForceLogout)?.call();
+  }
 }

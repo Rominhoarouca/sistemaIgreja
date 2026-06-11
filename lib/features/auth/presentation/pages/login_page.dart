@@ -83,219 +83,262 @@ class _LoginPageState extends State<LoginPage> {
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
           final isLoading = state is AuthLoading;
-          return Scaffold(
-            backgroundColor: theme.scaffoldBackgroundColor,
-            body: SafeArea(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // ── Logo Area ──────────────────────────────────────────────
-                    AppGradientHeader(
-                      height: 280,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: AppColors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusXl,
-                                ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusXl,
-                                ),
-                                child: Image.asset(
-                                  'assets/images/logo App.png',
-                                  fit: BoxFit.cover,
-                                ),
+          final isWide = MediaQuery.of(context).size.width >= 720;
+          final formContent = SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // ── Logo Area ──────────────────────────────────────────────
+                  AppGradientHeader(
+                    height: 280,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: AppColors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusXl,
                               ),
                             ),
-                            const SizedBox(height: AppSpacing.base),
-                            Text(
-                              'Sistema Igreja',
-                              style: AppTypography.headlineSmall.copyWith(
-                                color: AppColors.white,
-                                fontWeight: FontWeight.w700,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusXl,
+                              ),
+                              child: Image.asset(
+                                'assets/images/logo App.png',
+                                fit: BoxFit.cover,
                               ),
                             ),
+                          ),
+                          const SizedBox(height: AppSpacing.base),
+                          Text(
+                            'Sistema Igreja',
+                            style: AppTypography.headlineSmall.copyWith(
+                              color: AppColors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Recepção & Integração',
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: AppColors.white.withValues(alpha: 0.75),
+                            ),
+                          ),
+                          if (_appVersion.isNotEmpty) ...[
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              'Recepção & Integração',
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: AppColors.white.withValues(alpha: 0.75),
+                              _appVersion,
+                              style: AppTypography.labelSmall.copyWith(
+                                color: AppColors.white.withValues(alpha: 0.5),
                               ),
                             ),
-                            if (_appVersion.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                _appVersion,
-                                style: AppTypography.labelSmall.copyWith(
-                                  color: AppColors.white.withValues(alpha: 0.5),
-                                ),
-                              ),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
+                  ),
 
-                    // ── Form Card ──────────────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: AppSpacing.base),
-                            Text(
-                              'Entrar',
-                              style: theme.textTheme.headlineSmall,
+                  // ── Form Card ──────────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: AppSpacing.base),
+                          Text('Entrar', style: theme.textTheme.headlineSmall),
+                          Text(
+                            'Acesse sua conta para continuar',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
-                            Text(
-                              'Acesse sua conta para continuar',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.xl),
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
 
-                            if (kDebugMode) ...[
-                              AppCard(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Credenciais de desenvolvimento',
-                                      style: theme.textTheme.titleSmall,
-                                    ),
-                                    const SizedBox(height: AppSpacing.xs),
-                                    Text(
-                                      'E-mail: admin@sistemaigreja.com.br',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                    Text(
-                                      'Senha: admin123',
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                    const SizedBox(height: AppSpacing.sm),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton(
-                                        onPressed: _fillDevCredentials,
-                                        child: const Text('Usar credenciais'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.base),
-                            ],
-
-                            AppTextField(
-                              controller: _emailCtrl,
-                              label: 'E-mail',
-                              hint: 'seu@email.com',
-                              prefixIcon: Icons.email_outlined,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Informe seu e-mail';
-                                }
-                                if (!v.contains('@')) return 'E-mail inválido';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: AppSpacing.base),
-
-                            AppTextField(
-                              controller: _passwordCtrl,
-                              label: 'Senha',
-                              hint: '••••••••',
-                              prefixIcon: Icons.lock_outline,
-                              obscureText: _obscurePassword,
-                              suffixIcon: _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              onSuffixTap: () => setState(
-                                () => _obscurePassword = !_obscurePassword,
-                              ),
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _submit(),
-                              validator: (v) {
-                                if (v == null || v.length < 6) {
-                                  return 'Mínimo 6 caracteres';
-                                }
-                                return null;
-                              },
-                            ),
-
-                            const SizedBox(height: AppSpacing.sm),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: isLoading
-                                    ? null
-                                    : () => context.push('/forgot-password'),
-                                child: const Text('Esqueci minha senha'),
-                              ),
-                            ),
-
-                            const SizedBox(height: AppSpacing.base),
-                            AppButton(
-                              label: 'Entrar',
-                              isLoading: isLoading,
-                              onPressed: _submit,
-                              prefixIcon: Icons.login,
-                            ),
-
-                            const SizedBox(height: AppSpacing.xl),
-                            const Divider(),
-                            const SizedBox(height: AppSpacing.base),
-
-                            Center(
+                          if (kDebugMode) ...[
+                            AppCard(
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Novo por aqui?',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                    'Credenciais de desenvolvimento',
+                                    style: theme.textTheme.titleSmall,
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    'E-mail: admin@sistemaigreja.com.br',
+                                    style: theme.textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
                                     ),
                                   ),
-                                  const SizedBox(height: AppSpacing.xs),
-                                  AppButton(
-                                    label: 'Fazer cadastro',
-                                    variant: AppButtonVariant.outline,
-                                    prefixIcon: Icons.person_add_outlined,
-                                    onPressed: isLoading
-                                        ? null
-                                        : () =>
-                                              context.push(AppRoutes.register),
+                                  Text(
+                                    'Senha: admin123',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: _fillDevCredentials,
+                                      child: const Text('Usar credenciais'),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: AppSpacing.xl2),
+                            const SizedBox(height: AppSpacing.base),
                           ],
+
+                          AppTextField(
+                            controller: _emailCtrl,
+                            label: 'E-mail',
+                            hint: 'seu@email.com',
+                            prefixIcon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Informe seu e-mail';
+                              }
+                              if (!v.contains('@')) return 'E-mail inválido';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.base),
+
+                          AppTextField(
+                            controller: _passwordCtrl,
+                            label: 'Senha',
+                            hint: '••••••••',
+                            prefixIcon: Icons.lock_outline,
+                            obscureText: _obscurePassword,
+                            suffixIcon: _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            onSuffixTap: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _submit(),
+                            validator: (v) {
+                              if (v == null || v.length < 6) {
+                                return 'Mínimo 6 caracteres';
+                              }
+                              return null;
+                            },
+                          ),
+
+                          const SizedBox(height: AppSpacing.sm),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: isLoading
+                                  ? null
+                                  : () => context.push('/forgot-password'),
+                              child: const Text('Esqueci minha senha'),
+                            ),
+                          ),
+
+                          const SizedBox(height: AppSpacing.base),
+                          AppButton(
+                            label: 'Entrar',
+                            isLoading: isLoading,
+                            onPressed: _submit,
+                            prefixIcon: Icons.login,
+                          ),
+
+                          const SizedBox(height: AppSpacing.xl),
+                          const Divider(),
+                          const SizedBox(height: AppSpacing.base),
+
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Novo por aqui?',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                AppButton(
+                                  label: 'Fazer cadastro',
+                                  variant: AppButtonVariant.outline,
+                                  prefixIcon: Icons.person_add_outlined,
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => context.push(AppRoutes.register),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: AppSpacing.xl2),
+                          Center(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'É visitante?',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                AppButton(
+                                  label: 'Cadastrar como visitante',
+                                  variant: AppButtonVariant.ghost,
+                                  prefixIcon: Icons.how_to_reg_outlined,
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => context.push(
+                                          AppRoutes.visitorSelfRegister,
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xl2),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          return Scaffold(
+            backgroundColor: isWide
+                ? AppColors.primaryDark
+                : theme.scaffoldBackgroundColor,
+            body: isWide
+                ? Center(
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.xl2,
+                        ),
+                        child: SizedBox(
+                          width: 500,
+                          child: Material(
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusLg,
+                            ),
+                            elevation: 16,
+                            clipBehavior: Clip.antiAlias,
+                            child: formContent,
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
+                  )
+                : formContent,
           );
         },
       ),

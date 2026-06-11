@@ -31,6 +31,9 @@ class AuthRepositoryImpl implements AuthRepository {
       await _storage.saveUserProfile(response.user.toJsonString());
       return Right(response.user);
     } catch (e) {
+      if (e is DioException && e.response?.statusCode == 401) {
+        return const Left(AuthFailure('E-mail ou senha inválidos.'));
+      }
       return Left(_mapError(e));
     }
   }

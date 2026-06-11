@@ -451,313 +451,342 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
           backgroundColor: AppColors.background,
-          body: Form(
-            key: _formKey,
-            child: ListView(
-              children: [
-                // Header with photo
-                Container(
-                  width: double.infinity,
-                  color: AppColors.primary,
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.pagePaddingH,
-                    0,
-                    AppSpacing.pagePaddingH,
-                    AppSpacing.xl2,
-                  ),
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: _editing ? _pickPhoto : null,
-                        child: Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            CircleAvatar(
-                              radius: 44,
-                              backgroundColor: AppColors.primaryLight,
-                              backgroundImage: _photoBytes != null
-                                  ? MemoryImage(_photoBytes!)
-                                  : (_photoUrl != null
-                                            ? NetworkImage(_photoUrl!)
-                                            : null)
-                                        as ImageProvider<Object>?,
-                              child: (_photoBytes == null && _photoUrl == null)
-                                  ? Text(
-                                      initials,
-                                      style: AppTypography.headlineMedium
-                                          .copyWith(color: AppColors.primary),
-                                    )
-                                  : null,
-                            ),
-                            if (_editing)
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  color: AppColors.primary,
-                                  size: 16,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.base),
-                      if (_editing)
-                        TextButton.icon(
-                          onPressed: _pickPhoto,
-                          icon: const Icon(
-                            Icons.photo_camera_outlined,
-                            color: AppColors.white,
+          body: LayoutBuilder(
+            builder: (ctx, constraints) {
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      children: [
+                        // Header with photo
+                        Container(
+                          width: double.infinity,
+                          color: AppColors.primary,
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.pagePaddingH,
+                            0,
+                            AppSpacing.pagePaddingH,
+                            AppSpacing.xl2,
                           ),
-                          label: const Text(
-                            'Alterar foto',
-                            style: TextStyle(color: AppColors.white),
-                          ),
-                        )
-                      else ...[
-                        Text(
-                          displayName,
-                          style: AppTypography.headlineSmall.copyWith(
-                            color: AppColors.white,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          user?.email ?? '',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.white.withValues(alpha: 0.8),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        AppBadge(
-                          label: roleLabel,
-                          variant: AppBadgeVariant.info,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_editing) ...[
-                        AppSectionHeader(title: 'Informações pessoais'),
-                        const SizedBox(height: AppSpacing.base),
-                        AppCard(
                           child: Column(
                             children: [
-                              TextFormField(
-                                controller: _nameCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Nome completo',
-                                ),
-                                textCapitalization: TextCapitalization.words,
-                                validator: (v) =>
-                                    (v == null || v.trim().isEmpty)
-                                    ? 'Nome obrigatório'
-                                    : null,
-                              ),
-                              const SizedBox(height: AppSpacing.base),
-                              TextFormField(
-                                controller: _phoneCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Telefone',
-                                ),
-                                keyboardType: TextInputType.phone,
-                              ),
-                              const SizedBox(height: AppSpacing.base),
-                              TextFormField(
-                                controller: _addressCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Endereço',
-                                ),
-                                textCapitalization:
-                                    TextCapitalization.sentences,
-                                maxLines: 2,
-                              ),
-                              const SizedBox(height: AppSpacing.base),
-                              InkWell(
-                                onTap: _pickBirthDate,
-                                child: InputDecorator(
-                                  decoration: const InputDecoration(
-                                    labelText: 'Data de nascimento',
-                                    suffixIcon: Icon(
-                                      Icons.calendar_today_outlined,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _birthDate != null
-                                        ? DateFormat(
-                                            'dd/MM/yyyy',
-                                          ).format(_birthDate!)
-                                        : 'Selecionar data',
-                                    style: AppTypography.bodyMedium,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: AppSpacing.xl),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            AppSectionHeader(title: 'Filhos'),
-                            TextButton.icon(
-                              onPressed: _addChild,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Adicionar'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-
-                        if (_children.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.base,
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Nenhum filho cadastrado',
-                                style: AppTypography.bodyMedium.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          AppCard(
-                            padding: EdgeInsets.zero,
-                            child: Column(
-                              children: _children.asMap().entries.map((entry) {
-                                final i = entry.key;
-                                final child = entry.value;
-                                final dob = child['birthDate'] as DateTime?;
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
+                              GestureDetector(
+                                onTap: _editing ? _pickPhoto : null,
+                                child: Stack(
+                                  alignment: Alignment.bottomRight,
                                   children: [
-                                    if (i > 0) const Divider(height: 1),
-                                    ListTile(
-                                      leading: const Icon(
-                                        Icons.child_care_outlined,
-                                        color: AppColors.primary,
-                                      ),
-                                      title: Text(
-                                        child['name'] as String,
-                                        style: AppTypography.bodyMedium,
-                                      ),
-                                      subtitle: dob != null
+                                    CircleAvatar(
+                                      radius: 44,
+                                      backgroundColor: AppColors.primaryLight,
+                                      backgroundImage: _photoBytes != null
+                                          ? MemoryImage(_photoBytes!)
+                                          : (_photoUrl != null
+                                                    ? NetworkImage(_photoUrl!)
+                                                    : null)
+                                                as ImageProvider<Object>?,
+                                      child:
+                                          (_photoBytes == null &&
+                                              _photoUrl == null)
                                           ? Text(
-                                              DateFormat(
-                                                'dd/MM/yyyy',
-                                              ).format(dob),
-                                              style: AppTypography.bodySmall
+                                              initials,
+                                              style: AppTypography
+                                                  .headlineMedium
                                                   .copyWith(
-                                                    color:
-                                                        AppColors.textSecondary,
+                                                    color: AppColors.primary,
                                                   ),
                                             )
                                           : null,
-                                      trailing: IconButton(
-                                        icon: const Icon(
-                                          Icons.edit_outlined,
-                                          size: 18,
-                                        ),
-                                        onPressed: () => _editChild(i),
-                                      ),
                                     ),
+                                    if (_editing)
+                                      Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.white,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.camera_alt,
+                                          color: AppColors.primary,
+                                          size: 16,
+                                        ),
+                                      ),
                                   ],
-                                );
-                              }).toList(),
-                            ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.base),
+                              if (_editing)
+                                TextButton.icon(
+                                  onPressed: _pickPhoto,
+                                  icon: const Icon(
+                                    Icons.photo_camera_outlined,
+                                    color: AppColors.white,
+                                  ),
+                                  label: const Text(
+                                    'Alterar foto',
+                                    style: TextStyle(color: AppColors.white),
+                                  ),
+                                )
+                              else ...[
+                                Text(
+                                  displayName,
+                                  style: AppTypography.headlineSmall.copyWith(
+                                    color: AppColors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  user?.email ?? '',
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    color: AppColors.white.withValues(
+                                      alpha: 0.8,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                AppBadge(
+                                  label: roleLabel,
+                                  variant: AppBadgeVariant.info,
+                                ),
+                              ],
+                            ],
                           ),
-
-                        const SizedBox(height: AppSpacing.xl2),
-
-                        AppButton(
-                          label: _saving ? 'Salvando...' : 'Salvar alterações',
-                          prefixIcon: Icons.save_outlined,
-                          onPressed: _saving ? null : _saveProfile,
                         ),
 
-                        const SizedBox(height: AppSpacing.xl),
-                      ],
-
-                      // Account options (always visible)
-                      if (!_editing) ...[
-                        const SizedBox(height: AppSpacing.base),
-                        AppCard(
-                          padding: EdgeInsets.zero,
+                        Padding(
+                          padding: const EdgeInsets.all(
+                            AppSpacing.pagePaddingH,
+                          ),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ListTile(
-                                leading: const Icon(
-                                  Icons.lock_outline,
-                                  color: AppColors.primary,
+                              if (_editing) ...[
+                                AppSectionHeader(title: 'Informações pessoais'),
+                                const SizedBox(height: AppSpacing.base),
+                                AppCard(
+                                  child: Column(
+                                    children: [
+                                      TextFormField(
+                                        controller: _nameCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Nome completo',
+                                        ),
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        validator: (v) =>
+                                            (v == null || v.trim().isEmpty)
+                                            ? 'Nome obrigatório'
+                                            : null,
+                                      ),
+                                      const SizedBox(height: AppSpacing.base),
+                                      TextFormField(
+                                        controller: _phoneCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Telefone',
+                                        ),
+                                        keyboardType: TextInputType.phone,
+                                      ),
+                                      const SizedBox(height: AppSpacing.base),
+                                      TextFormField(
+                                        controller: _addressCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Endereço',
+                                        ),
+                                        textCapitalization:
+                                            TextCapitalization.sentences,
+                                        maxLines: 2,
+                                      ),
+                                      const SizedBox(height: AppSpacing.base),
+                                      InkWell(
+                                        onTap: _pickBirthDate,
+                                        child: InputDecorator(
+                                          decoration: const InputDecoration(
+                                            labelText: 'Data de nascimento',
+                                            suffixIcon: Icon(
+                                              Icons.calendar_today_outlined,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _birthDate != null
+                                                ? DateFormat(
+                                                    'dd/MM/yyyy',
+                                                  ).format(_birthDate!)
+                                                : 'Selecionar data',
+                                            style: AppTypography.bodyMedium,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                title: const Text('Alterar senha'),
-                                trailing: const Icon(
-                                  Icons.chevron_right,
-                                  color: AppColors.grey400,
+
+                                const SizedBox(height: AppSpacing.xl),
+
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    AppSectionHeader(title: 'Filhos'),
+                                    TextButton.icon(
+                                      onPressed: _addChild,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Adicionar'),
+                                    ),
+                                  ],
                                 ),
-                                onTap: () => context.push('/change-password'),
+                                const SizedBox(height: AppSpacing.sm),
+
+                                if (_children.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: AppSpacing.base,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Nenhum filho cadastrado',
+                                        style: AppTypography.bodyMedium
+                                            .copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  AppCard(
+                                    padding: EdgeInsets.zero,
+                                    child: Column(
+                                      children: _children.asMap().entries.map((
+                                        entry,
+                                      ) {
+                                        final i = entry.key;
+                                        final child = entry.value;
+                                        final dob =
+                                            child['birthDate'] as DateTime?;
+                                        return Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (i > 0) const Divider(height: 1),
+                                            ListTile(
+                                              leading: const Icon(
+                                                Icons.child_care_outlined,
+                                                color: AppColors.primary,
+                                              ),
+                                              title: Text(
+                                                child['name'] as String,
+                                                style: AppTypography.bodyMedium,
+                                              ),
+                                              subtitle: dob != null
+                                                  ? Text(
+                                                      DateFormat(
+                                                        'dd/MM/yyyy',
+                                                      ).format(dob),
+                                                      style: AppTypography
+                                                          .bodySmall
+                                                          .copyWith(
+                                                            color: AppColors
+                                                                .textSecondary,
+                                                          ),
+                                                    )
+                                                  : null,
+                                              trailing: IconButton(
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                  size: 18,
+                                                ),
+                                                onPressed: () => _editChild(i),
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+
+                                const SizedBox(height: AppSpacing.xl2),
+
+                                AppButton(
+                                  label: _saving
+                                      ? 'Salvando...'
+                                      : 'Salvar alterações',
+                                  prefixIcon: Icons.save_outlined,
+                                  onPressed: _saving ? null : _saveProfile,
+                                ),
+
+                                const SizedBox(height: AppSpacing.xl),
+                              ],
+
+                              // Account options (always visible)
+                              if (!_editing) ...[
+                                const SizedBox(height: AppSpacing.base),
+                                AppCard(
+                                  padding: EdgeInsets.zero,
+                                  child: Column(
+                                    children: [
+                                      ListTile(
+                                        leading: const Icon(
+                                          Icons.lock_outline,
+                                          color: AppColors.primary,
+                                        ),
+                                        title: const Text('Alterar senha'),
+                                        trailing: const Icon(
+                                          Icons.chevron_right,
+                                          color: AppColors.grey400,
+                                        ),
+                                        onTap: () =>
+                                            context.push('/change-password'),
+                                      ),
+                                      const Divider(height: 1),
+                                      ListTile(
+                                        leading: const Icon(
+                                          Icons.notifications_outlined,
+                                          color: AppColors.primary,
+                                        ),
+                                        title: const Text('Notificações'),
+                                        trailing: const Icon(
+                                          Icons.chevron_right,
+                                          color: AppColors.grey400,
+                                        ),
+                                        onTap: () =>
+                                            context.push('/notifications'),
+                                      ),
+                                      const Divider(height: 1),
+                                      ListTile(
+                                        leading: const Icon(
+                                          Icons.info_outline,
+                                          color: AppColors.primary,
+                                        ),
+                                        title: const Text('Sobre o app'),
+                                        trailing: const Icon(
+                                          Icons.chevron_right,
+                                          color: AppColors.grey400,
+                                        ),
+                                        onTap: () => context.push('/about'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: AppSpacing.xl),
+
+                              AppButton(
+                                label: 'Sair da conta',
+                                variant: AppButtonVariant.danger,
+                                prefixIcon: Icons.logout,
+                                onPressed: () => _confirmLogout(context),
                               ),
-                              const Divider(height: 1),
-                              ListTile(
-                                leading: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: AppColors.primary,
-                                ),
-                                title: const Text('Notificações'),
-                                trailing: const Icon(
-                                  Icons.chevron_right,
-                                  color: AppColors.grey400,
-                                ),
-                                onTap: () => context.push('/notifications'),
-                              ),
-                              const Divider(height: 1),
-                              ListTile(
-                                leading: const Icon(
-                                  Icons.info_outline,
-                                  color: AppColors.primary,
-                                ),
-                                title: const Text('Sobre o app'),
-                                trailing: const Icon(
-                                  Icons.chevron_right,
-                                  color: AppColors.grey400,
-                                ),
-                                onTap: () => context.push('/about'),
-                              ),
+
+                              const SizedBox(height: AppSpacing.xl2),
                             ],
                           ),
                         ),
                       ],
-
-                      const SizedBox(height: AppSpacing.xl),
-
-                      AppButton(
-                        label: 'Sair da conta',
-                        variant: AppButtonVariant.danger,
-                        prefixIcon: Icons.logout,
-                        onPressed: () => _confirmLogout(context),
-                      ),
-
-                      const SizedBox(height: AppSpacing.xl2),
-                    ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         );
       },

@@ -58,46 +58,91 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    final isWide = MediaQuery.of(context).size.width >= 720;
+
+    final appBar = AppBar(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _tabTitles[_selectedIndex],
+            style: AppTypography.titleLarge.copyWith(color: AppColors.white),
+          ),
+          if (_selectedIndex == 0)
             Text(
-              _tabTitles[_selectedIndex],
-              style: AppTypography.titleLarge.copyWith(color: AppColors.white),
-            ),
-            if (_selectedIndex == 0)
-              Text(
-                'Visão geral da integração',
-                style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.white.withValues(alpha: 0.75),
-                ),
+              'Visão geral da integração',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.white.withValues(alpha: 0.75),
               ),
+            ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () => context.push('/notifications'),
+        ),
+        IconButton(
+          icon: const Icon(Icons.account_circle_outlined),
+          onPressed: () => context.push('/profile'),
+        ),
+      ],
+    );
+
+    final tabContent = IndexedStack(
+      index: _selectedIndex,
+      children: [
+        _DashboardTab(onSwitchTab: (i) => setState(() => _selectedIndex = i)),
+        const _VisitorsAdminTab(),
+        const _CellsAdminTab(),
+        const _ReportsTab(),
+      ],
+    );
+
+    if (isWide) {
+      return Scaffold(
+        appBar: appBar,
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: Text('Dashboard'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.people_outline),
+                  selectedIcon: Icon(Icons.people),
+                  label: Text('Visitantes'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.groups_2_outlined),
+                  selectedIcon: Icon(Icons.groups_2),
+                  label: Text('Células'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.description_outlined),
+                  selectedIcon: Icon(Icons.description),
+                  label: Text('Relatórios'),
+                ),
+              ],
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(child: tabContent),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => context.push('/notifications'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => context.push('/profile'),
-          ),
-        ],
-      ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _DashboardTab(onSwitchTab: (i) => setState(() => _selectedIndex = i)),
-          const _VisitorsAdminTab(),
-          const _CellsAdminTab(),
-          const _ReportsTab(),
-        ],
-      ),
+      );
+    }
+
+    return Scaffold(
+      appBar: appBar,
+      body: tabContent,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),

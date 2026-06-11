@@ -27,6 +27,10 @@ const _publicRoutes = {
   AppRoutes.visitorSelfRegister,
 };
 
+/// Routes that authenticated users are still allowed to visit freely
+/// (not redirected to their home dashboard).
+const _alwaysAllowedRoutes = {AppRoutes.visitorSelfRegister};
+
 /// Creates a [GoRouter] that reacts to [AuthBloc] state changes.
 GoRouter createRouter(AuthBloc authBloc) {
   final notifier = _AuthRouterNotifier(authBloc);
@@ -51,6 +55,11 @@ GoRouter createRouter(AuthBloc authBloc) {
       if (!isAuthenticated && !isPublic) return AppRoutes.login;
 
       if (authState is AuthAuthenticated && isPublic) {
+        // Some public routes (e.g. visitor self-register) must remain
+        // accessible even while the user is logged in.
+        if (_alwaysAllowedRoutes.any((r) => location.startsWith(r))) {
+          return null;
+        }
         if (authState.user.isAdmin) return AppRoutes.adminDashboard;
         if (authState.user.isSupervisor) return AppRoutes.supervisorHome;
         return AppRoutes.leaderHome;

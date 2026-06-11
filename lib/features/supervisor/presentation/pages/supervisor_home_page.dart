@@ -31,28 +31,64 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Painel do Supervisor'),
-        elevation: 0,
-        backgroundColor: AppColors.background,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => context.push('/notifications'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => context.push('/profile'),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-        ],
-      ),
+    final isWide = MediaQuery.of(context).size.width >= 720;
+
+    final appBar = AppBar(
+      title: const Text('Painel do Supervisor'),
+      elevation: 0,
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _selectedTab,
-        children: const [_LeadersTab(), _OverviewTab()],
-      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () => context.push('/notifications'),
+        ),
+        IconButton(
+          icon: const Icon(Icons.account_circle_outlined),
+          onPressed: () => context.push('/profile'),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+      ],
+    );
+
+    final tabContent = IndexedStack(
+      index: _selectedTab,
+      children: const [_LeadersTab(), _OverviewTab()],
+    );
+
+    if (isWide) {
+      return Scaffold(
+        appBar: appBar,
+        backgroundColor: AppColors.background,
+        body: Row(
+          children: [
+            NavigationRail(
+              selectedIndex: _selectedTab,
+              onDestinationSelected: (i) => setState(() => _selectedTab = i),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.people_outline),
+                  selectedIcon: Icon(Icons.people),
+                  label: Text('Líderes'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: Text('Visão Geral'),
+                ),
+              ],
+            ),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(child: tabContent),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: appBar,
+      backgroundColor: AppColors.background,
+      body: tabContent,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         onDestinationSelected: (i) => setState(() => _selectedTab = i),

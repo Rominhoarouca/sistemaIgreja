@@ -38,7 +38,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final isWide = MediaQuery.of(context).size.width >= 720;
+    final formContent = Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -95,6 +96,26 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+    if (!isWide) return formContent;
+    return Scaffold(
+      backgroundColor: AppColors.primaryDark,
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl2),
+            child: SizedBox(
+              width: 500,
+              child: Material(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                elevation: 16,
+                clipBehavior: Clip.antiAlias,
+                child: formContent,
+              ),
+            ),
           ),
         ),
       ),

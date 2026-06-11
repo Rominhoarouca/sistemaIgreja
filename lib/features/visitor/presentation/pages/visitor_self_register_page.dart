@@ -207,6 +207,8 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   @override
   Widget build(BuildContext context) {
     if (_success) return _SuccessScreen();
+    if (MediaQuery.of(context).size.width >= 720.0)
+      return _buildWideLayout(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -505,6 +507,428 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Wide layout (tablet / desktop) ──────────────────────────────────────
+  Widget _buildWideLayout(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
+    return Scaffold(
+      backgroundColor: AppColors.primaryDark,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1020),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl2,
+                vertical: AppSpacing.xl,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                child: Material(
+                  elevation: 12,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: screenH * 0.9),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildBrandingPanel(),
+                        Expanded(
+                          child: ColoredBox(
+                            color: AppColors.background,
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xl2,
+                                vertical: AppSpacing.xl,
+                              ),
+                              child: Form(
+                                key: _formKey,
+                                child: _buildFormContent(wide: true),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandingPanel() {
+    return Container(
+      width: 300,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, AppColors.primaryDark],
+        ),
+      ),
+      padding: const EdgeInsets.all(AppSpacing.xl2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.md),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
+            child: const Icon(Icons.church, color: AppColors.white, size: 30),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text(
+            'Bem-vindo!',
+            style: AppTypography.headlineMedium.copyWith(
+              color: AppColors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Preencha seus dados e faça parte da nossa comunidade.',
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.white.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl2),
+          ...[
+            ('Cadastro simples e rápido', Icons.flash_on_outlined),
+            ('Sem necessidade de login', Icons.lock_open_outlined),
+            ('Nossa equipe entrará em contato', Icons.support_agent_outlined),
+            ('Fique por dentro dos eventos', Icons.calendar_today_outlined),
+          ].map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Row(
+                children: [
+                  Icon(
+                    item.$2,
+                    color: AppColors.white.withValues(alpha: 0.75),
+                    size: 18,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      item.$1,
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '\u00a9 ${DateTime.now().year} Sistema Igreja',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.white.withValues(alpha: 0.45),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormContent({required bool wide}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Dados Pessoais', Icons.person_outline),
+        const SizedBox(height: AppSpacing.base),
+        if (wide) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: AppTextField(
+                  controller: _nameCtrl,
+                  label: 'Nome completo *',
+                  hint: 'Ex: João da Silva',
+                  prefixIcon: Icons.person_outline,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Campo obrigatório'
+                      : null,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.base),
+              Expanded(
+                flex: 2,
+                child: AppTextField(
+                  controller: _phoneCtrl,
+                  label: 'Telefone / WhatsApp *',
+                  hint: '(00) 00000-0000',
+                  prefixIcon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => (v == null || v.trim().length < 8)
+                      ? 'Informe um telefone válido'
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.base),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _DatePickerField(
+                  label: 'Data de Nascimento *',
+                  value: _birthDate,
+                  onTap: _pickBirthDate,
+                  validator: () =>
+                      _birthDate == null ? 'Campo obrigatório' : null,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.base),
+              Expanded(
+                child: _DropdownField<String>(
+                  label: 'Estado Civil (opcional)',
+                  value: _maritalStatus,
+                  hint: 'Selecione',
+                  items: _maritalOptions,
+                  itemLabel: (v) => v,
+                  onChanged: (v) => setState(() => _maritalStatus = v),
+                ),
+              ),
+            ],
+          ),
+        ] else ...[
+          AppTextField(
+            controller: _nameCtrl,
+            label: 'Nome completo *',
+            hint: 'Ex: João da Silva',
+            prefixIcon: Icons.person_outline,
+            textInputAction: TextInputAction.next,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
+          ),
+          const SizedBox(height: AppSpacing.base),
+          AppTextField(
+            controller: _phoneCtrl,
+            label: 'Telefone / WhatsApp *',
+            hint: '(00) 00000-0000',
+            prefixIcon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.next,
+            validator: (v) => (v == null || v.trim().length < 8)
+                ? 'Informe um telefone válido'
+                : null,
+          ),
+          const SizedBox(height: AppSpacing.base),
+          _DatePickerField(
+            label: 'Data de Nascimento *',
+            value: _birthDate,
+            onTap: _pickBirthDate,
+            validator: () => _birthDate == null ? 'Campo obrigatório' : null,
+          ),
+          const SizedBox(height: AppSpacing.base),
+          _DropdownField<String>(
+            label: 'Estado Civil (opcional)',
+            value: _maritalStatus,
+            hint: 'Selecione',
+            items: _maritalOptions,
+            itemLabel: (v) => v,
+            onChanged: (v) => setState(() => _maritalStatus = v),
+          ),
+        ],
+        _divider(),
+        _sectionHeader('Endereço', Icons.location_on_outlined),
+        const SizedBox(height: AppSpacing.base),
+        AppTextField(
+          controller: _addressCtrl,
+          label: 'Endereço *',
+          hint: 'Rua, número',
+          prefixIcon: Icons.home_outlined,
+          textInputAction: TextInputAction.next,
+          validator: (v) =>
+              (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
+        ),
+        const SizedBox(height: AppSpacing.base),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: AppTextField(
+                controller: _neighborhoodCtrl,
+                label: 'Bairro *',
+                hint: 'Seu bairro',
+                textInputAction: TextInputAction.next,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Obrigatório' : null,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: AppTextField(
+                controller: _cityCtrl,
+                label: 'Cidade *',
+                hint: 'Sua cidade',
+                textInputAction: TextInputAction.next,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Obrigatório' : null,
+              ),
+            ),
+          ],
+        ),
+        _divider(),
+        _sectionHeader('Sobre Você', Icons.info_outline),
+        const SizedBox(height: AppSpacing.base),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildBaptizedSwitch()),
+              const SizedBox(width: AppSpacing.base),
+              Expanded(child: _buildCellSwitch()),
+            ],
+          )
+        else ...[
+          _buildBaptizedSwitch(),
+          const SizedBox(height: AppSpacing.base),
+          _buildCellSwitch(),
+        ],
+        if (_attendsCell) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _CellSelector(
+            cells: _cells,
+            loading: _cellsLoading,
+            selectedCellId: _selectedCellId,
+            customCellSelected: _customCellSelected,
+            customCellCtrl: _customCellCtrl,
+            onCellSelected: (id, isCustom) => setState(() {
+              _selectedCellId = isCustom ? null : id;
+              _customCellSelected = isCustom;
+              if (!isCustom) _customCellCtrl.clear();
+            }),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.base),
+        AppTextField(
+          controller: _knownPersonCtrl,
+          label: 'Conhece alguém na igreja? (opcional)',
+          hint: 'Nome da pessoa',
+          prefixIcon: Icons.people_outline,
+          textInputAction: TextInputAction.next,
+        ),
+        _divider(),
+        _sectionHeader('Como posso ajudar você?', Icons.favorite_outline),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Selecione todas as opções que se aplicam',
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: _interestOptions
+              .map(
+                (opt) => FilterChip(
+                  label: Text(opt),
+                  selected: _interests.contains(opt),
+                  onSelected: (selected) => setState(() {
+                    if (selected) {
+                      _interests.add(opt);
+                    } else {
+                      _interests.remove(opt);
+                    }
+                  }),
+                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                  checkmarkColor: AppColors.primary,
+                  labelStyle: AppTypography.bodySmall.copyWith(
+                    color: _interests.contains(opt)
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
+                    fontWeight: _interests.contains(opt)
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: AppSpacing.xl2),
+        AppButton(
+          label: 'Enviar Cadastro',
+          isLoading: _submitting,
+          onPressed: _submit,
+          prefixIcon: Icons.send_outlined,
+        ),
+        const SizedBox(height: AppSpacing.xl),
+      ],
+    );
+  }
+
+  Widget _buildBaptizedSwitch() {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.water_outlined, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Text('Já é batizado(a)?', style: AppTypography.bodyMedium),
+          ),
+          Switch(
+            value: _isBaptized,
+            onChanged: (v) => setState(() => _isBaptized = v),
+            activeColor: AppColors.primary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCellSwitch() {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.home_outlined, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          const Expanded(
+            child: Text(
+              'Frequenta alguma célula?',
+              style: AppTypography.bodyMedium,
+            ),
+          ),
+          Switch(
+            value: _attendsCell,
+            onChanged: (v) => setState(() {
+              _attendsCell = v;
+              if (!v) {
+                _selectedCellId = null;
+                _customCellSelected = false;
+                _customCellCtrl.clear();
+              }
+            }),
+            activeColor: AppColors.primary,
           ),
         ],
       ),
