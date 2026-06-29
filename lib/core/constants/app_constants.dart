@@ -80,6 +80,12 @@ abstract final class AppRoutes {
   static const String adminVisitors = '/admin/visitors';
   static const String adminCells = '/admin/cells';
   static const String adminLeaders = '/admin/leaders';
+  static const String adminSupervisors = '/admin/supervisors';
+  static const String adminCoordenacoes = '/admin/coordenacoes';
+  static const String adminLocation = '/admin/location';
   static const String adminReports = '/admin/reports';
   static const String adminMaterials = '/admin/materials';
+  static const String adminCellTypes = '/admin/cell-types';
+  static const String adminWhatsapp = '/admin/whatsapp';
+  static const String adminUsersRegister = '/admin/users/register';
 }

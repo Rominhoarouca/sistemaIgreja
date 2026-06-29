@@ -50,6 +50,7 @@ services:
     depends_on:
       - api
       - app
+      - minio
     networks:
       - sistema_igreja_net
 
@@ -57,10 +58,10 @@ services:
   # Build: docker compose build app
   # Publish: npm --prefix api run publishDockerApp
   app:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile.web
-    image: rominhoarouca/sistema-igreja-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.build-web
+    # image: rominhoarouca/sistema-igreja-app:latest
     container_name: sistema_igreja_app
     restart: unless-stopped
     environment:
@@ -73,7 +74,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
-    image: rominhoarouca/sistema-igreja-api:latest
+    # image: rominhoarouca/sistema-igreja-api:latest
     container_name: sistema_igreja_api
     restart: unless-stopped
     environment:

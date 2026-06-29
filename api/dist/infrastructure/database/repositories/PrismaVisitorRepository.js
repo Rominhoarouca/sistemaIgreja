@@ -1,6 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaVisitorRepository = void 0;
+const bairroInclude = {
+    bairro: {
+        select: {
+            id: true, name: true,
+            cidade: { select: { id: true, name: true, estado: { select: { id: true, name: true, uf: true } } } },
+        },
+    },
+};
+function deriveLocation(bairro) {
+    if (!bairro)
+        return { neighborhood: null, city: null, state: null };
+    return { neighborhood: bairro.name, city: bairro.cidade.name, state: bairro.cidade.estado.uf };
+}
 class PrismaVisitorRepository {
     prisma;
     constructor(prisma) {
@@ -9,7 +22,7 @@ class PrismaVisitorRepository {
     async findById(id) {
         const row = await this.prisma.visitor.findUnique({
             where: { id },
-            include: { convertedMember: { select: { id: true } } },
+            include: { convertedMember: { select: { id: true } }, ...bairroInclude },
         });
         return row ? this.mapRow(row) : null;
     }
@@ -34,7 +47,7 @@ class PrismaVisitorRepository {
             this.prisma.visitor.count({ where }),
             this.prisma.visitor.findMany({
                 where,
-                include: { convertedMember: { select: { id: true } } },
+                include: { convertedMember: { select: { id: true } }, ...bairroInclude },
                 orderBy: { createdAt: 'desc' },
                 skip: (page - 1) * pageSize,
                 take: pageSize,
@@ -55,14 +68,20 @@ class PrismaVisitorRepository {
                 phone: data.phone,
                 ...(data.email !== undefined ? { email: data.email } : {}),
                 ...(data.address !== undefined ? { address: data.address } : {}),
-                ...(data.neighborhood !== undefined ? { neighborhood: data.neighborhood } : {}),
-                ...(data.city !== undefined ? { city: data.city } : {}),
+                ...(data.numero !== undefined ? { numero: data.numero } : {}),
+                ...(data.complemento !== undefined ? { complemento: data.complemento } : {}),
+                ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
                 ...(data.originChurch !== undefined ? { originChurch: data.originChurch } : {}),
+                ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
+                ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
+                ...(data.isBaptized !== undefined ? { isBaptized: data.isBaptized } : {}),
+                ...(data.knownPersonName !== undefined ? { knownPersonName: data.knownPersonName } : {}),
+                ...(data.interests !== undefined ? { interests: data.interests } : {}),
                 ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
                 ...(data.cellId !== undefined ? { cellId: data.cellId } : {}),
                 ...(data.referredById !== undefined ? { referredById: data.referredById } : {}),
             },
-            include: { convertedMember: { select: { id: true } } },
+            include: { convertedMember: { select: { id: true } }, ...bairroInclude },
         });
         return this.mapRow(row);
     }
@@ -74,7 +93,7 @@ class PrismaVisitorRepository {
                 ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
                 ...(data.cellId !== undefined ? { cellId: data.cellId } : {}),
             },
-            include: { convertedMember: { select: { id: true } } },
+            include: { convertedMember: { select: { id: true } }, ...bairroInclude },
         });
         return this.mapRow(row);
     }
@@ -111,15 +130,25 @@ class PrismaVisitorRepository {
         }));
     }
     mapRow(row) {
+        const loc = deriveLocation(row.bairro ?? null);
         return {
             id: row.id,
             name: row.name,
             phone: row.phone,
             email: row.email,
             address: row.address,
-            neighborhood: row.neighborhood,
-            city: row.city,
+            numero: row.numero,
+            complemento: row.complemento,
+            bairroId: row.bairroId,
+            neighborhood: loc.neighborhood,
+            city: loc.city,
+            state: loc.state,
             originChurch: row.originChurch,
+            birthDate: row.birthDate ?? null,
+            maritalStatus: row.maritalStatus ?? null,
+            isBaptized: row.isBaptized ?? false,
+            knownPersonName: row.knownPersonName ?? null,
+            interests: row.interests ?? [],
             status: row.status,
             leaderId: row.leaderId,
             cellId: row.cellId,

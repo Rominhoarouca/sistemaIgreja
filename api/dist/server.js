@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 // Attempt to load .env if available, but don't crash if dotenv isn't installed
 try {
@@ -11,11 +14,13 @@ catch (_err) {
 const app_1 = require("./infrastructure/http/app");
 const container_1 = require("./shared/container");
 const logger_1 = require("@shared/logger/logger");
+const http_1 = __importDefault(require("http"));
 const PORT = Number(process.env['PORT'] ?? 3000);
 async function bootstrap() {
     const container = (0, container_1.createContainer)();
     const app = (0, app_1.createApp)(container);
-    const server = app.listen(PORT, () => {
+    // Only HTTP — TLS is handled by nginx/reverse-proxy in production
+    const server = http_1.default.createServer(app).listen(PORT, '0.0.0.0', () => {
         logger_1.logger.info(`[API] Sistema Igreja rodando na porta ${PORT}`);
         logger_1.logger.info(`[API] Health: http://localhost:${PORT}/health`);
         // Also print to stdout to ensure parent watcher's terminal shows messages

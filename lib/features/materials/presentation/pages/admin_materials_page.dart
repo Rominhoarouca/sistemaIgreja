@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/utils/app_snackbar.dart';
 
 /// Admin Materials page — load/upload/delete/view materials via API + MinIO.
 class AdminMaterialsPage extends StatefulWidget {
@@ -86,6 +87,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
   String? _error;
   List<_MaterialData> _materials = [];
   List<_CellOption> _cells = [];
+  List<Map<String, dynamic>> _cellTypes = [];
   final Map<String, bool> _opening = {};
 
   @override
@@ -110,10 +112,13 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       final results = await Future.wait([
         _dio.get('/materials'),
         _dio.get('/cells'),
+        _dio.get('/cell-types'),
       ]);
       final mData =
           (results[0].data as Map<String, dynamic>)['materials'] as List;
       final cData = (results[1].data as Map<String, dynamic>)['cells'] as List;
+      final tData =
+          (results[2].data as Map<String, dynamic>)['cellTypes'] as List? ?? [];
       if (!mounted) return;
       setState(() {
         _materials = mData
@@ -125,14 +130,16 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
                   _CellOption(id: c['id'] as String, name: c['name'] as String),
             )
             .toList();
+        _cellTypes = tData.cast<Map<String, dynamic>>();
         _isLoading = false;
       });
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error =
-            e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar materiais';
+        _error = extractDioErrorMessage(
+          e,
+          fallback: 'Erro ao carregar materiais',
+        );
         _isLoading = false;
       });
     }
@@ -184,12 +191,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
 
   Future<void> _uploadMaterial() async {
     if (_cells.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nenhuma célula cadastrada para associar material'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      AppSnackbar.warning('Nenhuma célula cadastrada para associar material');
       return;
     }
 
@@ -207,6 +209,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       builder: (ctx) => _UploadDialog(
         defaultTitle: file.name.replaceAll(RegExp(r'\.\w+$'), ''),
         cells: _cells,
+        cellTypes: _cellTypes,
       ),
     );
     if (params == null) return;
@@ -221,6 +224,8 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       };
       if (params.allCells) {
         map['allCells'] = 'true';
+      } else if (params.cellTypeId != null) {
+        map['cellTypeId'] = params.cellTypeId!;
       } else {
         map['cellIds'] = jsonEncode(params.selectedCellIds);
       }
@@ -228,24 +233,13 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       await _dio.post('/materials', data: formData);
       if (!mounted) return;
       setState(() => _isUploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"${params.title}" enviado com sucesso!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppSnackbar.success('"${params.title}" enviado com sucesso!');
       _loadData();
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isUploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao enviar arquivo',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao enviar arquivo'),
       );
     }
   }
@@ -278,22 +272,11 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
       await _dio.delete('/materials/${material.id}');
       if (!mounted) return;
       setState(() => _materials.removeWhere((m) => m.id == material.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Material excluído'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppSnackbar.success('Material excluído');
     } on DioException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao excluir material',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao excluir material'),
       );
     }
   }
@@ -310,21 +293,11 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
         throw Exception('Não foi possível abrir o arquivo');
       }
     } on DioException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao obter URL do arquivo',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao obter URL do arquivo'),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
-      );
+      AppSnackbar.error(e.toString());
     } finally {
       if (mounted) setState(() => _opening.remove(material.id));
     }
@@ -623,17 +596,24 @@ class _UploadParams {
   final String title;
   final bool allCells;
   final List<String> selectedCellIds;
+  final String? cellTypeId;
   const _UploadParams({
     required this.title,
     required this.allCells,
     required this.selectedCellIds,
+    this.cellTypeId,
   });
 }
 
 class _UploadDialog extends StatefulWidget {
-  const _UploadDialog({required this.defaultTitle, required this.cells});
+  const _UploadDialog({
+    required this.defaultTitle,
+    required this.cells,
+    this.cellTypes = const [],
+  });
   final String defaultTitle;
   final List<_CellOption> cells;
+  final List<Map<String, dynamic>> cellTypes;
 
   @override
   State<_UploadDialog> createState() => _UploadDialogState();
@@ -642,6 +622,7 @@ class _UploadDialog extends StatefulWidget {
 class _UploadDialogState extends State<_UploadDialog> {
   late final TextEditingController _titleCtrl;
   bool _allCells = true;
+  String? _selectedCellTypeId;
   late final Set<String> _selectedIds;
 
   @override
@@ -694,40 +675,66 @@ class _UploadDialogState extends State<_UploadDialog> {
           ),
           if (!_allCells) ...[
             const SizedBox(height: AppSpacing.sm),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => _toggleSelectAll(true),
-                  child: const Text('Selecionar todos'),
+            if (widget.cellTypes.isNotEmpty) ...[
+              DropdownButtonFormField<String?>(
+                initialValue: _selectedCellTypeId,
+                decoration: const InputDecoration(
+                  labelText: 'Filtrar por tipo de célula (opcional)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
                 ),
-                TextButton(
-                  onPressed: () => _toggleSelectAll(false),
-                  child: const Text('Limpar'),
-                ),
-              ],
-            ),
-            SizedBox(
-              height: 160,
-              child: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: widget.cells.map((c) {
-                    final selected = _selectedIds.contains(c.id);
-                    return FilterChip(
-                      label: Text(c.name, overflow: TextOverflow.ellipsis),
-                      selected: selected,
-                      onSelected: (s) => setState(
-                        () => s
-                            ? _selectedIds.add(c.id)
-                            : _selectedIds.remove(c.id),
-                      ),
-                    );
-                  }).toList(),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Selecionar células individualmente'),
+                  ),
+                  ...widget.cellTypes.map(
+                    (t) => DropdownMenuItem(
+                      value: t['id'] as String,
+                      child: Text(t['name'] as String),
+                    ),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _selectedCellTypeId = v),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (_selectedCellTypeId == null) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => _toggleSelectAll(true),
+                    child: const Text('Selecionar todos'),
+                  ),
+                  TextButton(
+                    onPressed: () => _toggleSelectAll(false),
+                    child: const Text('Limpar'),
+                  ),
+                ],
+              ),
+              SizedBox(
+                height: 160,
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.cells.map((c) {
+                      final selected = _selectedIds.contains(c.id);
+                      return FilterChip(
+                        label: Text(c.name, overflow: TextOverflow.ellipsis),
+                        selected: selected,
+                        onSelected: (s) => setState(
+                          () => s
+                              ? _selectedIds.add(c.id)
+                              : _selectedIds.remove(c.id),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ],
       ),
@@ -740,13 +747,10 @@ class _UploadDialogState extends State<_UploadDialog> {
           onPressed: () {
             final title = _titleCtrl.text.trim();
             if (title.isEmpty) return;
-            if (!_allCells && _selectedIds.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Selecione ao menos uma célula'),
-                  backgroundColor: AppColors.warning,
-                ),
-              );
+            if (!_allCells &&
+                _selectedCellTypeId == null &&
+                _selectedIds.isEmpty) {
+              AppSnackbar.warning('Selecione ao menos uma célula ou tipo');
               return;
             }
             Navigator.pop(
@@ -755,6 +759,7 @@ class _UploadDialogState extends State<_UploadDialog> {
                 title: title,
                 allCells: _allCells,
                 selectedCellIds: _selectedIds.toList(),
+                cellTypeId: _allCells ? null : _selectedCellTypeId,
               ),
             );
           },

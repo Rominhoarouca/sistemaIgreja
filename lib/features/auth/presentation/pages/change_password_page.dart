@@ -129,8 +129,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       onSuffixTap: () => setState(() => _showNew = !_showNew),
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return 'Informe a nova senha';
+                        }
                         if (v.length < 6) return 'Mínimo 6 caracteres';
                         return null;
                       },
@@ -152,10 +153,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _submit(),
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return 'Confirme a nova senha';
-                        if (v != _newCtrl.text)
+                        }
+                        if (v != _newCtrl.text) {
                           return 'As senhas não coincidem';
+                        }
                         return null;
                       },
                     ),

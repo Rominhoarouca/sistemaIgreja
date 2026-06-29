@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'LIDER' | 'SUPERVISOR';
+export type UserRole = 'ADMIN' | 'LIDER' | 'SUPERVISOR' | 'COORDENADOR';
 
 export interface User {
   readonly id: string;
@@ -9,7 +9,11 @@ export interface User {
   readonly phone: string | null;
   readonly address: string | null;
   readonly birthDate: Date | null;
+  readonly isMarried: boolean;
+  readonly spouseName: string | null;
+  readonly weddingDate: Date | null;
   readonly supervisorId: string | null;
+  readonly coordenacaoId: string | null;
   readonly description: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -29,4 +33,6 @@ export interface Child {
 
 export interface UserProfile extends User {
   readonly children: Child[];
+  readonly coordenacaoName: string | null;
+  readonly coordenacaoColor: string | null;
 }

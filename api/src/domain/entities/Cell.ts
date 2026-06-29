@@ -12,9 +12,16 @@ export interface Cell {
   readonly name: string;
   readonly leaderId: string;
   readonly leaderName?: string;
+  readonly cellTypeId: string | null;
+  readonly cellTypeName?: string | null;
   readonly address: string;
+  readonly bairroId: string | null;
+  readonly estadoId?: string | null;
+  readonly cidadeId?: string | null;
+  // Derived from bairro relation for backward-compat display
   readonly neighborhood: string;
   readonly city: string;
+  readonly state: string;
   readonly dayOfWeek: DayOfWeek;
   readonly time: string;
   readonly maxCapacity: number;
@@ -38,9 +45,9 @@ export interface NearbySearchParams {
 export interface CreateCellData {
   readonly name: string;
   readonly leaderId: string;
+  readonly cellTypeId?: string | null;
   readonly address: string;
-  readonly neighborhood: string;
-  readonly city: string;
+  readonly bairroId?: string | null;
   readonly dayOfWeek: DayOfWeek;
   readonly time: string;
   readonly maxCapacity?: number;

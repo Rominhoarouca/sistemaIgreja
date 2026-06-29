@@ -4,6 +4,7 @@ import type { UploadMaterialUseCase } from '@application/usecases/material/Uploa
 import type { IMaterialRepository } from '@domain/repositories/IMaterialRepository';
 import type { ICellRepository } from '@domain/repositories/ICellRepository';
 import type { MinioService } from '@infrastructure/storage/MinioService';
+import { PrismaClient } from '@prisma/client';
 import { AppError } from '@shared/errors/AppError';
 
 export class MaterialController {
@@ -12,18 +13,20 @@ export class MaterialController {
     private readonly materialRepo: IMaterialRepository,
     private readonly minioService: MinioService,
     private readonly cellRepo: ICellRepository,
+    private readonly prisma: PrismaClient,
   ) {}
 
   upload = async (req: Request, res: Response): Promise<void> => {
     const file = req.file;
     if (!file) throw new AppError('Nenhum arquivo enviado', 400);
 
-    // Accept either a single cellId, a JSON array 'cellIds' (when sending via multipart/form-data)
-    // or the 'allCells' flag. We will create one material per target cell.
+    // Accept either a single cellId, a JSON array 'cellIds' (when sending via multipart/form-data),
+    // the 'allCells' flag, or a 'cellTypeId' to target all cells of a specific type.
     const bodySchema = z.object({
       cellId: z.string().uuid().optional(),
       cellIds: z.string().optional(), // JSON encoded array coming from FormData
       allCells: z.string().optional(), // may arrive as 'true' string from form
+      cellTypeId: z.string().uuid().optional(), // target all cells of this type
     });
     const parsed = bodySchema.parse(req.body);
     const title = (req.body.title as string | undefined) ?? file.originalname;
@@ -31,7 +34,11 @@ export class MaterialController {
 
     // resolve target cell ids
     let targetCellIds: string[] = [];
-    if (parsed.allCells && parsed.allCells === 'true') {
+    if (parsed.cellTypeId) {
+      // All cells of a given type
+      const cells = await this.prisma.cell.findMany({ where: { cellTypeId: parsed.cellTypeId }, select: { id: true } });
+      targetCellIds = cells.map((c) => c.id);
+    } else if (parsed.allCells && parsed.allCells === 'true') {
       const cells = await this.cellRepo.findAll();
       targetCellIds = cells.map((c) => c.id);
     } else if (parsed.cellIds) {

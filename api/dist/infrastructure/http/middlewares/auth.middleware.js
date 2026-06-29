@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authMiddleware = authMiddleware;
 exports.requireAdmin = requireAdmin;
+exports.requireSupervisor = requireSupervisor;
+exports.requireSupervisorOrAdmin = requireSupervisorOrAdmin;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const AppError_1 = require("@shared/errors/AppError");
 function authMiddleware(req, _res, next) {
@@ -31,6 +33,18 @@ function authMiddleware(req, _res, next) {
 function requireAdmin(req, _res, next) {
     if (req.userRole !== 'ADMIN') {
         throw AppError_1.AppError.forbidden('Acesso restrito a administradores');
+    }
+    next();
+}
+function requireSupervisor(req, _res, next) {
+    if (req.userRole !== 'SUPERVISOR') {
+        throw AppError_1.AppError.forbidden('Acesso restrito a supervisores');
+    }
+    next();
+}
+function requireSupervisorOrAdmin(req, _res, next) {
+    if (req.userRole !== 'ADMIN' && req.userRole !== 'SUPERVISOR') {
+        throw AppError_1.AppError.forbidden('Acesso restrito a supervisores e administradores');
     }
     next();
 }

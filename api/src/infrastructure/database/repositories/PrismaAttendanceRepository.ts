@@ -125,4 +125,19 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
       update: {},
     });
   }
+
+  async updateMeetingPhoto(cellId: string, meetingDate: Date, photoKey: string): Promise<void> {
+    await this.prisma.cellMeeting.updateMany({
+      where: { cellId, meetingDate },
+      data: { photoKey },
+    });
+  }
+
+  async getMeetingPhotoKey(cellId: string, meetingDate: Date): Promise<string | null> {
+    const meeting = await this.prisma.cellMeeting.findUnique({
+      where: { cellId_meetingDate: { cellId, meetingDate } },
+      select: { photoKey: true },
+    });
+    return meeting?.photoKey ?? null;
+  }
 }

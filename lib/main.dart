@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'design_system/design_system.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'injection/injection.dart';
 import 'routing/app_router.dart';
+import 'shared/utils/app_snackbar.dart';
 
 import 'dart:async';
 import 'dart:developer' as developer;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
 
   // Global error handling to capture initialization/runtime errors that
   // otherwise cause the app to terminate when launched from the home screen.
@@ -74,6 +77,7 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
         darkTheme: AppTheme.dark,
         themeMode: ThemeMode.system,
         routerConfig: _router,
+        scaffoldMessengerKey: scaffoldMessengerKey,
       ),
     );
   }

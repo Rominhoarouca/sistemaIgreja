@@ -2,6 +2,19 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaCellMemberRepository = void 0;
 const AppError_1 = require("@shared/errors/AppError");
+const bairroInclude = {
+    bairro: {
+        select: {
+            id: true, name: true,
+            cidade: { select: { id: true, name: true, estado: { select: { id: true, name: true, uf: true } } } },
+        },
+    },
+};
+function deriveLocation(bairro) {
+    if (!bairro)
+        return { neighborhood: null, city: null, state: null };
+    return { neighborhood: bairro.name, city: bairro.cidade.name, state: bairro.cidade.estado.uf };
+}
 class PrismaCellMemberRepository {
     prisma;
     constructor(prisma) {
@@ -10,6 +23,7 @@ class PrismaCellMemberRepository {
     async findByCellId(cellId) {
         const rows = await this.prisma.cellMember.findMany({
             where: { cellId },
+            include: { ...bairroInclude },
             orderBy: { createdAt: 'desc' },
         });
         return rows.map((row) => this.mapRow(row));
@@ -22,10 +36,10 @@ class PrismaCellMemberRepository {
                 phone: data.phone,
                 ...(data.email !== undefined ? { email: data.email } : {}),
                 ...(data.address !== undefined ? { address: data.address } : {}),
-                ...(data.neighborhood !== undefined ? { neighborhood: data.neighborhood } : {}),
-                ...(data.city !== undefined ? { city: data.city } : {}),
+                ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
                 ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
             },
+            include: { ...bairroInclude },
         });
         return this.mapRow(row);
     }
@@ -40,6 +54,7 @@ class PrismaCellMemberRepository {
         }
         const existing = await this.prisma.cellMember.findUnique({
             where: { sourceVisitorId: visitorId },
+            include: { ...bairroInclude },
         });
         if (existing) {
             return this.mapRow(existing);
@@ -52,11 +67,11 @@ class PrismaCellMemberRepository {
                     phone: visitor.phone,
                     email: visitor.email,
                     address: visitor.address,
-                    neighborhood: visitor.neighborhood,
-                    city: visitor.city,
+                    bairroId: visitor.bairroId,
                     leaderId: visitor.leaderId,
                     sourceVisitorId: visitor.id,
                 },
+                include: { ...bairroInclude },
             });
             await tx.visitor.update({
                 where: { id: visitor.id },
@@ -70,6 +85,7 @@ class PrismaCellMemberRepository {
         return this.mapRow(member);
     }
     mapRow(row) {
+        const loc = deriveLocation(row.bairro ?? null);
         return {
             id: row.id,
             cellId: row.cellId,
@@ -77,8 +93,10 @@ class PrismaCellMemberRepository {
             phone: row.phone,
             email: row.email,
             address: row.address,
-            neighborhood: row.neighborhood,
-            city: row.city,
+            bairroId: row.bairroId,
+            neighborhood: loc.neighborhood,
+            city: loc.city,
+            state: loc.state,
             leaderId: row.leaderId,
             sourceVisitorId: row.sourceVisitorId,
             createdAt: row.createdAt,

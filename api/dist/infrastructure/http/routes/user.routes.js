@@ -14,18 +14,16 @@ const upload = (0, multer_1.default)({
 function userRoutes(controller) {
     const router = (0, express_1.Router)();
     router.use(auth_middleware_1.authMiddleware);
-    /**
-     * @openapi
-     * /v1/users/me:
-     *   get:
-     *     summary: Retorna o perfil do usuário autenticado
-     *     tags: [Users]
-     *   patch:
-     *     summary: Atualiza o perfil (com foto opcional)
-     *     tags: [Users]
-     */
     router.get('/me', controller.getProfile);
-    router.get('/leaders', controller.findLeaders);
     router.patch('/me', upload.single('photo'), controller.updateProfile);
+    router.get('/leaders', auth_middleware_1.requireSupervisorOrAdmin, controller.findLeaders);
+    router.get('/supervisors', auth_middleware_1.requireAdmin, controller.findSupervisors);
+    router.get('/coordinadores', auth_middleware_1.requireAdmin, controller.findCoordinadores);
+    router.get('/my-leaders', auth_middleware_1.requireSupervisorOrAdmin, controller.getMyLeaders);
+    router.post('/create', auth_middleware_1.requireAdmin, controller.createUser);
+    router.patch('/leaders/:leaderId/supervisor', auth_middleware_1.requireAdmin, controller.assignLeaderSupervisor);
+    router.patch('/leaders/:leaderId/promote', auth_middleware_1.requireAdmin, controller.promoteLeader);
+    router.patch('/leaders/:leaderId', auth_middleware_1.requireAdmin, controller.updateLeaderDescription);
+    router.patch('/supervisors/:supervisorId/coordenacao', auth_middleware_1.requireAdmin, controller.assignSupervisorCoordenacao);
     return router;
 }

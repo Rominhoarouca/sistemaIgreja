@@ -15,7 +15,8 @@ class LoginUseCase {
         this.refreshTokenRepo = refreshTokenRepo;
     }
     async execute(input) {
-        const userWithPassword = await this.userRepo.findByEmail(input.email);
+        const normalizedEmail = input.email.toLowerCase().trim();
+        const userWithPassword = await this.userRepo.findByEmail(normalizedEmail);
         if (!userWithPassword) {
             throw AppError_1.AppError.unauthorized('Credenciais inválidas');
         }

@@ -7,27 +7,48 @@ class PrismaAttendanceRepository {
         this.prisma = prisma;
     }
     async register(data) {
-        const row = await this.prisma.attendance.upsert({
-            where: {
-                visitorId_cellId_meetingDate: {
+        if (data.visitorId) {
+            const existing = await this.prisma.attendance.findFirst({
+                where: { visitorId: data.visitorId, cellId: data.cellId, meetingDate: data.meetingDate },
+            });
+            if (existing) {
+                return this.prisma.attendance.update({
+                    where: { id: existing.id },
+                    data: { isPresent: data.isPresent, notes: data.notes ?? null },
+                });
+            }
+            return this.prisma.attendance.create({
+                data: {
                     visitorId: data.visitorId,
                     cellId: data.cellId,
                     meetingDate: data.meetingDate,
+                    isPresent: data.isPresent,
+                    notes: data.notes ?? null,
                 },
-            },
-            create: {
-                visitorId: data.visitorId,
-                cellId: data.cellId,
-                meetingDate: data.meetingDate,
-                isPresent: data.isPresent,
-                notes: data.notes ?? null,
-            },
-            update: {
-                isPresent: data.isPresent,
-                notes: data.notes ?? null,
-            },
-        });
-        return row;
+            });
+        }
+        else {
+            // memberId path — data.memberId is guaranteed non-undefined here
+            const memberId = data.memberId;
+            const existing = await this.prisma.attendance.findFirst({
+                where: { memberId, cellId: data.cellId, meetingDate: data.meetingDate },
+            });
+            if (existing) {
+                return this.prisma.attendance.update({
+                    where: { id: existing.id },
+                    data: { isPresent: data.isPresent, notes: data.notes ?? null },
+                });
+            }
+            return this.prisma.attendance.create({
+                data: {
+                    memberId,
+                    cellId: data.cellId,
+                    meetingDate: data.meetingDate,
+                    isPresent: data.isPresent,
+                    notes: data.notes ?? null,
+                },
+            });
+        }
     }
     async findByCellAndDate(cellId, meetingDate) {
         return this.prisma.attendance.findMany({
@@ -92,6 +113,19 @@ class PrismaAttendanceRepository {
             create: { cellId, meetingDate, createdById },
             update: {},
         });
+    }
+    async updateMeetingPhoto(cellId, meetingDate, photoKey) {
+        await this.prisma.cellMeeting.updateMany({
+            where: { cellId, meetingDate },
+            data: { photoKey },
+        });
+    }
+    async getMeetingPhotoKey(cellId, meetingDate) {
+        const meeting = await this.prisma.cellMeeting.findUnique({
+            where: { cellId_meetingDate: { cellId, meetingDate } },
+            select: { photoKey: true },
+        });
+        return meeting?.photoKey ?? null;
     }
 }
 exports.PrismaAttendanceRepository = PrismaAttendanceRepository;

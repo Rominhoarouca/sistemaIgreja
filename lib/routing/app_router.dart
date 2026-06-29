@@ -16,8 +16,14 @@ import '../features/about/presentation/pages/about_page.dart';
 import '../features/dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../features/materials/presentation/pages/admin_materials_page.dart';
 import '../features/admin/presentation/pages/admin_leaders_page.dart';
+import '../features/admin/presentation/pages/admin_supervisors_page.dart';
+import '../features/admin/presentation/pages/admin_coordenacoes_page.dart';
+import '../features/admin/presentation/pages/admin_location_page.dart';
 import '../features/visitor/presentation/pages/visitor_self_register_page.dart';
 import '../features/supervisor/presentation/pages/supervisor_home_page.dart';
+import '../features/admin/presentation/pages/admin_cell_types_page.dart';
+import '../features/whatsapp/presentation/pages/admin_whatsapp_page.dart';
+import '../features/admin/presentation/pages/admin_users_register_page.dart';
 
 /// Public routes that can be accessed without authentication.
 const _publicRoutes = {
@@ -160,6 +166,52 @@ GoRouter createRouter(AuthBloc authBloc) {
             const MaterialPage(child: AdminLeadersPage()),
       ),
 
+      // ── Admin Supervisors ─────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminSupervisors,
+        name: 'admin-supervisors',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminSupervisorsPage()),
+      ),
+
+      // ── Admin Coordenações ────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminCoordenacoes,
+        name: 'admin-coordenacoes',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminCoordenacoes()),
+      ),
+
+      // ── Admin Location (Cidades + Bairros) ────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminLocation,
+        name: 'admin-location',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminLocationPage()),
+      ),
+
+      // ── Admin Cell Types ──────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminCellTypes,
+        name: 'admin-cell-types',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminCellTypesPage()),
+      ),
+
+      // ── Admin WhatsApp ────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminWhatsapp,
+        name: 'admin-whatsapp',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminWhatsappPage()),
+      ),
+      // ── Admin Users Register ──────────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.adminUsersRegister,
+        name: 'admin-users-register',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AdminUsersRegisterPage()),
+      ),
       // ── Visitor flow ──────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.visitorRegister,

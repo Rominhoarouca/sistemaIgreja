@@ -1,0 +1,35 @@
+# Multi-stage Flutter Web Builder
+# Stage 1: Build Flutter web
+FROM ghcr.io/cirruslabs/flutter:stable AS builder
+
+WORKDIR /app
+
+# Copy pubspec files first (for better caching)
+COPY pubspec.yaml pubspec.lock ./
+
+# Get dependencies - with reduced memory usage for Flutter
+RUN flutter config --enable-web && \
+    flutter pub get
+
+# Copy all source code
+COPY . .
+
+# Build web with API base URL
+ARG API_BASE_URL=http://192.168.0.190/v1
+RUN flutter build web --release --dart-define=API_BASE_URL="$API_BASE_URL" 2>&1 || true
+
+# Stage 2: Serve with nginx
+FROM nginx:alpine
+
+COPY --from=builder /app/build/web /usr/share/nginx/html
+COPY nginx-app.conf /etc/nginx/conf.d/default.conf
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost/ || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

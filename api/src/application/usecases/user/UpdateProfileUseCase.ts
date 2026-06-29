@@ -16,6 +16,9 @@ interface UpdateProfileInput {
   phone?: string | null;
   address?: string | null;
   birthDate?: string | null;
+  isMarried?: boolean;
+  spouseName?: string | null;
+  weddingDate?: string | null;
   children?: ChildInput[];
   fileBuffer?: Buffer;
   mimeType?: string;
@@ -56,6 +59,11 @@ export class UpdateProfileUseCase {
       ...(input.address !== undefined && { address: input.address }),
       ...(input.birthDate !== undefined && {
         birthDate: input.birthDate ? new Date(input.birthDate) : null,
+      }),
+      ...(input.isMarried !== undefined && { isMarried: input.isMarried }),
+      ...(input.spouseName !== undefined && { spouseName: input.spouseName }),
+      ...(input.weddingDate !== undefined && {
+        weddingDate: input.weddingDate ? new Date(input.weddingDate) : null,
       }),
       ...(photoKey !== undefined && { photoKey }),
     });

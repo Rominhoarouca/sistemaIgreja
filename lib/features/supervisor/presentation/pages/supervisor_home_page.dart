@@ -1,9 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/address_selector.dart';
 
 /// Supervisor Panel — coordinates multiple leaders and their cells.
 class SupervisorHomePage extends StatefulWidget {
@@ -345,11 +349,54 @@ class _LeaderCellsSheet extends StatefulWidget {
 class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
   bool _loading = false;
   List<_CellDetail> _cellDetails = [];
+  List<_LeaderOption> _availableLeaders = [];
+  List<_CellTypeOption> _cellTypes = [];
 
   @override
   void initState() {
     super.initState();
     _loadCells();
+    _loadLeadersAndTypes();
+  }
+
+  Future<void> _loadLeadersAndTypes() async {
+    try {
+      // Load all supervisors' leaders
+      final leadersResp = await widget.dio.get('/users/my-leaders');
+      final leadersList =
+          (leadersResp.data as Map<String, dynamic>)['leaders'] as List? ?? [];
+      final leaders = leadersList
+          .map(
+            (l) => _LeaderOption(
+              id: l['id'] as String,
+              name: l['name'] as String? ?? '',
+            ),
+          )
+          .toList();
+
+      // Load cell types
+      List<_CellTypeOption> types = [];
+      try {
+        final typesResp = await widget.dio.get('/cell-types');
+        final typesList =
+            (typesResp.data as Map<String, dynamic>)['cellTypes'] as List? ??
+            [];
+        types = typesList
+            .map(
+              (t) => _CellTypeOption(
+                id: t['id'] as String,
+                name: t['name'] as String? ?? '',
+              ),
+            )
+            .toList();
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() {
+        _availableLeaders = leaders;
+        _cellTypes = types;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadCells() async {
@@ -371,6 +418,26 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
       _cellDetails = details;
       _loading = false;
     });
+  }
+
+  Future<void> _editCell(_CellDetail cell) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _EditCellDetailsSheet(
+        dio: widget.dio,
+        cell: cell,
+        availableLeaders: _availableLeaders,
+        cellTypes: _cellTypes,
+      ),
+    );
+    if (changed == true) {
+      await _loadCells();
+    }
   }
 
   @override
@@ -415,7 +482,7 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
                 child: ListView.separated(
                   controller: ctrl,
                   itemCount: _cellDetails.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (_, i) {
                     final c = _cellDetails[i];
@@ -424,7 +491,40 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(c.name, style: AppTypography.titleSmall),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      c.name,
+                                      style: AppTypography.titleSmall,
+                                    ),
+                                    if (c.cellTypeName != null &&
+                                        c.cellTypeName!.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.xs2,
+                                        ),
+                                        child: Text(
+                                          c.cellTypeName!,
+                                          style: AppTypography.bodySmall
+                                              .copyWith(
+                                                color: AppColors.primary,
+                                              ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined, size: 20),
+                                onPressed: () => _editCell(c),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: AppSpacing.xs),
                           Row(
                             children: [
@@ -594,6 +694,528 @@ class _OverviewTabState extends State<_OverviewTab> {
   }
 }
 
+// ── Edit Cell Sheet ───────────────────────────────────────────────────────
+
+class _EditCellDetailsSheet extends StatefulWidget {
+  const _EditCellDetailsSheet({
+    required this.dio,
+    required this.cell,
+    required this.availableLeaders,
+    required this.cellTypes,
+  });
+
+  final Dio dio;
+  final _CellDetail cell;
+  final List<_LeaderOption> availableLeaders;
+  final List<_CellTypeOption> cellTypes;
+
+  @override
+  State<_EditCellDetailsSheet> createState() => _EditCellDetailsSheetState();
+}
+
+class _EditCellDetailsSheetState extends State<_EditCellDetailsSheet> {
+  late String _selectedLeaderId;
+  late String? _selectedCellTypeId;
+
+  // Address state
+  late final TextEditingController _cepCtrl;
+  late final TextEditingController _addressCtrl;
+  String? _bairroId;
+  String? _estadoId; // used only for AddressSelector initial pre-fill
+  String? _cidadeId; // used only for AddressSelector initial pre-fill
+
+  // Map / coordinates
+  double? _latitude;
+  double? _longitude;
+  late final MapController _mapController;
+
+  bool _cepLoading = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLeaderId = widget.cell.leaderId;
+    _selectedCellTypeId = widget.cell.cellTypeId;
+    _cepCtrl = TextEditingController();
+    _addressCtrl = TextEditingController(text: widget.cell.address);
+    _bairroId = widget.cell.bairroId;
+    _estadoId = widget.cell.estadoId;
+    _cidadeId = widget.cell.cidadeId;
+    _latitude = widget.cell.latitude;
+    _longitude = widget.cell.longitude;
+    _mapController = MapController();
+  }
+
+  @override
+  void dispose() {
+    _cepCtrl.dispose();
+    _addressCtrl.dispose();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  // ── CEP lookup ────────────────────────────────────────────────────────────
+
+  Future<void> _lookupCep(String cep) async {
+    final cleaned = cep.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.length != 8) return;
+
+    setState(() => _cepLoading = true);
+    try {
+      final resp = await Dio().get('https://viacep.com.br/ws/$cleaned/json/');
+      final data = resp.data as Map<String, dynamic>;
+      if (data['erro'] == true) {
+        setState(() => _cepLoading = false);
+        return;
+      }
+
+      final logradouro = data['logradouro'] as String? ?? '';
+      final bairroName = data['bairro'] as String? ?? '';
+      final localidade = data['localidade'] as String? ?? '';
+      final uf = data['uf'] as String? ?? '';
+
+      String? foundEstadoId;
+      String? foundCidadeId;
+      String? foundBairroId;
+      double? foundLat;
+      double? foundLng;
+
+      try {
+        final estadosResp = await widget.dio.get('/location/estados');
+        final estadosList =
+            (estadosResp.data as Map<String, dynamic>)['estados'] as List;
+
+        for (final e in estadosList) {
+          final estado = e as Map<String, dynamic>;
+          if ((estado['uf'] as String?)?.toUpperCase() == uf.toUpperCase()) {
+            foundEstadoId = estado['id'] as String;
+            break;
+          }
+        }
+
+        if (foundEstadoId != null) {
+          final cidadesResp = await widget.dio.get(
+            '/location/estados/$foundEstadoId/cidades',
+          );
+          final cidadesList =
+              (cidadesResp.data as Map<String, dynamic>)['cidades'] as List;
+
+          for (final c in cidadesList) {
+            final cidade = c as Map<String, dynamic>;
+            if ((cidade['name'] as String?)?.trim().toLowerCase() ==
+                localidade.trim().toLowerCase()) {
+              foundCidadeId = cidade['id'] as String;
+              break;
+            }
+          }
+
+          if (foundCidadeId != null) {
+            final bairrosResp = await widget.dio.get(
+              '/location/cidades/$foundCidadeId/bairros',
+            );
+            final bairrosList =
+                (bairrosResp.data as Map<String, dynamic>)['bairros'] as List;
+
+            for (final b in bairrosList) {
+              final bairroOption = b as Map<String, dynamic>;
+              if ((bairroOption['name'] as String?)?.trim().toLowerCase() ==
+                  bairroName.trim().toLowerCase()) {
+                foundBairroId = bairroOption['id'] as String;
+                foundLat = (bairroOption['latitude'] as num?)?.toDouble();
+                foundLng = (bairroOption['longitude'] as num?)?.toDouble();
+                break;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() {
+        if (logradouro.isNotEmpty) _addressCtrl.text = logradouro;
+        _cepLoading = false;
+        _estadoId = foundEstadoId;
+        _cidadeId = foundCidadeId;
+        _bairroId = foundBairroId;
+        if (foundLat != null && foundLng != null) {
+          _latitude = foundLat;
+          _longitude = foundLng;
+        }
+      });
+
+      if (foundLat != null && foundLng != null) {
+        try {
+          _mapController.move(LatLng(foundLat, foundLng), 15);
+        } catch (_) {}
+      } else if (logradouro.isNotEmpty) {
+        await _geocodeWithNominatim(logradouro, localidade, uf);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cepLoading = false);
+    }
+  }
+
+  Future<void> _geocodeWithNominatim(
+    String logradouro,
+    String localidade,
+    String uf,
+  ) async {
+    try {
+      final query = '$logradouro, $localidade, $uf, Brasil';
+      final resp = await Dio().get(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {
+          'format': 'json',
+          'q': query,
+          'countrycodes': 'br',
+          'limit': '1',
+        },
+        options: Options(headers: {'User-Agent': 'SistemaIgrejaApp/1.0'}),
+      );
+      final results = resp.data as List;
+      if (results.isNotEmpty && mounted) {
+        final lat = double.tryParse(results[0]['lat'] as String? ?? '');
+        final lng = double.tryParse(results[0]['lon'] as String? ?? '');
+        if (lat != null && lng != null) {
+          setState(() {
+            _latitude = lat;
+            _longitude = lng;
+          });
+          try {
+            _mapController.move(LatLng(lat, lng), 15);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final updateData = <String, dynamic>{};
+      if (_selectedLeaderId != widget.cell.leaderId) {
+        updateData['leaderId'] = _selectedLeaderId;
+      }
+      if (_selectedCellTypeId != widget.cell.cellTypeId) {
+        updateData['cellTypeId'] = _selectedCellTypeId;
+      }
+      final address = _addressCtrl.text.trim();
+      if (address.isNotEmpty && address != widget.cell.address) {
+        updateData['address'] = address;
+      }
+      if (_bairroId != widget.cell.bairroId) {
+        updateData['bairroId'] = _bairroId;
+      }
+      if (_latitude != widget.cell.latitude) {
+        updateData['latitude'] = _latitude;
+      }
+      if (_longitude != widget.cell.longitude) {
+        updateData['longitude'] = _longitude;
+      }
+
+      if (updateData.isEmpty) {
+        if (!mounted) return;
+        Navigator.of(context).pop(false);
+        return;
+      }
+
+      await widget.dio.patch('/cells/${widget.cell.id}', data: updateData);
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.response?.data?['error']?['message'] as String? ??
+                'Erro ao salvar célula',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCoords = _latitude != null && _longitude != null;
+    final mapLat = _latitude ?? -14.235;
+    final mapLng = _longitude ?? -51.925;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.base),
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              Text('Editar Célula', style: AppTypography.headlineSmall),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                widget.cell.name,
+                style: AppTypography.titleMedium.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              // ── Líder ───────────────────────────────────────────────────
+              Text('Líder', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: _selectedLeaderId,
+                items: widget.availableLeaders.map((leader) {
+                  return DropdownMenuItem(
+                    value: leader.id,
+                    child: Text(leader.name),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _selectedLeaderId = value);
+                },
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              // ── Tipo de Célula ───────────────────────────────────────────
+              Text('Tipo de Célula', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButton<String?>(
+                isExpanded: true,
+                value: _selectedCellTypeId,
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('Nenhum tipo selecionado'),
+                  ),
+                  ...widget.cellTypes.map((type) {
+                    return DropdownMenuItem(
+                      value: type.id,
+                      child: Text(type.name),
+                    );
+                  }),
+                ],
+                onChanged: (value) =>
+                    setState(() => _selectedCellTypeId = value),
+              ),
+
+              // ── Endereço ─────────────────────────────────────────────────
+              const SizedBox(height: AppSpacing.base),
+              const Divider(),
+              const SizedBox(height: AppSpacing.base),
+              Text('Endereço', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.xs),
+              if (widget.cell.neighborhood.isNotEmpty ||
+                  widget.cell.city.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Atual: ${widget.cell.address.isNotEmpty ? '${widget.cell.address}, ' : ''}${widget.cell.neighborhood}, ${widget.cell.city}',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // CEP
+              Stack(
+                children: [
+                  AppTextField(
+                    controller: _cepCtrl,
+                    label: 'CEP (auto busca após 8 dígitos)',
+                    hint: '00000-000',
+                    prefixIcon: Icons.search_outlined,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    enabled: !_cepLoading,
+                    inputFormatters: [
+                      MaskTextInputFormatter(
+                        mask: '#####-###',
+                        filter: {'#': RegExp(r'[0-9]')},
+                      ),
+                    ],
+                    onChanged: (v) {
+                      final cleaned = v.replaceAll(RegExp(r'\D'), '');
+                      if (cleaned.length == 8 && !_cepLoading) {
+                        _lookupCep(cleaned);
+                      }
+                    },
+                  ),
+                  if (_cepLoading)
+                    Positioned(
+                      right: 50,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.base),
+
+              // Logradouro
+              AppTextField(
+                controller: _addressCtrl,
+                label: 'Logradouro',
+                hint: 'Rua, avenida, etc',
+                prefixIcon: Icons.home_outlined,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.base),
+
+              // Estado / Cidade / Bairro
+              AddressSelector(
+                dio: widget.dio,
+                onChanged: (id) => setState(() => _bairroId = id),
+                initialEstadoId: _estadoId,
+                initialCidadeId: _cidadeId,
+                initialBairroId: _bairroId,
+                isRequired: false,
+              ),
+
+              // ── Mapa ────────────────────────────────────────────────────
+              const SizedBox(height: AppSpacing.xl),
+              Text('Localização no Mapa', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                hasCoords
+                    ? 'Toque no mapa para ajustar a posição da célula'
+                    : 'Informe um CEP para localizar automaticamente, ou toque no mapa para definir a posição',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                height: 220,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: LatLng(mapLat, mapLng),
+                      initialZoom: hasCoords ? 15.0 : 4.0,
+                      onTap: (tapPosition, point) {
+                        setState(() {
+                          _latitude = point.latitude;
+                          _longitude = point.longitude;
+                        });
+                      },
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.app',
+                      ),
+                      if (hasCoords)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(_latitude!, _longitude!),
+                              child: const Icon(
+                                Icons.location_on,
+                                color: AppColors.primary,
+                                size: 40,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              if (hasCoords) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Lat: ${_latitude!.toStringAsFixed(6)}, Lng: ${_longitude!.toStringAsFixed(6)}',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Remover'),
+                      onPressed: () => setState(() {
+                        _latitude = null;
+                        _longitude = null;
+                      }),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: AppSpacing.xl),
+              AppButton(
+                label: _saving ? 'Salvando...' : 'Salvar',
+                isLoading: _saving,
+                onPressed: _saving ? null : _save,
+                prefixIcon: Icons.save_outlined,
+                isFullWidth: true,
+              ),
+              const SizedBox(height: AppSpacing.base),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.icon,
@@ -669,33 +1291,82 @@ class _CellSummary {
   );
 }
 
+class _LeaderOption {
+  final String id;
+  final String name;
+
+  const _LeaderOption({required this.id, required this.name});
+}
+
+class _CellTypeOption {
+  final String id;
+  final String name;
+
+  const _CellTypeOption({required this.id, required this.name});
+}
+
 class _CellDetail {
   final String id;
   final String name;
+  final String address;
   final String neighborhood;
   final String city;
   final String dayOfWeek;
   final String time;
   final int memberCount;
+  final String leaderId;
+  final String leaderName;
+  final String? cellTypeId;
+  final String? cellTypeName;
+  final String? bairroId;
+  final String? estadoId;
+  final String? cidadeId;
+  final double? latitude;
+  final double? longitude;
 
   const _CellDetail({
     required this.id,
     required this.name,
+    required this.address,
     required this.neighborhood,
     required this.city,
     required this.dayOfWeek,
     required this.time,
     required this.memberCount,
+    required this.leaderId,
+    required this.leaderName,
+    this.cellTypeId,
+    this.cellTypeName,
+    this.bairroId,
+    this.estadoId,
+    this.cidadeId,
+    this.latitude,
+    this.longitude,
   });
 
   factory _CellDetail.fromJson(Map<String, dynamic> json, int memberCount) =>
       _CellDetail(
         id: json['id'] as String,
         name: json['name'] as String? ?? '',
+        address: json['address'] as String? ?? '',
         neighborhood: json['neighborhood'] as String? ?? '',
         city: json['city'] as String? ?? '',
         dayOfWeek: json['dayOfWeek'] as String? ?? '',
         time: json['time'] as String? ?? '',
         memberCount: memberCount,
+        leaderId: json['leaderId'] as String? ?? '',
+        leaderName:
+            json['leaderName'] as String? ??
+            json['leader']?['name'] as String? ??
+            '',
+        cellTypeId: json['cellTypeId'] as String?,
+        cellTypeName:
+            json['cellTypeName'] as String? ??
+            json['cellType']?['name'] as String?,
+        bairroId: json['bairroId'] as String?,
+        estadoId: json['estadoId'] as String?,
+        cidadeId: json['cidadeId'] as String?,
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
       );
 }

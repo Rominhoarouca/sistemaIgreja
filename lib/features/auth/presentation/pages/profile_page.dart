@@ -35,6 +35,9 @@ class _ProfilePageState extends State<ProfilePage> {
   Uint8List? _photoBytes;
   String? _photoUrl;
   DateTime? _birthDate;
+  bool _isMarried = false;
+  final _spouseNameCtrl = TextEditingController();
+  DateTime? _weddingDate;
   bool _editing = false;
   bool _saving = false;
   bool _loadingProfile = true;
@@ -53,6 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
+    _spouseNameCtrl.dispose();
     super.dispose();
   }
 
@@ -73,6 +77,13 @@ class _ProfilePageState extends State<ProfilePage> {
         final birthRaw = user['birthDate'] as String?;
         _birthDate = birthRaw != null
             ? DateTime.tryParse(birthRaw)?.toLocal()
+            : null;
+
+        _isMarried = (user['isMarried'] as bool?) ?? false;
+        _spouseNameCtrl.text = (user['spouseName'] as String?) ?? '';
+        final weddingRaw = user['weddingDate'] as String?;
+        _weddingDate = weddingRaw != null
+            ? DateTime.tryParse(weddingRaw)?.toLocal()
             : null;
 
         _children
@@ -205,6 +216,18 @@ class _ProfilePageState extends State<ProfilePage> {
     if (picked != null && mounted) setState(() => _birthDate = picked);
   }
 
+  Future<void> _pickWeddingDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _weddingDate ?? DateTime(now.year - 5),
+      firstDate: DateTime(1950),
+      lastDate: now,
+      helpText: 'Data do casamento',
+    );
+    if (picked != null && mounted) setState(() => _weddingDate = picked);
+  }
+
   void _addChild() => _showChildDialog(null, null);
   void _editChild(int index) => _showChildDialog(index, _children[index]);
 
@@ -274,9 +297,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 if (nameCtrl.text.trim().isEmpty) return;
                 setState(() {
                   final entry = <String, dynamic>{
-                    if (existing?['id'] case final id?) 'id': id,
+                    'id': ?existing?['id'],
                     'name': nameCtrl.text.trim(),
-                    if (childDob != null) 'birthDate': childDob,
+                    'birthDate': ?childDob,
                   };
                   if (index == null) {
                     _children.add(entry);
@@ -315,6 +338,13 @@ class _ProfilePageState extends State<ProfilePage> {
             ? null
             : _addressCtrl.text.trim(),
         'birthDate': _birthDate?.toUtc().toIso8601String(),
+        'isMarried': _isMarried,
+        'spouseName': _isMarried && _spouseNameCtrl.text.trim().isNotEmpty
+            ? _spouseNameCtrl.text.trim()
+            : null,
+        'weddingDate': _isMarried
+            ? _weddingDate?.toUtc().toIso8601String()
+            : null,
         'children': jsonEncode(children),
       };
 
@@ -623,6 +653,60 @@ class _ProfilePageState extends State<ProfilePage> {
 
                                 const SizedBox(height: AppSpacing.xl),
 
+                                // ── Estado Civil ───────────────────────
+                                AppSectionHeader(title: 'Estado Civil'),
+                                const SizedBox(height: AppSpacing.base),
+                                AppCard(
+                                  child: Column(
+                                    children: [
+                                      SwitchListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        title: const Text('Casado(a)'),
+                                        value: _isMarried,
+                                        onChanged: (v) =>
+                                            setState(() => _isMarried = v),
+                                      ),
+                                      if (_isMarried) ...[
+                                        const Divider(height: 1),
+                                        const SizedBox(height: AppSpacing.base),
+                                        TextFormField(
+                                          controller: _spouseNameCtrl,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Nome do cônjuge',
+                                            prefixIcon: Icon(
+                                              Icons.favorite_outline,
+                                            ),
+                                          ),
+                                          textCapitalization:
+                                              TextCapitalization.words,
+                                        ),
+                                        const SizedBox(height: AppSpacing.base),
+                                        InkWell(
+                                          onTap: _pickWeddingDate,
+                                          child: InputDecorator(
+                                            decoration: const InputDecoration(
+                                              labelText: 'Data do casamento',
+                                              suffixIcon: Icon(
+                                                Icons.calendar_today_outlined,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              _weddingDate != null
+                                                  ? DateFormat(
+                                                      'dd/MM/yyyy',
+                                                    ).format(_weddingDate!)
+                                                  : 'Selecionar data',
+                                              style: AppTypography.bodyMedium,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: AppSpacing.xs),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: AppSpacing.xl),
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,

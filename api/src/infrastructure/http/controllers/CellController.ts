@@ -14,9 +14,9 @@ const nearbySchema = z.object({
 const createCellSchema = z.object({
   name: z.string().min(2),
   leaderId: z.string().uuid(),
+  cellTypeId: z.string().uuid().optional(),
   address: z.string().min(3),
-  neighborhood: z.string().min(2),
-  city: z.string().min(2),
+  bairroId: z.string().uuid().optional(),
   dayOfWeek: z.enum(['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve ser HH:MM'),
   maxCapacity: z.coerce.number().int().positive().optional(),
@@ -27,9 +27,9 @@ const createCellSchema = z.object({
 const updateCellSchema = z.object({
   name: z.string().min(2).optional(),
   leaderId: z.string().uuid().optional(),
+  cellTypeId: z.string().uuid().nullable().optional(),
   address: z.string().min(3).optional(),
-  neighborhood: z.string().min(2).optional(),
-  city: z.string().min(2).optional(),
+  bairroId: z.string().uuid().nullable().optional(),
   dayOfWeek: z.enum(['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']).optional(),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve ser HH:MM').optional(),
   maxCapacity: z.coerce.number().int().nonnegative().optional(),
@@ -42,8 +42,7 @@ const createMemberSchema = z.object({
   phone: z.string().min(8),
   email: z.string().email().optional(),
   address: z.string().optional(),
-  neighborhood: z.string().optional(),
-  city: z.string().optional(),
+  bairroId: z.string().uuid().optional(),
   leaderId: z.string().uuid().optional(),
 });
 
@@ -81,9 +80,9 @@ export class CellController {
     const createData = {
       name: data.name,
       leaderId: data.leaderId,
+      cellTypeId: data.cellTypeId ?? null,
       address: data.address,
-      neighborhood: data.neighborhood,
-      city: data.city,
+      bairroId: data.bairroId ?? null,
       dayOfWeek: data.dayOfWeek,
       time: data.time,
       ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
@@ -102,9 +101,9 @@ export class CellController {
     const updateData = {
       ...(data.name !== undefined && { name: data.name }),
       ...(data.leaderId !== undefined && { leaderId: data.leaderId }),
+      ...(data.cellTypeId !== undefined && { cellTypeId: data.cellTypeId }),
       ...(data.address !== undefined && { address: data.address }),
-      ...(data.neighborhood !== undefined && { neighborhood: data.neighborhood }),
-      ...(data.city !== undefined && { city: data.city }),
+      ...(data.bairroId !== undefined && { bairroId: data.bairroId }),
       ...(data.dayOfWeek !== undefined && { dayOfWeek: data.dayOfWeek }),
       ...(data.time !== undefined && { time: data.time }),
       ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
@@ -139,7 +138,12 @@ export class CellController {
     const data = createMemberSchema.parse(req.body);
     const member = await this.cellMemberRepo.create({
       cellId: id,
-      ...data,
+      name: data.name,
+      phone: data.phone,
+      ...(data.email !== undefined ? { email: data.email } : {}),
+      ...(data.address !== undefined ? { address: data.address } : {}),
+      ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
+      ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
     });
 
     res.status(201).json({ member });

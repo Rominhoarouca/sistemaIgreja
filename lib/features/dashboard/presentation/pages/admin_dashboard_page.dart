@@ -1,44 +1,36 @@
 import 'package:dio/dio.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'dart:developer' as developer;
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/address_selector.dart';
+import '../../data/report_export_service.dart';
 
+import '../utils/snackbar_helper.dart';
+import '../widgets/chart_legend.dart';
+import '../widgets/monthly_bar_chart.dart';
+import '../widgets/visitor_details_sheet.dart';
+import '../widgets/visitor_widgets.dart';
+import 'chart_detail_page.dart';
+import 'admin_dashboard_sheets.dart';
+import 'dashboard_tab.dart';
+
+// Alias para retrocompatibilidade com código legado no arquivo
 void _showTopSnackBar(
   BuildContext context,
   String message, {
   Color backgroundColor = AppColors.error,
-}) {
-  final rootContext = Navigator.of(context, rootNavigator: true).context;
-  final messenger = ScaffoldMessenger.maybeOf(rootContext);
-  if (messenger == null) return;
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: backgroundColor),
-    );
-}
-
-class _LeaderOption {
-  const _LeaderOption({
-    required this.id,
-    required this.name,
-    required this.email,
-  });
-
-  final String id;
-  final String name;
-  final String email;
-}
+}) => showDashboardSnackBar(context, message, backgroundColor: backgroundColor);
 
 /// Admin Dashboard — RF12
 /// Multi-tab interface: Dashboard, Visitantes, Células, Relatórios
+/// OCP: cada tab é aberta para extensão (nova tab = novo widget) sem modificar este arquivo.
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
 
@@ -94,7 +86,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final tabContent = IndexedStack(
       index: _selectedIndex,
       children: [
-        _DashboardTab(onSwitchTab: (i) => setState(() => _selectedIndex = i)),
+        DashboardTab(onSwitchTab: (i) => setState(() => _selectedIndex = i)),
         const _VisitorsAdminTab(),
         const _CellsAdminTab(),
         const _ReportsTab(),
@@ -173,549 +165,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 }
 
-// ── Tab 0: Dashboard overview ────────────────────────────────────────────────
-
-class _DashboardTab extends StatefulWidget {
-  const _DashboardTab({required this.onSwitchTab});
-
-  final void Function(int) onSwitchTab;
-
-  @override
-  State<_DashboardTab> createState() => _DashboardTabState();
-}
-
-class _DashboardTabState extends State<_DashboardTab> {
-  late final Dio _dio;
-  bool _loading = true;
-  String? _error;
-  Map<String, dynamic> _stats = {};
-  List<Map<String, dynamic>> _months = [];
-  List<Map<String, dynamic>> _cells = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _dio = DioClient(AuthStorage()).dio;
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final results = await Future.wait([
-        _dio.get('/dashboard/stats'),
-        _dio.get('/dashboard/monthly-stats'),
-        _dio.get('/cells'),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _stats =
-            (results[0].data as Map<String, dynamic>)['stats']
-                as Map<String, dynamic>;
-        _months = ((results[1].data as Map<String, dynamic>)['months'] as List)
-            .cast<Map<String, dynamic>>();
-        _cells = ((results[2].data as Map<String, dynamic>)['cells'] as List)
-            .cast<Map<String, dynamic>>();
-        _loading = false;
-      });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error =
-            e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar dashboard';
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _error!,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
-            ),
-            const SizedBox(height: AppSpacing.base),
-            AppButton(
-              label: 'Tentar novamente',
-              variant: AppButtonVariant.outline,
-              isFullWidth: false,
-              onPressed: _loadData,
-            ),
-          ],
-        ),
-      );
-    }
-
-    final highlightedCells = _cells.take(3).toList();
-    final totalVisitors = _stats['totalVisitors'] as int? ?? 0;
-    final forwarded = _stats['forwardedVisitors'] as int? ?? 0;
-    final integrated = _stats['integratedVisitors'] as int? ?? 0;
-    final avgAttendance = _stats['averageAttendanceRate'] as num? ?? 0;
-
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-        children: [
-          // ── Stat Cards ─────────────────────────────────────────
-          GridView.custom(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppSpacing.sm,
-              mainAxisSpacing: AppSpacing.sm,
-              mainAxisExtent: 148,
-            ),
-            childrenDelegate: SliverChildListDelegate([
-              StatCard(
-                label: 'Visitantes Cadastrados',
-                value: '$totalVisitors',
-                icon: Icons.people_outline,
-                color: AppColors.primary,
-              ),
-              StatCard(
-                label: 'Encaminhamentos',
-                value: '$forwarded',
-                icon: Icons.send_outlined,
-                color: AppColors.secondary,
-              ),
-              StatCard(
-                label: 'Visitantes Integrados',
-                value: '$integrated',
-                icon: Icons.check_circle_outline,
-                color: AppColors.success,
-              ),
-              StatCard(
-                label: 'Frequência nas Células',
-                value: '${avgAttendance.toStringAsFixed(1)}%',
-                icon: Icons.bar_chart_outlined,
-                color: AppColors.accent,
-              ),
-            ]),
-          ),
-
-          const SizedBox(height: AppSpacing.xl),
-
-          // ── Integration Growth Chart ────────────────────────────
-          AppSectionHeader(
-            title: 'Crescimento de Integração',
-            actionLabel: 'Ver relatório',
-            onAction: () => widget.onSwitchTab(3),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            child: _months.isEmpty
-                ? SizedBox(
-                    height: 160,
-                    child: Center(
-                      child: Text(
-                        'Sem dados de visitantes ainda.',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  )
-                : _IntegrationLineChart(months: _months),
-          ),
-
-          const SizedBox(height: AppSpacing.xl),
-
-          // ── Active Cells ───────────────────────────────────────
-          AppSectionHeader(
-            title: 'Células Ativas',
-            actionLabel: 'Gerenciar',
-            onAction: () => widget.onSwitchTab(2),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: highlightedCells.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(AppSpacing.base),
-                    child: Text(
-                      'Nenhuma célula cadastrada.',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: List.generate(highlightedCells.length, (index) {
-                      final cell = highlightedCells[index];
-                      return Column(
-                        children: [
-                          _CellRow(
-                            name: (cell['name'] as String?) ?? 'Célula',
-                            leader:
-                                (cell['leaderName'] as String?) ?? 'Sem líder',
-                            day: _dayLabel(
-                              (cell['dayOfWeek'] as String?) ?? '',
-                            ),
-                            status: 'Ativa',
-                          ),
-                          if (index < highlightedCells.length - 1)
-                            const Divider(height: 1),
-                        ],
-                      );
-                    }),
-                  ),
-          ),
-
-          const SizedBox(height: AppSpacing.xl),
-
-          // ── Quick Actions ──────────────────────────────────────
-          AppSectionHeader(title: 'Ações Rápidas'),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: 'Nova Célula',
-                  variant: AppButtonVariant.secondary,
-                  prefixIcon: Icons.add_circle_outline,
-                  onPressed: () => _showSheet(
-                    context,
-                    _NewCellSheet(dio: DioClient(AuthStorage()).dio),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: AppButton(
-                  label: 'Novo Líder',
-                  variant: AppButtonVariant.secondary,
-                  prefixIcon: Icons.person_add_outlined,
-                  onPressed: () => _showSheet(
-                    context,
-                    _NewLeaderSheet(dio: DioClient(AuthStorage()).dio),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppSpacing.sm),
-                ),
-                child: const Icon(
-                  Icons.folder_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              title: const Text('Gerenciar Materiais'),
-              subtitle: const Text('Enviar e organizar materiais para líderes'),
-              trailing: const Icon(
-                Icons.chevron_right,
-                color: AppColors.grey400,
-              ),
-              onTap: () => context.push('/admin/materials'),
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppSpacing.sm),
-                ),
-                child: const Icon(
-                  Icons.people_outlined,
-                  color: AppColors.primary,
-                ),
-              ),
-              title: const Text('Líderes'),
-              subtitle: const Text('Visualizar líderes, células e frequências'),
-              trailing: const Icon(
-                Icons.chevron_right,
-                color: AppColors.grey400,
-              ),
-              onTap: () => context.push(AppRoutes.adminLeaders),
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.xl2),
-        ],
-      ),
-    );
-  }
-
-  String _dayLabel(String dayOfWeek) {
-    return switch (dayOfWeek) {
-      'segunda' => 'Segunda-feira',
-      'terca' => 'Terça-feira',
-      'quarta' => 'Quarta-feira',
-      'quinta' => 'Quinta-feira',
-      'sexta' => 'Sexta-feira',
-      'sabado' => 'Sábado',
-      'domingo' => 'Domingo',
-      _ => 'Dia não informado',
-    };
-  }
-
-  void _showSheet(BuildContext context, Widget sheet) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => sheet,
-    );
-  }
-}
-
-// ── Tab 1: Visitors Admin ────────────────────────────────────────────────────
-
-/// Line chart that renders total visitors (blue) vs integrated (green) by month.
-class _IntegrationLineChart extends StatelessWidget {
-  const _IntegrationLineChart({required this.months});
-
-  final List<Map<String, dynamic>> months;
-
-  @override
-  Widget build(BuildContext context) {
-    final spots = <FlSpot>[];
-    final intSpots = <FlSpot>[];
-    for (var i = 0; i < months.length; i++) {
-      spots.add(FlSpot(i.toDouble(), (months[i]['total'] as num).toDouble()));
-      intSpots.add(
-        FlSpot(i.toDouble(), (months[i]['integrated'] as num).toDouble()),
-      );
-    }
-    final maxY = spots.isEmpty
-        ? 10.0
-        : (spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) * 1.2)
-              .ceilToDouble();
-
-    return SizedBox(
-      height: 180,
-      child: Padding(
-        padding: const EdgeInsets.only(
-          top: AppSpacing.base,
-          right: AppSpacing.base,
-          bottom: AppSpacing.sm,
-        ),
-        child: LineChart(
-          LineChartData(
-            minY: 0,
-            maxY: maxY,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: AppColors.grey300, strokeWidth: 0.5),
-            ),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 28,
-                  getTitlesWidget: (value, _) => Text(
-                    '${value.toInt()}',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: 9,
-                    ),
-                  ),
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: 1,
-                  getTitlesWidget: (value, _) {
-                    final idx = value.toInt();
-                    if (idx < 0 || idx >= months.length) {
-                      return const SizedBox.shrink();
-                    }
-                    final label = (months[idx]['month'] as String).substring(5);
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        label,
-                        style: AppTypography.labelSmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 9,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-            ),
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                color: AppColors.primary,
-                barWidth: 2.5,
-                dotData: const FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                ),
-              ),
-              LineChartBarData(
-                spots: intSpots,
-                isCurved: true,
-                color: AppColors.success,
-                barWidth: 2,
-                dotData: const FlDotData(show: false),
-                dashArray: [4, 3],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bar chart for monthly new visitors (reports tab).
-class _MonthlyBarChart extends StatelessWidget {
-  const _MonthlyBarChart({required this.months});
-
-  final List<Map<String, dynamic>> months;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxY = months.isEmpty
-        ? 10.0
-        : (months
-                      .map((m) => (m['total'] as num).toDouble())
-                      .reduce((a, b) => a > b ? a : b) *
-                  1.2)
-              .ceilToDouble();
-
-    return SizedBox(
-      height: 200,
-      child: Padding(
-        padding: const EdgeInsets.only(
-          top: AppSpacing.base,
-          right: AppSpacing.base,
-          bottom: AppSpacing.sm,
-        ),
-        child: BarChart(
-          BarChartData(
-            maxY: maxY,
-            barTouchData: BarTouchData(enabled: true),
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: AppColors.grey300, strokeWidth: 0.5),
-            ),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 28,
-                  getTitlesWidget: (value, _) => Text(
-                    '${value.toInt()}',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: 9,
-                    ),
-                  ),
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, _) {
-                    final idx = value.toInt();
-                    if (idx < 0 || idx >= months.length) {
-                      return const SizedBox.shrink();
-                    }
-                    final label = (months[idx]['month'] as String).substring(5);
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        label,
-                        style: AppTypography.labelSmall.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 9,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              topTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-              rightTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
-            ),
-            barGroups: List.generate(months.length, (i) {
-              final total = (months[i]['total'] as num).toDouble();
-              final integrated = (months[i]['integrated'] as num).toDouble();
-              return BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: total,
-                    color: AppColors.primary,
-                    width: 10,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(3),
-                    ),
-                  ),
-                  BarChartRodData(
-                    toY: integrated,
-                    color: AppColors.success,
-                    width: 10,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(3),
-                    ),
-                  ),
-                ],
-                barsSpace: 3,
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _VisitorsAdminTab extends StatefulWidget {
   const _VisitorsAdminTab();
 
@@ -728,20 +177,49 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _visitors = [];
+  List<Map<String, dynamic>> _bairros = [];
+
   final _searchCtrl = TextEditingController();
   String _query = '';
+  String? _selectedBairroId;
+  String? _selectedEstadoCivil;
+  bool? _isBaptized;
+  bool? _frequentacelula;
+  String? _selectedAgeRange;
+
+  static const _ageRanges = [
+    '18-25',
+    '26-35',
+    '36-45',
+    '46-55',
+    '56-65',
+    '65+',
+  ];
+  static const _maritalStatuses = ['solteiro', 'casado', 'divorciado', 'viuvo'];
 
   @override
   void initState() {
     super.initState();
     _dio = DioClient(AuthStorage()).dio;
-    _loadVisitors();
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
+  Future<void> _loadData() async {
+    await Future.wait([_loadBairros(), _loadVisitors()]);
+  }
+
+  Future<void> _loadBairros() async {
+    try {
+      // Por enquanto não carrega bairros dinamicamente
+      // Você pode expandir para carregar por cidade se necessário
+      if (mounted) {
+        setState(() {
+          _bairros = [];
+        });
+      }
+    } catch (e) {
+      developer.log('Erro ao carregar bairros: $e');
+    }
   }
 
   Future<void> _loadVisitors() async {
@@ -768,12 +246,81 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
     }
   }
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   List<Map<String, dynamic>> get _filtered {
     final q = _query.toLowerCase();
-    if (q.isEmpty) return _visitors;
-    return _visitors
-        .where((v) => (v['name'] as String).toLowerCase().contains(q))
-        .toList();
+    var filtered = _visitors;
+
+    // Filtro por nome/search
+    if (q.isNotEmpty) {
+      filtered = filtered
+          .where((v) => (v['name'] as String).toLowerCase().contains(q))
+          .toList();
+    }
+
+    // Filtro por bairro
+    if (_selectedBairroId != null) {
+      filtered = filtered
+          .where((v) => v['bairroId'] == _selectedBairroId)
+          .toList();
+    }
+
+    // Filtro por estado civil
+    if (_selectedEstadoCivil != null) {
+      filtered = filtered
+          .where(
+            (v) =>
+                (v['maritalStatus'] as String?)?.toLowerCase().contains(
+                  _selectedEstadoCivil!.toLowerCase(),
+                ) ??
+                false,
+          )
+          .toList();
+    }
+
+    // Filtro por batizados
+    if (_isBaptized != null) {
+      filtered = filtered
+          .where((v) => (v['isBaptized'] as bool?) == _isBaptized)
+          .toList();
+    }
+
+    // Filtro por frequência em célula
+    if (_frequentacelula != null) {
+      if (_frequentacelula!) {
+        filtered = filtered.where((v) => v['cellId'] != null).toList();
+      } else {
+        filtered = filtered.where((v) => v['cellId'] == null).toList();
+      }
+    }
+
+    // Filtro por faixa etária
+    if (_selectedAgeRange != null) {
+      filtered = filtered.where((v) {
+        final birthDate = v['birthDate'] != null
+            ? DateTime.tryParse(v['birthDate'] as String)
+            : null;
+        if (birthDate == null) return false;
+        final age = DateTime.now().difference(birthDate).inDays ~/ 365;
+        return _isInAgeRange(age, _selectedAgeRange!);
+      }).toList();
+    }
+
+    return filtered;
+  }
+
+  bool _isInAgeRange(int age, String range) {
+    final parts = range.split('-');
+    final min = int.tryParse(parts[0]) ?? 0;
+    final max = parts.length > 1 && parts[1] != '+'
+        ? int.tryParse(parts[1]) ?? 100
+        : 150;
+    return age >= min && age <= max;
   }
 
   void _openNewVisitorSheet() async {
@@ -783,7 +330,7 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _NewVisitorSheet(dio: _dio),
+      builder: (_) => NewVisitorSheet(dio: _dio),
     );
     if (created == true) _loadVisitors();
   }
@@ -816,7 +363,7 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                 ),
               )
             : RefreshIndicator(
-                onRefresh: _loadVisitors,
+                onRefresh: _loadData,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(
@@ -826,14 +373,178 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                     88,
                   ),
                   children: [
+                    // ── Search ──────────────────────────────────
                     AppSearchField(
                       hint: 'Pesquisar visitante...',
                       controller: _searchCtrl,
                       onChanged: (v) => setState(() => _query = v),
                     ),
                     const SizedBox(height: AppSpacing.base),
+
+                    // ── Filters ─────────────────────────────────
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          // Bairro filter
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 140),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.grey300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String?>(
+                                value: _selectedBairroId,
+                                hint: const Text('Bairro'),
+                                isDense: true,
+                                isExpanded: true,
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Todos os bairros'),
+                                  ),
+                                  ..._bairros.map(
+                                    (b) => DropdownMenuItem<String?>(
+                                      value: b['id'] as String,
+                                      child: Text(b['name'] as String),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _selectedBairroId = v);
+                                  _loadVisitors();
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+
+                          // Faixa etária filter
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 130),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.grey300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String?>(
+                                value: _selectedAgeRange,
+                                hint: const Text('Faixa etária'),
+                                isDense: true,
+                                isExpanded: true,
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Todas'),
+                                  ),
+                                  ..._ageRanges.map(
+                                    (r) => DropdownMenuItem<String?>(
+                                      value: r,
+                                      child: Text('$r anos'),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _selectedAgeRange = v);
+                                  _loadVisitors();
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+
+                          // Estado civil filter
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 150),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.grey300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String?>(
+                                value: _selectedEstadoCivil,
+                                hint: const Text('Estado civil'),
+                                isDense: true,
+                                isExpanded: true,
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('Todos'),
+                                  ),
+                                  ..._maritalStatuses.map(
+                                    (s) => DropdownMenuItem<String?>(
+                                      value: s,
+                                      child: Text(s),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _selectedEstadoCivil = v);
+                                  _loadVisitors();
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+
+                          // Batizados filter
+                          FilterChip(
+                            label: const Text('Batizados'),
+                            selected: _isBaptized == true,
+                            onSelected: (v) => setState(() {
+                              _isBaptized = v ? true : null;
+                              _loadVisitors();
+                            }),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+
+                          // Frequenta célula filter
+                          FilterChip(
+                            label: const Text('Frequ. Célula'),
+                            selected: _frequentacelula == true,
+                            onSelected: (v) => setState(() {
+                              _frequentacelula = v ? true : null;
+                              _loadVisitors();
+                            }),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+
+                          // Limpar filtros
+                          if (_selectedBairroId != null ||
+                              _selectedAgeRange != null ||
+                              _selectedEstadoCivil != null ||
+                              _isBaptized != null ||
+                              _frequentacelula != null)
+                            AppButton(
+                              label: 'Limpar filtros',
+                              variant: AppButtonVariant.outline,
+                              onPressed: () => setState(() {
+                                _selectedBairroId = null;
+                                _selectedAgeRange = null;
+                                _selectedEstadoCivil = null;
+                                _isBaptized = null;
+                                _frequentacelula = null;
+                                _loadVisitors();
+                              }),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.base),
                     AppSectionHeader(
-                      title: 'Todos os Visitantes (${_visitors.length})',
+                      title:
+                          'Visitantes (${_filtered.length}/${_visitors.length})',
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     if (_filtered.isEmpty)
@@ -850,7 +561,7 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                       )
                     else
                       ..._filtered.map(
-                        (v) => _VisitorAdminTile(
+                        (v) => VisitorAdminTile(
                           name: v['name'] as String,
                           status: v['status'] as String? ?? 'novo',
                           time: _relativeTime(v['createdAt'] as String),
@@ -897,7 +608,7 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (_) => _VisitorDetailsSheet(visitor: visitor),
+        builder: (_) => VisitorDetailsSheet(visitor: visitor),
       );
     } on DioException catch (e) {
       if (!mounted) return;
@@ -909,221 +620,6 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
     }
   }
 }
-
-class _VisitorAdminTile extends StatelessWidget {
-  const _VisitorAdminTile({
-    required this.name,
-    required this.status,
-    required this.time,
-    required this.onTap,
-  });
-
-  final String name;
-  final String status;
-  final String time;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      onTap: onTap,
-      child: Row(
-        children: [
-          AppAvatar(initials: name.split(' ').map((e) => e[0]).take(2).join()),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: AppTypography.titleSmall),
-                const SizedBox(height: AppSpacing.xs2),
-                Row(
-                  children: [
-                    VisitorStatusBadge(status: status),
-                    const SizedBox(width: AppSpacing.sm),
-                    Text(
-                      time,
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right, color: AppColors.grey400),
-        ],
-      ),
-    );
-  }
-}
-
-class _VisitorDetailsSheet extends StatelessWidget {
-  const _VisitorDetailsSheet({required this.visitor});
-
-  final Map<String, dynamic> visitor;
-
-  @override
-  Widget build(BuildContext context) {
-    String textOrDash(Object? v) {
-      final value = (v ?? '').toString().trim();
-      return value.isEmpty ? 'Nao informado' : value;
-    }
-
-    final name = textOrDash(visitor['name']);
-    final status = textOrDash(visitor['status']);
-    final createdAt = DateTime.tryParse(
-      (visitor['createdAt'] as String?) ?? '',
-    );
-
-    String relativeTime() {
-      if (createdAt == null) return 'Sem data';
-      final diff = DateTime.now().difference(createdAt);
-      if (diff.inDays == 0) return 'hoje';
-      if (diff.inDays == 1) return 'ha 1 dia';
-      if (diff.inDays < 7) return 'ha ${diff.inDays} dias';
-      if (diff.inDays < 14) return 'ha 1 sem.';
-      return 'ha ${(diff.inDays / 7).round()} sem.';
-    }
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.4,
-      maxChildSize: 0.9,
-      expand: false,
-      builder: (_, controller) => SingleChildScrollView(
-        controller: controller,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.grey300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                children: [
-                  AppAvatar(
-                    initials: name.split(' ').map((e) => e[0]).take(2).join(),
-                    size: 56,
-                  ),
-                  const SizedBox(width: AppSpacing.base),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: AppTypography.headlineSmall),
-                        const SizedBox(height: AppSpacing.xs),
-                        VisitorStatusBadge(status: status),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    _DetailRow(
-                      icon: Icons.phone_outlined,
-                      label: 'Telefone',
-                      value: textOrDash(visitor['phone']),
-                    ),
-                    const Divider(height: 1),
-                    _DetailRow(
-                      icon: Icons.location_on_outlined,
-                      label: 'Endereco',
-                      value: textOrDash(visitor['address']),
-                    ),
-                    const Divider(height: 1),
-                    _DetailRow(
-                      icon: Icons.access_time_outlined,
-                      label: 'Cadastrado',
-                      value: relativeTime(),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text('Alterar status', style: AppTypography.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                children: const [
-                  _VisitorStatusChip(label: 'Novo'),
-                  _VisitorStatusChip(label: 'Em acompanhamento'),
-                  _VisitorStatusChip(label: 'Integrado'),
-                  _VisitorStatusChip(label: 'Inativo'),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.base),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primary, size: 20),
-      title: Text(
-        label,
-        style: AppTypography.labelSmall.copyWith(
-          color: AppColors.textSecondary,
-        ),
-      ),
-      subtitle: Text(value, style: AppTypography.titleSmall),
-    );
-  }
-}
-
-class _VisitorStatusChip extends StatelessWidget {
-  const _VisitorStatusChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      label: Text(label, style: AppTypography.labelMedium),
-      onPressed: () {
-        _showTopSnackBar(
-          context,
-          'Status alterado para: $label',
-          backgroundColor: AppColors.success,
-        );
-      },
-    );
-  }
-}
-
-// ── Tab 2: Cells Admin ───────────────────────────────────────────────────────
 
 class _CellsAdminTab extends StatefulWidget {
   const _CellsAdminTab();
@@ -1306,7 +802,7 @@ class _CellsAdminTabState extends State<_CellsAdminTab> {
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
-                builder: (_) => _NewCellSheet(dio: _dio),
+                builder: (_) => NewCellSheet(dio: _dio),
               );
               if (created == true) _loadCells();
             },
@@ -1412,6 +908,10 @@ class _ReportsTabState extends State<_ReportsTab> {
   String? _error;
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _months = [];
+  bool _exportingPdf = false;
+  bool _exportingExcel = false;
+
+  static const _exportService = ReportExportService();
 
   @override
   void initState() {
@@ -1548,16 +1048,46 @@ class _ReportsTabState extends State<_ReportsTab> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _MonthlyBarChart(months: _months),
+                      TappableChart(
+                        detailTitle: 'Visitantes por Mês',
+                        detailSubtitle: 'Últimos 6 meses — total vs integrados',
+                        detailChart: DetailBarChart(months: _months),
+                        columns: const ['Mês', 'Total', 'Integrados', 'Taxa'],
+                        rows: _months.map((m) {
+                          final total = (m['total'] as num?)?.toInt() ?? 0;
+                          final integ = (m['integrated'] as num?)?.toInt() ?? 0;
+                          final rate = total == 0
+                              ? '0%'
+                              : '${(integ / total * 100).toStringAsFixed(1)}%';
+                          return ChartDataRow(
+                            label: (m['month'] as String?) ?? '',
+                            values: [
+                              ChartValue(
+                                header: 'Total',
+                                value: '$total',
+                                color: AppColors.primary,
+                              ),
+                              ChartValue(
+                                header: 'Integrados',
+                                value: '$integ',
+                                color: AppColors.success,
+                              ),
+                              ChartValue(header: 'Taxa', value: rate),
+                            ],
+                          );
+                        }).toList(),
+                        legendItems: const [
+                          (color: AppColors.primary, label: 'Total'),
+                          (color: AppColors.success, label: 'Integrados'),
+                        ],
+                        child: MonthlyBarChart(months: _months),
+                      ),
                       const SizedBox(height: AppSpacing.sm),
                       Row(
                         children: [
-                          _ChartLegend(
-                            color: AppColors.primary,
-                            label: 'Total',
-                          ),
+                          ChartLegend(color: AppColors.primary, label: 'Total'),
                           const SizedBox(width: AppSpacing.base),
-                          _ChartLegend(
+                          ChartLegend(
                             color: AppColors.success,
                             label: 'Integrados',
                           ),
@@ -1572,53 +1102,52 @@ class _ReportsTabState extends State<_ReportsTab> {
           AppSectionHeader(title: 'Exportar Relatório'),
           const SizedBox(height: AppSpacing.sm),
           AppButton(
-            label: 'Exportar em PDF',
+            label: _exportingPdf ? 'Gerando PDF...' : 'Exportar em PDF',
             variant: AppButtonVariant.outline,
             prefixIcon: Icons.picture_as_pdf_outlined,
-            onPressed: () {},
+            onPressed: _exportingPdf
+                ? null
+                : () async {
+                    setState(() => _exportingPdf = true);
+                    try {
+                      await _exportService.exportPdf(
+                        stats: _stats,
+                        months: _months,
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      _showTopSnackBar(context, 'Erro ao gerar PDF: $e');
+                    } finally {
+                      if (mounted) setState(() => _exportingPdf = false);
+                    }
+                  },
           ),
           const SizedBox(height: AppSpacing.sm),
           AppButton(
-            label: 'Exportar em Excel',
+            label: _exportingExcel ? 'Gerando Excel...' : 'Exportar em Excel',
             variant: AppButtonVariant.outline,
             prefixIcon: Icons.table_chart_outlined,
-            onPressed: () {},
+            onPressed: _exportingExcel
+                ? null
+                : () async {
+                    setState(() => _exportingExcel = true);
+                    try {
+                      await _exportService.exportExcel(
+                        stats: _stats,
+                        months: _months,
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      _showTopSnackBar(context, 'Erro ao gerar Excel: $e');
+                    } finally {
+                      if (mounted) setState(() => _exportingExcel = false);
+                    }
+                  },
           ),
 
           const SizedBox(height: AppSpacing.xl2),
         ],
       ),
-    );
-  }
-}
-
-class _ChartLegend extends StatelessWidget {
-  const _ChartLegend({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: AppTypography.labelSmall.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1772,6 +1301,8 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
   }
 
   Future<void> _openAddressMap(String address) async {
+    final lat = (_cell?['latitude'] as num?)?.toDouble();
+    final lng = (_cell?['longitude'] as num?)?.toDouble();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1781,6 +1312,8 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
       builder: (_) => _AddressMapSheet(
         title: (_cell?['name'] as String?) ?? widget.name,
         address: address,
+        latitude: lat,
+        longitude: lng,
       ),
     );
   }
@@ -1830,6 +1363,7 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
 
     final cell = _cell ?? const <String, dynamic>{};
     final name = (cell['name'] as String?) ?? widget.name;
+    // ignore: unused_local_variable
     final leader = (cell['leaderName'] as String?) ?? widget.leader;
     final day = (cell['dayOfWeek'] as String?) ?? widget.day;
     final time = (cell['time'] as String?) ?? '';
@@ -1876,10 +1410,10 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.base),
-                Text('ID: ${widget.id}', style: AppTypography.bodySmall),
+                // const SizedBox(height: AppSpacing.base),
+                // Text('ID: ${widget.id}', style: AppTypography.bodySmall),
                 const SizedBox(height: AppSpacing.xs),
-                Text('Líder: $leader', style: AppTypography.bodyMedium),
+                // Text('Líder: $leader', style: AppTypography.bodyMedium),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Dia: $day ${time.isEmpty ? '' : '· $time'}',
@@ -2106,10 +1640,16 @@ class _EditCellSheet extends StatefulWidget {
 class _EditCellSheetState extends State<_EditCellSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _addressCtrl;
-  late final TextEditingController _neighborhoodCtrl;
-  late final TextEditingController _cityCtrl;
   late final TextEditingController _timeCtrl;
+  final _cepCtrl = TextEditingController();
+  String? _bairroId;
+  String? _estadoId;
+  String? _cidadeId;
+  double? _latitude;
+  double? _longitude;
+  bool _cepLoading = false;
   bool _saving = false;
+  late final MapController _mapController;
 
   @override
   void initState() {
@@ -2120,25 +1660,158 @@ class _EditCellSheetState extends State<_EditCellSheet> {
     _addressCtrl = TextEditingController(
       text: (widget.cell['address'] as String?) ?? '',
     );
-    _neighborhoodCtrl = TextEditingController(
-      text: (widget.cell['neighborhood'] as String?) ?? '',
-    );
-    _cityCtrl = TextEditingController(
-      text: (widget.cell['city'] as String?) ?? '',
-    );
     _timeCtrl = TextEditingController(
       text: (widget.cell['time'] as String?) ?? '19:00',
     );
+    _bairroId = widget.cell['bairroId'] as String?;
+    _estadoId = widget.cell['estadoId'] as String?;
+    _cidadeId = widget.cell['cidadeId'] as String?;
+    _latitude = (widget.cell['latitude'] as num?)?.toDouble();
+    _longitude = (widget.cell['longitude'] as num?)?.toDouble();
+    _mapController = MapController();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _addressCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
     _timeCtrl.dispose();
+    _cepCtrl.dispose();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  // ── CEP lookup ─────────────────────────────────────────────────────────
+
+  Future<void> _lookupCep(String cep) async {
+    final cleaned = cep.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.length != 8) return;
+    setState(() => _cepLoading = true);
+    try {
+      final resp = await Dio().get('https://viacep.com.br/ws/$cleaned/json/');
+      final data = resp.data as Map<String, dynamic>;
+      if (data['erro'] == true) {
+        setState(() => _cepLoading = false);
+        return;
+      }
+
+      final logradouro = data['logradouro'] as String? ?? '';
+      final bairroName = data['bairro'] as String? ?? '';
+      final localidade = data['localidade'] as String? ?? '';
+      final uf = data['uf'] as String? ?? '';
+
+      String? foundEstadoId, foundCidadeId, foundBairroId;
+      double? foundLat, foundLng;
+
+      try {
+        final estadosResp = await widget.dio.get('/location/estados');
+        final estadosList =
+            (estadosResp.data as Map<String, dynamic>)['estados'] as List;
+        for (final e in estadosList) {
+          final estado = e as Map<String, dynamic>;
+          if ((estado['uf'] as String?)?.toUpperCase() == uf.toUpperCase()) {
+            foundEstadoId = estado['id'] as String;
+            break;
+          }
+        }
+        if (foundEstadoId != null) {
+          final cidadesResp = await widget.dio.get(
+            '/location/estados/$foundEstadoId/cidades',
+          );
+          final cidadesList =
+              (cidadesResp.data as Map<String, dynamic>)['cidades'] as List;
+          for (final c in cidadesList) {
+            final cidade = c as Map<String, dynamic>;
+            if ((cidade['name'] as String?)?.trim().toLowerCase() ==
+                localidade.trim().toLowerCase()) {
+              foundCidadeId = cidade['id'] as String;
+              break;
+            }
+          }
+          if (foundCidadeId != null) {
+            final bairrosResp = await widget.dio.get(
+              '/location/cidades/$foundCidadeId/bairros',
+            );
+            final bairrosList =
+                (bairrosResp.data as Map<String, dynamic>)['bairros'] as List;
+            for (final b in bairrosList) {
+              final bairroOption = b as Map<String, dynamic>;
+              if ((bairroOption['name'] as String?)?.trim().toLowerCase() ==
+                  bairroName.trim().toLowerCase()) {
+                foundBairroId = bairroOption['id'] as String;
+                foundLat = (bairroOption['latitude'] as num?)?.toDouble();
+                foundLng = (bairroOption['longitude'] as num?)?.toDouble();
+                break;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() {
+        if (logradouro.isNotEmpty) _addressCtrl.text = logradouro;
+        _cepLoading = false;
+        _estadoId = foundEstadoId;
+        _cidadeId = foundCidadeId;
+        _bairroId = foundBairroId;
+        if (foundLat != null && foundLng != null) {
+          _latitude = foundLat;
+          _longitude = foundLng;
+        }
+      });
+
+      if (foundLat != null && foundLng != null) {
+        try {
+          _mapController.move(LatLng(foundLat, foundLng), 15);
+        } catch (_) {}
+      } else if (logradouro.isNotEmpty) {
+        await _geocodeWithNominatim(logradouro, localidade, uf);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cepLoading = false);
+    }
+  }
+
+  Future<void> _geocodeWithNominatim(
+    String logradouro,
+    String localidade,
+    String uf,
+  ) async {
+    try {
+      final resp = await Dio().get(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {
+          'format': 'json',
+          'q': '$logradouro, $localidade, $uf, Brasil',
+          'countrycodes': 'br',
+          'limit': '1',
+        },
+        options: Options(headers: {'User-Agent': 'SistemaIgrejaApp/1.0'}),
+      );
+      final results = resp.data as List;
+      if (results.isNotEmpty && mounted) {
+        final lat = double.tryParse(results[0]['lat'] as String? ?? '');
+        final lng = double.tryParse(results[0]['lon'] as String? ?? '');
+        if (lat != null && lng != null) {
+          setState(() {
+            _latitude = lat;
+            _longitude = lng;
+          });
+          try {
+            _mapController.move(LatLng(lat, lng), 15);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _updateMapPosition() async {
+    if (_latitude == null || _longitude == null) return;
+    try {
+      _mapController.move(LatLng(_latitude!, _longitude!), 15);
+    } catch (_) {}
   }
 
   Future<void> _save() async {
@@ -2149,9 +1822,15 @@ class _EditCellSheetState extends State<_EditCellSheet> {
         data: {
           'name': _nameCtrl.text.trim(),
           'address': _addressCtrl.text.trim(),
-          'neighborhood': _neighborhoodCtrl.text.trim(),
-          'city': _cityCtrl.text.trim(),
+          if (_estadoId != null) 'estadoId': _estadoId,
+          if (_cidadeId != null) 'cidadeId': _cidadeId,
+          if (_bairroId != null) 'bairroId': _bairroId,
           'time': _timeCtrl.text.trim(),
+          if (_latitude != null) 'latitude': _latitude else 'latitude': null,
+          if (_longitude != null)
+            'longitude': _longitude
+          else
+            'longitude': null,
         },
       );
       if (!mounted) return;
@@ -2186,23 +1865,148 @@ class _EditCellSheetState extends State<_EditCellSheet> {
                 hint: 'Nome da célula',
               ),
               const SizedBox(height: AppSpacing.base),
+              // ── CEP ──────────────────────────────────────────────────────
+              Stack(
+                children: [
+                  AppTextField(
+                    controller: _cepCtrl,
+                    label: 'CEP (auto busca após 8 dígitos)',
+                    hint: '00000-000',
+                    prefixIcon: Icons.search_outlined,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    enabled: !_cepLoading,
+                    inputFormatters: [
+                      MaskTextInputFormatter(
+                        mask: '#####-###',
+                        filter: {'#': RegExp(r'[0-9]')},
+                      ),
+                    ],
+                    onChanged: (v) {
+                      final cleaned = v.replaceAll(RegExp(r'\D'), '');
+                      if (cleaned.length == 8 && !_cepLoading) {
+                        _lookupCep(cleaned);
+                      }
+                    },
+                  ),
+                  if (_cepLoading)
+                    Positioned(
+                      right: 50,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.base),
               AppTextField(
                 controller: _addressCtrl,
-                label: 'Endereço',
+                label: 'Rua / número',
                 hint: 'Rua, número',
               ),
               const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _neighborhoodCtrl,
-                label: 'Bairro',
-                hint: 'Bairro',
+              AddressSelector(
+                dio: widget.dio,
+                initialEstadoId: _estadoId,
+                initialCidadeId: _cidadeId,
+                initialBairroId: _bairroId,
+                onChanged: (id) {
+                  setState(() => _bairroId = id);
+                  _updateMapPosition();
+                },
+                isRequired: false,
               ),
+
+              // ── Mapa ──────────────────────────────────────────────────────
               const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _cityCtrl,
-                label: 'Cidade',
-                hint: 'Cidade',
+              Text('Localização no Mapa', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                _latitude != null
+                    ? 'Toque no mapa para ajustar a posição da célula'
+                    : 'Informe um CEP ou toque no mapa para definir a localização',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              SizedBox(
+                height: 220,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _latitude != null
+                          ? LatLng(_latitude!, _longitude!)
+                          : const LatLng(-14.235, -51.925),
+                      initialZoom: _latitude != null ? 15.0 : 4.0,
+                      onTap: (_, point) => setState(() {
+                        _latitude = point.latitude;
+                        _longitude = point.longitude;
+                      }),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.app',
+                      ),
+                      if (_latitude != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(_latitude!, _longitude!),
+                              child: const Icon(
+                                Icons.location_on,
+                                color: AppColors.primary,
+                                size: 40,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_latitude != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Lat: ${_latitude!.toStringAsFixed(6)}, Lng: ${_longitude!.toStringAsFixed(6)}',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: const Text('Remover'),
+                      onPressed: () => setState(() {
+                        _latitude = null;
+                        _longitude = null;
+                      }),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: AppSpacing.base),
               AppTextField(
                 controller: _timeCtrl,
@@ -2224,10 +2028,17 @@ class _EditCellSheetState extends State<_EditCellSheet> {
 }
 
 class _AddressMapSheet extends StatefulWidget {
-  const _AddressMapSheet({required this.title, required this.address});
+  const _AddressMapSheet({
+    required this.title,
+    required this.address,
+    this.latitude,
+    this.longitude,
+  });
 
   final String title;
   final String address;
+  final double? latitude;
+  final double? longitude;
 
   @override
   State<_AddressMapSheet> createState() => _AddressMapSheetState();
@@ -2246,6 +2057,17 @@ class _AddressMapSheetState extends State<_AddressMapSheet> {
 
   Future<void> _geocode() async {
     try {
+      // Se temos coordenadas, usar elas diretamente (mais preciso)
+      if (widget.latitude != null && widget.longitude != null) {
+        if (!mounted) return;
+        setState(() {
+          _position = LatLng(widget.latitude!, widget.longitude!);
+          _loading = false;
+        });
+        return;
+      }
+
+      // Caso contrário, tentar geocoding do endereço
       final locations = await locationFromAddress(widget.address);
       if (!mounted) return;
       if (locations.isNotEmpty) {
@@ -2345,750 +2167,3 @@ class _AddressMapSheetState extends State<_AddressMapSheet> {
 }
 
 // ── Shared bottom sheets ─────────────────────────────────────────────────────
-
-class _NewCellSheet extends StatefulWidget {
-  const _NewCellSheet({required this.dio});
-  final Dio dio;
-
-  @override
-  State<_NewCellSheet> createState() => _NewCellSheetState();
-}
-
-class _NewCellSheetState extends State<_NewCellSheet> {
-  final _nameCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _neighborhoodCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
-  final _timeCtrl = TextEditingController(text: '19:00');
-  String _dayOfWeek = 'terca';
-  bool _isSaving = false;
-  bool _isLoadingLeaders = true;
-  List<_LeaderOption> _leaders = const [];
-  _LeaderOption? _selectedLeader;
-
-  static const _days = [
-    ('segunda', 'Segunda-feira'),
-    ('terca', 'Terça-feira'),
-    ('quarta', 'Quarta-feira'),
-    ('quinta', 'Quinta-feira'),
-    ('sexta', 'Sexta-feira'),
-    ('sabado', 'Sábado'),
-    ('domingo', 'Domingo'),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadLeaders();
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _addressCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
-    _timeCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadLeaders() async {
-    setState(() => _isLoadingLeaders = true);
-    try {
-      final resp = await widget.dio.get('/users/leaders');
-      final data = (resp.data as Map<String, dynamic>)['leaders'] as List;
-      final leaders = data
-          .map(
-            (u) => _LeaderOption(
-              id: u['id'] as String,
-              name: u['name'] as String,
-              email: (u['email'] as String?) ?? '',
-            ),
-          )
-          .toList();
-
-      if (!mounted) return;
-      setState(() {
-        _leaders = leaders;
-        _selectedLeader = leaders.isNotEmpty ? leaders.first : null;
-        _isLoadingLeaders = false;
-      });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoadingLeaders = false);
-      _showTopSnackBar(
-        context,
-        e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar lideres',
-      );
-    }
-  }
-
-  Future<void> _openLeaderSelector() async {
-    if (_leaders.isEmpty) {
-      _showTopSnackBar(
-        context,
-        'Nenhum lider cadastrado. Cadastre um lider antes de criar a celula.',
-        backgroundColor: AppColors.warning,
-      );
-      return;
-    }
-
-    final selected = await Navigator.of(context).push<_LeaderOption>(
-      MaterialPageRoute(
-        builder: (_) => _LeaderSelectorPage(
-          leaders: _leaders,
-          initialId: _selectedLeader?.id,
-        ),
-      ),
-    );
-
-    if (selected != null && mounted) {
-      setState(() => _selectedLeader = selected);
-    }
-  }
-
-  Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
-    final address = _addressCtrl.text.trim();
-    final neighborhood = _neighborhoodCtrl.text.trim();
-    final city = _cityCtrl.text.trim();
-    final time = _timeCtrl.text.trim();
-    final leaderId = _selectedLeader?.id ?? '';
-
-    if (name.isEmpty ||
-        address.isEmpty ||
-        city.isEmpty ||
-        time.isEmpty ||
-        leaderId.isEmpty) {
-      _showTopSnackBar(
-        context,
-        'Preencha todos os campos obrigatorios',
-        backgroundColor: AppColors.warning,
-      );
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    try {
-      await widget.dio.post(
-        '/cells',
-        data: {
-          'name': name,
-          'leaderId': leaderId,
-          'address': address,
-          'neighborhood': neighborhood.isEmpty ? city : neighborhood,
-          'city': city,
-          'dayOfWeek': _dayOfWeek,
-          'time': time,
-        },
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      _showTopSnackBar(
-        context,
-        e.response?.data?['error']?['message'] as String? ??
-            'Erro ao criar celula',
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.grey300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.base),
-              Text('Nova Célula', style: AppTypography.headlineSmall),
-              const SizedBox(height: AppSpacing.xl),
-              AppTextField(
-                controller: _nameCtrl,
-                label: 'Nome da Célula *',
-                hint: 'Ex: Célula Esperança',
-                prefixIcon: Icons.groups_2_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              InkWell(
-                onTap: _isLoadingLeaders ? null : _openLeaderSelector,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Lider *',
-                    prefixIcon: const Icon(Icons.person_search_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                  ),
-                  child: _isLoadingLeaders
-                      ? const Row(
-                          children: [
-                            SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                            SizedBox(width: AppSpacing.sm),
-                            Text('Carregando lideres...'),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _selectedLeader?.name ?? 'Selecionar lider',
-                                style: AppTypography.bodyMedium,
-                              ),
-                            ),
-                            const Icon(Icons.chevron_right),
-                          ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _addressCtrl,
-                label: 'Endereço *',
-                hint: 'Rua, número',
-                prefixIcon: Icons.location_on_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _neighborhoodCtrl,
-                label: 'Bairro',
-                hint: 'Bairro',
-                prefixIcon: Icons.map_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _cityCtrl,
-                label: 'Cidade *',
-                hint: 'São Paulo',
-                prefixIcon: Icons.location_city_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _timeCtrl,
-                label: 'Horário *',
-                hint: '19:00',
-                prefixIcon: Icons.access_time_outlined,
-                textInputAction: TextInputAction.done,
-                keyboardType: TextInputType.datetime,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              Text(
-                'Dia da semana',
-                style: AppTypography.labelMedium.copyWith(
-                  color: AppColors.grey700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              DropdownButtonFormField<String>(
-                initialValue: _dayOfWeek,
-                items: _days
-                    .map(
-                      (d) => DropdownMenuItem(value: d.$1, child: Text(d.$2)),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _dayOfWeek = v!),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    borderSide: const BorderSide(color: AppColors.grey300),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.base,
-                    vertical: AppSpacing.md,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppButton(
-                label: _isSaving ? 'Salvando...' : 'Criar Célula',
-                prefixIcon: Icons.add,
-                onPressed: _isSaving ? null : _save,
-              ),
-              const SizedBox(height: AppSpacing.base),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LeaderSelectorPage extends StatefulWidget {
-  const _LeaderSelectorPage({required this.leaders, required this.initialId});
-
-  final List<_LeaderOption> leaders;
-  final String? initialId;
-
-  @override
-  State<_LeaderSelectorPage> createState() => _LeaderSelectorPageState();
-}
-
-class _LeaderSelectorPageState extends State<_LeaderSelectorPage> {
-  final _searchCtrl = TextEditingController();
-  String _query = '';
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final filtered = widget.leaders.where((l) {
-      final q = _query.toLowerCase();
-      return l.name.toLowerCase().contains(q) ||
-          l.email.toLowerCase().contains(q);
-    }).toList();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Selecionar lider'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-        child: Column(
-          children: [
-            AppSearchField(
-              hint: 'Pesquisar lider...',
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _query = v),
-            ),
-            const SizedBox(height: AppSpacing.base),
-            Expanded(
-              child: ListView.builder(
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final leader = filtered[index];
-                  final isSelected = leader.id == widget.initialId;
-                  return AppCard(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    onTap: () => Navigator.of(context).pop(leader),
-                    child: Row(
-                      children: [
-                        AppAvatar(
-                          initials: leader.name
-                              .split(' ')
-                              .map((e) => e[0])
-                              .take(2)
-                              .join(),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                leader.name,
-                                style: AppTypography.titleSmall,
-                              ),
-                              const SizedBox(height: AppSpacing.xs2),
-                              Text(
-                                leader.email,
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isSelected)
-                          const Icon(
-                            Icons.check_circle,
-                            color: AppColors.success,
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── New Visitor Sheet ────────────────────────────────────────────────────────
-
-class _NewVisitorSheet extends StatefulWidget {
-  const _NewVisitorSheet({required this.dio});
-  final Dio dio;
-
-  @override
-  State<_NewVisitorSheet> createState() => _NewVisitorSheetState();
-}
-
-class _NewVisitorSheetState extends State<_NewVisitorSheet> {
-  final _nameCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _neighborhoodCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
-  bool _isSaving = false;
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _phoneCtrl.dispose();
-    _emailCtrl.dispose();
-    _addressCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
-    final phone = _phoneCtrl.text.trim();
-    if (name.isEmpty || phone.isEmpty) {
-      _showTopSnackBar(
-        context,
-        'Nome e telefone sao obrigatorios',
-        backgroundColor: AppColors.warning,
-      );
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    try {
-      await widget.dio.post(
-        '/visitors',
-        data: {
-          'name': name,
-          'phone': phone,
-          if (_emailCtrl.text.trim().isNotEmpty)
-            'email': _emailCtrl.text.trim(),
-          if (_addressCtrl.text.trim().isNotEmpty)
-            'address': _addressCtrl.text.trim(),
-          if (_neighborhoodCtrl.text.trim().isNotEmpty)
-            'neighborhood': _neighborhoodCtrl.text.trim(),
-          if (_cityCtrl.text.trim().isNotEmpty) 'city': _cityCtrl.text.trim(),
-        },
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      _showTopSnackBar(
-        context,
-        e.response?.data?['error']?['message'] as String? ??
-            'Erro ao cadastrar visitante',
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.grey300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.base),
-              Text('Novo Visitante', style: AppTypography.headlineSmall),
-              const SizedBox(height: AppSpacing.xl),
-              AppTextField(
-                controller: _nameCtrl,
-                label: 'Nome *',
-                hint: 'Nome completo',
-                prefixIcon: Icons.person_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _phoneCtrl,
-                label: 'Telefone *',
-                hint: '(11) 99999-9999',
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _emailCtrl,
-                label: 'E-mail',
-                hint: 'email@exemplo.com',
-                prefixIcon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _addressCtrl,
-                label: 'Endereço',
-                hint: 'Rua, número',
-                prefixIcon: Icons.location_on_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _neighborhoodCtrl,
-                label: 'Bairro',
-                hint: 'Bairro',
-                prefixIcon: Icons.map_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _cityCtrl,
-                label: 'Cidade',
-                hint: 'São Paulo',
-                prefixIcon: Icons.location_city_outlined,
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppButton(
-                label: _isSaving ? 'Salvando...' : 'Cadastrar Visitante',
-                prefixIcon: Icons.person_add_outlined,
-                onPressed: _isSaving ? null : _save,
-              ),
-              const SizedBox(height: AppSpacing.base),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NewLeaderSheet extends StatefulWidget {
-  const _NewLeaderSheet({required this.dio});
-  final Dio dio;
-
-  @override
-  State<_NewLeaderSheet> createState() => _NewLeaderSheetState();
-}
-
-class _NewLeaderSheetState extends State<_NewLeaderSheet> {
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  bool _isSaving = false;
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    _phoneCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final name = _nameCtrl.text.trim();
-    final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
-
-    if (name.isEmpty || email.isEmpty || password.length < 6) {
-      _showTopSnackBar(
-        context,
-        'Preencha nome, email e senha (minimo 6 caracteres)',
-        backgroundColor: AppColors.warning,
-      );
-      return;
-    }
-
-    setState(() => _isSaving = true);
-    try {
-      await widget.dio.post(
-        '/auth/register',
-        data: {
-          'name': name,
-          'email': email,
-          'password': password,
-          'role': 'LIDER',
-        },
-      );
-
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-      _showTopSnackBar(
-        context,
-        'Lider cadastrado com sucesso',
-        backgroundColor: AppColors.success,
-      );
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
-      _showTopSnackBar(
-        context,
-        e.response?.data?['error']?['message'] as String? ??
-            'Erro ao cadastrar lider',
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.grey300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.base),
-              Text('Novo Líder', style: AppTypography.headlineSmall),
-              const SizedBox(height: AppSpacing.xl),
-              AppTextField(
-                controller: _nameCtrl,
-                label: 'Nome completo',
-                hint: 'Nome do líder',
-                prefixIcon: Icons.person_outline,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _emailCtrl,
-                label: 'E-mail',
-                hint: 'lider@email.com',
-                prefixIcon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _phoneCtrl,
-                label: 'Telefone',
-                hint: '(11) 99999-9999',
-                prefixIcon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _passwordCtrl,
-                label: 'Senha temporaria *',
-                hint: 'Minimo 6 caracteres',
-                prefixIcon: Icons.lock_outline,
-                obscureText: true,
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppButton(
-                label: _isSaving ? 'Salvando...' : 'Criar Líder',
-                prefixIcon: Icons.person_add_outlined,
-                onPressed: _isSaving ? null : _save,
-              ),
-              const SizedBox(height: AppSpacing.base),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Shared widget used in dashboard tab ──────────────────────────────────────
-
-class _CellRow extends StatelessWidget {
-  const _CellRow({
-    required this.name,
-    required this.leader,
-    required this.day,
-    required this.status,
-  });
-
-  final String name;
-  final String leader;
-  final String day;
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.base,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Expanded(flex: 2, child: Text(name, style: AppTypography.titleSmall)),
-          Expanded(
-            flex: 2,
-            child: Text(
-              leader,
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              day,
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          AppBadge(
-            label: status,
-            variant: AppBadgeVariant.success,
-            size: AppBadgeSize.sm,
-          ),
-        ],
-      ),
-    );
-  }
-}

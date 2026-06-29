@@ -3,12 +3,33 @@ import type { CellMember, CreateCellMemberData } from '@domain/entities/CellMemb
 import type { ICellMemberRepository } from '@domain/repositories/ICellMemberRepository';
 import { AppError } from '@shared/errors/AppError';
 
+type BairroRow = {
+  id: string;
+  name: string;
+  cidade: { id: string; name: string; estado: { id: string; name: string; uf: string } };
+} | null;
+
+const bairroInclude = {
+  bairro: {
+    select: {
+      id: true, name: true,
+      cidade: { select: { id: true, name: true, estado: { select: { id: true, name: true, uf: true } } } },
+    },
+  },
+} as const;
+
+function deriveLocation(bairro: BairroRow): { neighborhood: string | null; city: string | null; state: string | null } {
+  if (!bairro) return { neighborhood: null, city: null, state: null };
+  return { neighborhood: bairro.name, city: bairro.cidade.name, state: bairro.cidade.estado.uf };
+}
+
 export class PrismaCellMemberRepository implements ICellMemberRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findByCellId(cellId: string): Promise<CellMember[]> {
     const rows = await this.prisma.cellMember.findMany({
       where: { cellId },
+      include: { ...bairroInclude },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -23,10 +44,10 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
         phone: data.phone,
         ...(data.email !== undefined ? { email: data.email } : {}),
         ...(data.address !== undefined ? { address: data.address } : {}),
-        ...(data.neighborhood !== undefined ? { neighborhood: data.neighborhood } : {}),
-        ...(data.city !== undefined ? { city: data.city } : {}),
+        ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
         ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
       },
+      include: { ...bairroInclude },
     });
 
     return this.mapRow(row);
@@ -46,6 +67,7 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
 
     const existing = await this.prisma.cellMember.findUnique({
       where: { sourceVisitorId: visitorId },
+      include: { ...bairroInclude },
     });
 
     if (existing) {
@@ -60,11 +82,11 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
           phone: visitor.phone,
           email: visitor.email,
           address: visitor.address,
-          neighborhood: visitor.neighborhood,
-          city: visitor.city,
+          bairroId: visitor.bairroId,
           leaderId: visitor.leaderId,
           sourceVisitorId: visitor.id,
         },
+        include: { ...bairroInclude },
       });
 
       await tx.visitor.update({
@@ -88,13 +110,14 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
     phone: string;
     email: string | null;
     address: string | null;
-    neighborhood: string | null;
-    city: string | null;
+    bairroId: string | null;
+    bairro?: BairroRow;
     leaderId: string | null;
     sourceVisitorId: string | null;
     createdAt: Date;
     updatedAt: Date;
   }): CellMember {
+    const loc = deriveLocation(row.bairro ?? null);
     return {
       id: row.id,
       cellId: row.cellId,
@@ -102,8 +125,10 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
       phone: row.phone,
       email: row.email,
       address: row.address,
-      neighborhood: row.neighborhood,
-      city: row.city,
+      bairroId: row.bairroId,
+      neighborhood: loc.neighborhood,
+      city: loc.city,
+      state: loc.state,
       leaderId: row.leaderId,
       sourceVisitorId: row.sourceVisitorId,
       createdAt: row.createdAt,

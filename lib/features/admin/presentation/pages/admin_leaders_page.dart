@@ -18,6 +18,7 @@ class _LeaderInfo {
     this.address,
     this.description,
     this.createdAt,
+    this.supervisorId,
   });
 
   final String id;
@@ -27,6 +28,9 @@ class _LeaderInfo {
   final String? address;
   String? description;
   final DateTime? createdAt;
+  final String? supervisorId;
+  String? coordenacaoName;
+  String? coordenacaoColor;
   final List<_CellInfo> cells = [];
 
   factory _LeaderInfo.fromJson(Map<String, dynamic> json) => _LeaderInfo(
@@ -36,6 +40,7 @@ class _LeaderInfo {
     phone: json['phone'] as String? ?? '',
     address: json['address'] as String?,
     description: json['description'] as String?,
+    supervisorId: json['supervisorId'] as String?,
     createdAt: json['createdAt'] != null
         ? DateTime.tryParse(json['createdAt'] as String)
         : null,
@@ -138,6 +143,8 @@ class _AdminLeadersPageState extends State<AdminLeadersPage> {
       final results = await Future.wait([
         _dio.get('/users/leaders'),
         _dio.get('/cells'),
+        _dio.get('/users/supervisors'),
+        _dio.get('/coordenacoes'),
       ]);
 
       final leaderList =
@@ -146,6 +153,27 @@ class _AdminLeadersPageState extends State<AdminLeadersPage> {
       final cellList =
           ((results[1].data as Map<String, dynamic>)['cells'] as List)
               .cast<Map<String, dynamic>>();
+      final supervisorList =
+          ((results[2].data as Map<String, dynamic>)['supervisors'] as List)
+              .cast<Map<String, dynamic>>();
+      final coordenacaoList =
+          ((results[3].data as Map<String, dynamic>)['coordenacoes'] as List)
+              .cast<Map<String, dynamic>>();
+
+      // Build supervisor → coordenacao lookup
+      final supervisorCoordenacao = <String, Map<String, dynamic>>{};
+      for (final sup in supervisorList) {
+        final coordId = sup['coordenacaoId'] as String?;
+        if (coordId != null) {
+          final coord = coordenacaoList.firstWhere(
+            (c) => c['id'] == coordId,
+            orElse: () => <String, dynamic>{},
+          );
+          if (coord.isNotEmpty) {
+            supervisorCoordenacao[sup['id'] as String] = coord;
+          }
+        }
+      }
 
       // Group cells by leaderId (client-side)
       final cellsByLeader = <String, List<_CellInfo>>{};
@@ -159,6 +187,14 @@ class _AdminLeadersPageState extends State<AdminLeadersPage> {
       final leaders = leaderList.map((l) {
         final info = _LeaderInfo.fromJson(l);
         info.cells.addAll(cellsByLeader[info.id] ?? []);
+        // Enrich with coordenacao color via supervisor
+        if (info.supervisorId != null) {
+          final coord = supervisorCoordenacao[info.supervisorId];
+          if (coord != null) {
+            info.coordenacaoName = coord['name'] as String?;
+            info.coordenacaoColor = coord['color'] as String?;
+          }
+        }
         return info;
       }).toList();
 
@@ -262,6 +298,19 @@ class _AdminLeadersPageState extends State<AdminLeadersPage> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+Color _parseColor(String? hex) {
+  if (hex == null) return AppColors.textSecondary;
+  try {
+    return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+  } catch (_) {
+    return AppColors.textSecondary;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Leader Card
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -314,6 +363,29 @@ class _LeaderCard extends StatelessWidget {
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (leader.coordenacaoName != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: _parseColor(leader.coordenacaoColor),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Text(
+                        leader.coordenacaoName!,
+                        style: AppTypography.labelSmall.copyWith(
+                          color: _parseColor(leader.coordenacaoColor),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
@@ -557,8 +629,95 @@ class _LeaderDataTab extends StatelessWidget {
                 ),
         ),
 
+        const SizedBox(height: AppSpacing.xl),
+
+        // Promote section
+        Text('Cargo', style: AppTypography.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        AppCard(
+          child: Row(
+            children: [
+              const Icon(
+                Icons.badge_outlined,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Líder', style: AppTypography.bodyMedium),
+                    Text(
+                      'Promova para Supervisor se desejar.',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.arrow_upward, size: 16),
+                label: const Text('Promover'),
+                onPressed: () => _confirmPromote(context),
+              ),
+            ],
+          ),
+        ),
+
         const SizedBox(height: AppSpacing.xl2),
       ],
+    );
+  }
+
+  void _confirmPromote(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Promover para Supervisor'),
+        content: Text(
+          'Deseja promover ${leader.name} a Supervisor? '
+          'Ele passará a ter acesso ao painel de supervisor.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                await dio.patch(
+                  '/users/leaders/${leader.id}/promote',
+                  data: {'targetRole': 'SUPERVISOR'},
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Líder promovido a Supervisor com sucesso!'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+                onDescriptionUpdated(leader.description);
+              } on DioException catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      e.response?.data?['error']?['message'] as String? ??
+                          'Erro ao promover líder',
+                    ),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            },
+            child: const Text('Promover'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -762,7 +921,7 @@ class _LeaderCellsTabState extends State<_LeaderCellsTab> {
     return ListView.separated(
       padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
       itemCount: widget.leader.cells.length,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
       itemBuilder: (ctx, i) {
         final cell = widget.leader.cells[i];
         final meetings = _meetingsByCell[cell.id];
@@ -1051,7 +1210,7 @@ class _CellMeetingsSheet extends StatelessWidget {
                 horizontal: AppSpacing.pagePaddingH,
               ),
               itemCount: meetings.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const SizedBox(height: AppSpacing.xs),
               itemBuilder: (_, i) {
                 final m = meetings[i];
@@ -1188,8 +1347,9 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null)
+    if (_error != null) {
       return _ErrorView(error: _error!, onRetry: _loadVisitors);
+    }
     if (_visitors.isEmpty) {
       return const AppEmptyState(
         title: 'Nenhum visitante',
@@ -1203,7 +1363,7 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       child: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
         itemCount: _visitors.length,
-        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
+        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
         itemBuilder: (_, i) {
           final v = _visitors[i];
           final name = v['name'] as String? ?? '';

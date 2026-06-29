@@ -8,14 +8,34 @@ import type {
   PaginatedVisitors,
 } from '@domain/entities/Visitor';
 
+type BairroRow = {
+  id: string;
+  name: string;
+  cidade: { id: string; name: string; estado: { id: string; name: string; uf: string } };
+} | null;
+
+const bairroInclude = {
+  bairro: {
+    select: {
+      id: true, name: true,
+      cidade: { select: { id: true, name: true, estado: { select: { id: true, name: true, uf: true } } } },
+    },
+  },
+} as const;
+
+function deriveLocation(bairro: BairroRow): { neighborhood: string | null; city: string | null; state: string | null } {
+  if (!bairro) return { neighborhood: null, city: null, state: null };
+  return { neighborhood: bairro.name, city: bairro.cidade.name, state: bairro.cidade.estado.uf };
+}
+
 export class PrismaVisitorRepository implements IVisitorRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findById(id: string): Promise<Visitor | null> {
     const row = await this.prisma.visitor.findUnique({
       where: { id },
-      include: { convertedMember: { select: { id: true } } },
-    });
+      include: { convertedMember: { select: { id: true } }, ...bairroInclude },
+    }) as any;
     return row ? this.mapRow(row) : null;
   }
 
@@ -42,15 +62,15 @@ export class PrismaVisitorRepository implements IVisitorRepository {
       this.prisma.visitor.count({ where }),
       this.prisma.visitor.findMany({
         where,
-        include: { convertedMember: { select: { id: true } } },
+        include: { convertedMember: { select: { id: true } }, ...bairroInclude },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-      }),
+      }) as any,
     ]);
 
     return {
-      data: rows.map((r) => this.mapRow(r)),
+      data: rows.map((r: any) => this.mapRow(r)),
       total,
       page,
       pageSize,
@@ -65,8 +85,9 @@ export class PrismaVisitorRepository implements IVisitorRepository {
         phone: data.phone,
         ...(data.email !== undefined ? { email: data.email } : {}),
         ...(data.address !== undefined ? { address: data.address } : {}),
-        ...(data.neighborhood !== undefined ? { neighborhood: data.neighborhood } : {}),
-        ...(data.city !== undefined ? { city: data.city } : {}),
+        ...(data.numero !== undefined ? { numero: data.numero } : {}),
+        ...(data.complemento !== undefined ? { complemento: data.complemento } : {}),
+        ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
         ...(data.originChurch !== undefined ? { originChurch: data.originChurch } : {}),
         ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
         ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
@@ -77,8 +98,8 @@ export class PrismaVisitorRepository implements IVisitorRepository {
         ...(data.cellId !== undefined ? { cellId: data.cellId } : {}),
         ...(data.referredById !== undefined ? { referredById: data.referredById } : {}),
       },
-      include: { convertedMember: { select: { id: true } } },
-    });
+      include: { convertedMember: { select: { id: true } }, ...bairroInclude },
+    }) as any;
     return this.mapRow(row);
   }
 
@@ -90,8 +111,8 @@ export class PrismaVisitorRepository implements IVisitorRepository {
         ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
         ...(data.cellId !== undefined ? { cellId: data.cellId } : {}),
       },
-      include: { convertedMember: { select: { id: true } } },
-    });
+      include: { convertedMember: { select: { id: true } }, ...bairroInclude },
+    }) as any;
     return this.mapRow(row);
   }
 
@@ -140,8 +161,10 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     phone: string;
     email: string | null;
     address: string | null;
-    neighborhood: string | null;
-    city: string | null;
+    numero: string | null;
+    complemento: string | null;
+    bairroId: string | null;
+    bairro?: BairroRow;
     originChurch: string | null;
     birthDate?: Date | null;
     maritalStatus?: string | null;
@@ -156,14 +179,19 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     createdAt: Date;
     updatedAt: Date;
   }): Visitor {
+    const loc = deriveLocation(row.bairro ?? null);
     return {
       id: row.id,
       name: row.name,
       phone: row.phone,
       email: row.email,
       address: row.address,
-      neighborhood: row.neighborhood,
-      city: row.city,
+      numero: row.numero,
+      complemento: row.complemento,
+      bairroId: row.bairroId,
+      neighborhood: loc.neighborhood,
+      city: loc.city,
+      state: loc.state,
       originChurch: row.originChurch,
       birthDate: row.birthDate ?? null,
       maritalStatus: row.maritalStatus ?? null,

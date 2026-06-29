@@ -1,19 +1,41 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/address_selector.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CellOption {
-  _CellOption({required this.id, required this.name, required this.leaderName});
+  _CellOption({
+    required this.id,
+    required this.name,
+    required this.leaderName,
+    this.cellType = 'Célula',
+    this.latitude,
+    this.longitude,
+    this.maxCapacity = 20,
+    this.currentCount = 0,
+  });
 
   final String id;
   final String name;
   final String leaderName;
+  final String cellType;
+  final double? latitude;
+  final double? longitude;
+  final int maxCapacity;
+  final int currentCount;
+
+  bool get isAvailable => currentCount < maxCapacity;
+  int get availableSpots => maxCapacity - currentCount;
 
   String get display => '$name (Líder: $leaderName)';
 }
@@ -31,6 +53,7 @@ const _interestOptions = [
   'Procurando batismo',
   'Quero ter uma célula em casa',
   'Preciso de oração',
+  'Outros',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,15 +78,17 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
 
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _cepCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
-  final _neighborhoodCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
+  final _numeroCtrl = TextEditingController();
+  final _complementoCtrl = TextEditingController();
   final _customCellCtrl = TextEditingController();
-  final _knownPersonCtrl = TextEditingController();
+  final _otherInterestCtrl = TextEditingController();
+
+  String? _bairroId;
 
   DateTime? _birthDate;
   String? _maritalStatus;
-  bool _isBaptized = false;
   bool _attendsCell = false;
   String? _selectedCellId; // null when "other"
   bool _customCellSelected = false;
@@ -72,6 +97,18 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   // ── Cell list state ────────────────────────────────────────────────────────
   bool _cellsLoading = true;
   List<_CellOption> _cells = [];
+
+  // ── CEP Geolocation ────────────────────────────────────────────────────────
+  bool _cepLoading = false;
+  double? _cepLatitude;
+  double? _cepLongitude;
+  String? _cepEstadoId; // Estado ID from API
+  String? _cepCidadeId; // Cidade ID from API
+  String? _cepBairroId; // Bairro ID from API
+
+  // ── Selected cell detailed info ────────────────────────────────────────────
+  bool _selectedCellLoading = false;
+  Map<String, dynamic>? _selectedCellDetails;
 
   // ── Submit state ───────────────────────────────────────────────────────────
   bool _submitting = false;
@@ -95,11 +132,12 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _cepCtrl.dispose();
     _addressCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
+    _numeroCtrl.dispose();
+    _complementoCtrl.dispose();
     _customCellCtrl.dispose();
-    _knownPersonCtrl.dispose();
+    _otherInterestCtrl.dispose();
     super.dispose();
   }
 
@@ -116,6 +154,11 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                 id: c['id'] as String,
                 name: c['name'] as String? ?? '',
                 leaderName: c['leaderName'] as String? ?? 'Sem líder',
+                cellType: c['cellType'] as String? ?? 'Célula',
+                latitude: (c['latitude'] as num?)?.toDouble(),
+                longitude: (c['longitude'] as num?)?.toDouble(),
+                maxCapacity: (c['maxCapacity'] as num?)?.toInt() ?? 20,
+                currentCount: (c['currentCount'] as num?)?.toInt() ?? 0,
               ),
             )
             .toList();
@@ -137,6 +180,171 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
     );
     if (picked != null) setState(() => _birthDate = picked);
   }
+
+  Future<void> _lookupCep(String cep) async {
+    final cleaned = cep.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.length != 8) return;
+
+    setState(() => _cepLoading = true);
+    try {
+      // Step 1: Get address data from ViaCEP only
+      final resp = await Dio().get('https://viacep.com.br/ws/$cleaned/json/');
+      final data = resp.data as Map<String, dynamic>;
+      if (data['erro'] == true) {
+        setState(() => _cepLoading = false);
+        return;
+      }
+
+      final logradouro = data['logradouro'] as String? ?? '';
+      final bairro = data['bairro'] as String? ?? '';
+      final localidade = data['localidade'] as String? ?? '';
+      final uf = data['uf'] as String? ?? '';
+
+      try {
+        // Step 2: Try to match Estado, Cidade e Bairro in the backend
+        // First, find the estado by UF
+        final estadosResp = await _dio.get('/location/estados');
+        final estadosList =
+            (estadosResp.data as Map<String, dynamic>)['estados'] as List;
+        String? foundEstadoId;
+        String? foundCidadeId;
+        String? foundBairroId;
+
+        for (final e in estadosList) {
+          final estado = e as Map<String, dynamic>;
+          if ((estado['uf'] as String?)?.toUpperCase() == uf.toUpperCase()) {
+            foundEstadoId = estado['id'] as String;
+            break;
+          }
+        }
+
+        // If found estado, search for cidade
+        if (foundEstadoId != null) {
+          final cidadesResp = await _dio.get(
+            '/location/estados/$foundEstadoId/cidades',
+          );
+          final cidadesList =
+              (cidadesResp.data as Map<String, dynamic>)['cidades'] as List;
+          for (final c in cidadesList) {
+            final cidade = c as Map<String, dynamic>;
+            if ((cidade['name'] as String?)?.trim().toLowerCase() ==
+                localidade.trim().toLowerCase()) {
+              foundCidadeId = cidade['id'] as String;
+              break;
+            }
+          }
+
+          // If found cidade, search for bairro
+          if (foundCidadeId != null) {
+            final bairrosResp = await _dio.get(
+              '/location/cidades/$foundCidadeId/bairros',
+            );
+            final bairrosList =
+                (bairrosResp.data as Map<String, dynamic>)['bairros'] as List;
+            for (final b in bairrosList) {
+              final bairroOption = b as Map<String, dynamic>;
+              if ((bairroOption['name'] as String?)?.trim().toLowerCase() ==
+                  bairro.trim().toLowerCase()) {
+                foundBairroId = bairroOption['id'] as String;
+                break;
+              }
+            }
+          }
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _addressCtrl.text = logradouro;
+          _cepLoading = false;
+          _cepEstadoId = foundEstadoId;
+          _cepCidadeId = foundCidadeId;
+          _cepBairroId = foundBairroId;
+        });
+
+        // Geocode to get latitude/longitude and load nearby cells
+        _geocodeCep(logradouro, localidade, uf);
+      } catch (e) {
+        // If location API fails, just set address
+        if (!mounted) return;
+        setState(() {
+          _addressCtrl.text = logradouro;
+          _cepLoading = false;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _cepLoading = false);
+    }
+  }
+
+  void _onCepChanged(String value) {
+    final cleaned = value.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.length == 8 && !_cepLoading) {
+      _lookupCep(cleaned);
+    }
+  }
+
+  void _onNumeroChanged(String value) {
+    // Trigger map update when number changes (if cell selected)
+    if (_attendsCell &&
+        _selectedCellId != null &&
+        _selectedCellDetails != null) {
+      setState(() {}); // Trigger rebuild to update map
+    }
+  }
+
+  Future<void> _loadSelectedCellDetails(String cellId) async {
+    setState(() => _selectedCellLoading = true);
+    try {
+      final resp = await _dio.get('/cells/$cellId');
+      final cellData = resp.data as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _selectedCellDetails = cellData;
+        _selectedCellLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _selectedCellDetails = null;
+        _selectedCellLoading = false;
+      });
+    }
+  }
+
+  Future<void> _geocodeCep(
+    String logradouro,
+    String localidade,
+    String uf,
+  ) async {
+    try {
+      // Use Nominatim to get coordinates based on CEP
+      final query = '$logradouro, $localidade, $uf, Brasil';
+      final resp = await Dio().get(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {
+          'format': 'json',
+          'q': query,
+          'countrycodes': 'br',
+          'limit': '1',
+        },
+        options: Options(headers: {'User-Agent': 'SistemaIgrejaApp/1.0'}),
+      );
+      final results = resp.data as List;
+      if (results.isNotEmpty && mounted) {
+        final lat = double.tryParse(results[0]['lat'] as String? ?? '');
+        final lng = double.tryParse(results[0]['lon'] as String? ?? '');
+        if (lat != null && lng != null) {
+          setState(() {
+            _cepLatitude = lat;
+            _cepLongitude = lng;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Future<void> _loadSelectedCellDetails was here
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -165,18 +373,27 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
 
     setState(() => _submitting = true);
     try {
+      final interests = _interests.toList();
+      final otherText = _otherInterestCtrl.text.trim();
+      if (interests.contains('Outros') && otherText.isNotEmpty) {
+        interests.remove('Outros');
+        interests.add('Outros: $otherText');
+      } else if (interests.contains('Outros')) {
+        interests.remove('Outros');
+      }
+
       final body = <String, dynamic>{
         'name': _nameCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
-        'neighborhood': _neighborhoodCtrl.text.trim(),
-        'city': _cityCtrl.text.trim(),
-        'isBaptized': _isBaptized,
-        'interests': _interests.toList(),
+        if (_numeroCtrl.text.trim().isNotEmpty)
+          'numero': _numeroCtrl.text.trim(),
+        if (_complementoCtrl.text.trim().isNotEmpty)
+          'complemento': _complementoCtrl.text.trim(),
+        if (_bairroId != null) 'bairroId': _bairroId,
+        'interests': interests,
         if (_birthDate != null) 'birthDate': _birthDate!.toIso8601String(),
         if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
-        if (_knownPersonCtrl.text.trim().isNotEmpty)
-          'knownPersonName': _knownPersonCtrl.text.trim(),
         if (_attendsCell && !_customCellSelected && _selectedCellId != null)
           'cellId': _selectedCellId,
         if (_attendsCell &&
@@ -207,8 +424,9 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   @override
   Widget build(BuildContext context) {
     if (_success) return _SuccessScreen();
-    if (MediaQuery.of(context).size.width >= 720.0)
+    if (MediaQuery.of(context).size.width >= 720.0) {
       return _buildWideLayout(context);
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
@@ -282,9 +500,19 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
-                      validator: (v) => (v == null || v.trim().length < 8)
-                          ? 'Informe um telefone válido'
-                          : null,
+                      inputFormatters: [
+                        MaskTextInputFormatter(
+                          mask: '(##) #####-####',
+                          filter: {'#': RegExp(r'[0-9]')},
+                        ),
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Campo obrigatório';
+                        }
+                        final cleaned = v.replaceAll(RegExp(r'\D'), '');
+                        return cleaned.length < 10 ? 'Telefone inválido' : null;
+                      },
                     ),
                     const SizedBox(height: AppSpacing.base),
 
@@ -312,11 +540,58 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                     _sectionHeader('Endereço', Icons.location_on_outlined),
                     const SizedBox(height: AppSpacing.base),
 
+                    // CEP com auto lookup
+                    Stack(
+                      children: [
+                        AppTextField(
+                          controller: _cepCtrl,
+                          label: 'CEP (auto busca apos 8 digitos)',
+                          hint: '00000-000',
+                          prefixIcon: Icons.location_on_outlined,
+                          suffixIcon: _cepLoading
+                              ? null
+                              : Icons.search_outlined,
+                          keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.next,
+                          onChanged: _onCepChanged,
+                          inputFormatters: [
+                            MaskTextInputFormatter(
+                              mask: '#####-###',
+                              filter: {'#': RegExp(r'[0-9]')},
+                            ),
+                          ],
+                          enabled: !_cepLoading,
+                        ),
+                        if (_cepLoading)
+                          Positioned(
+                            right: 50,
+                            top: 0,
+                            bottom: 0,
+                            child: Center(
+                              child: Tooltip(
+                                message: 'Buscando CEP...',
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.base),
+
                     // Endereço
                     AppTextField(
                       controller: _addressCtrl,
-                      label: 'Endereço *',
-                      hint: 'Rua, número',
+                      label: 'Logradouro *',
+                      hint: 'Rua, avenida, etc',
                       prefixIcon: Icons.home_outlined,
                       textInputAction: TextInputAction.next,
                       validator: (v) => (v == null || v.trim().isEmpty)
@@ -325,68 +600,53 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                     ),
                     const SizedBox(height: AppSpacing.base),
 
+                    // Número e Complemento lado a lado
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
+                          flex: 2,
                           child: AppTextField(
-                            controller: _neighborhoodCtrl,
-                            label: 'Bairro *',
-                            hint: 'Seu bairro',
+                            controller: _numeroCtrl,
+                            label: 'Número *',
+                            hint: 'Ex: 123',
+                            keyboardType: TextInputType.number,
                             textInputAction: TextInputAction.next,
+                            onChanged: _onNumeroChanged,
                             validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Obrigatório'
+                                ? 'Campo obrigatório'
                                 : null,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.base),
                         Expanded(
+                          flex: 3,
                           child: AppTextField(
-                            controller: _cityCtrl,
-                            label: 'Cidade *',
-                            hint: 'Sua cidade',
+                            controller: _complementoCtrl,
+                            label: 'Complemento',
+                            hint: 'Apto, bloco, etc',
                             textInputAction: TextInputAction.next,
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Obrigatório'
-                                : null,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: AppSpacing.base),
 
+                    AddressSelector(
+                      onChanged: (id) {
+                        setState(() => _bairroId = id);
+                      },
+                      initialEstadoId: _cepEstadoId,
+                      initialCidadeId: _cepCidadeId,
+                      initialBairroId: _cepBairroId,
+                    ),
+
+                    // Removed nearby cells visualization section
                     _divider(),
                     _sectionHeader('Sobre Você', Icons.info_outline),
                     const SizedBox(height: AppSpacing.base),
 
-                    // É batizado?
-                    AppCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.water_outlined,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          const Expanded(
-                            child: Text(
-                              'Já é batizado(a)?',
-                              style: AppTypography.bodyMedium,
-                            ),
-                          ),
-                          Switch(
-                            value: _isBaptized,
-                            onChanged: (v) => setState(() => _isBaptized = v),
-                            activeColor: AppColors.primary,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Frequenta célula?
+                    // Deseja participar de célula?
                     AppCard(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
@@ -401,7 +661,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                           const SizedBox(width: AppSpacing.sm),
                           const Expanded(
                             child: Text(
-                              'Frequenta alguma célula?',
+                              'Deseja participar de alguma célula?',
                               style: AppTypography.bodyMedium,
                             ),
                           ),
@@ -415,7 +675,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                                 _customCellCtrl.clear();
                               }
                             }),
-                            activeColor: AppColors.primary,
+                            activeThumbColor: AppColors.primary,
                           ),
                         ],
                       ),
@@ -429,23 +689,24 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                         selectedCellId: _selectedCellId,
                         customCellSelected: _customCellSelected,
                         customCellCtrl: _customCellCtrl,
-                        onCellSelected: (id, isCustom) => setState(() {
-                          _selectedCellId = isCustom ? null : id;
-                          _customCellSelected = isCustom;
-                          if (!isCustom) _customCellCtrl.clear();
-                        }),
+                        cepLatitude: _cepLatitude,
+                        cepLongitude: _cepLongitude,
+                        selectedCellDetails: _selectedCellDetails,
+                        selectedCellLoading: _selectedCellLoading,
+                        onCellSelected: (id, isCustom) {
+                          setState(() {
+                            _selectedCellId = isCustom ? null : id;
+                            _customCellSelected = isCustom;
+                            if (!isCustom) {
+                              _customCellCtrl.clear();
+                              if (id != null) _loadSelectedCellDetails(id);
+                            } else {
+                              _selectedCellDetails = null;
+                            }
+                          });
+                        },
                       ),
                     ],
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Conhece alguém?
-                    AppTextField(
-                      controller: _knownPersonCtrl,
-                      label: 'Conhece alguém na igreja? (opcional)',
-                      hint: 'Nome da pessoa',
-                      prefixIcon: Icons.people_outline,
-                      textInputAction: TextInputAction.next,
-                    ),
 
                     _divider(),
                     _sectionHeader(
@@ -474,6 +735,9 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                                   _interests.add(opt);
                                 } else {
                                   _interests.remove(opt);
+                                  if (opt == 'Outros') {
+                                    _otherInterestCtrl.clear();
+                                  }
                                 }
                               }),
                               selectedColor: AppColors.primary.withValues(
@@ -492,6 +756,16 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                           )
                           .toList(),
                     ),
+                    if (_interests.contains('Outros')) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      AppTextField(
+                        controller: _otherInterestCtrl,
+                        label: 'Especifique outros interesses',
+                        hint: 'Descreva brevemente',
+                        maxLines: 2,
+                        prefixIcon: Icons.edit_outlined,
+                      ),
+                    ],
 
                     const SizedBox(height: AppSpacing.xl2),
 
@@ -677,6 +951,12 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    MaskTextInputFormatter(
+                      mask: '(##) #####-####',
+                      filter: {'#': RegExp(r'[0-9]')},
+                    ),
+                  ],
                   validator: (v) => (v == null || v.trim().length < 8)
                       ? 'Informe um telefone válido'
                       : null,
@@ -728,6 +1008,12 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
             prefixIcon: Icons.phone_outlined,
             keyboardType: TextInputType.phone,
             textInputAction: TextInputAction.next,
+            inputFormatters: [
+              MaskTextInputFormatter(
+                mask: '(##) #####-####',
+                filter: {'#': RegExp(r'[0-9]')},
+              ),
+            ],
             validator: (v) => (v == null || v.trim().length < 8)
                 ? 'Informe um telefone válido'
                 : null,
@@ -752,10 +1038,54 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
         _divider(),
         _sectionHeader('Endereço', Icons.location_on_outlined),
         const SizedBox(height: AppSpacing.base),
+        // CEP com auto lookup
+        Stack(
+          children: [
+            AppTextField(
+              controller: _cepCtrl,
+              label: 'CEP (auto busca apos 8 digitos)',
+              hint: '00000-000',
+              prefixIcon: Icons.location_on_outlined,
+              suffixIcon: _cepLoading ? null : Icons.search_outlined,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              onChanged: _onCepChanged,
+              inputFormatters: [
+                MaskTextInputFormatter(
+                  mask: '#####-###',
+                  filter: {'#': RegExp(r'[0-9]')},
+                ),
+              ],
+              enabled: !_cepLoading,
+            ),
+            if (_cepLoading)
+              Positioned(
+                right: 50,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Tooltip(
+                    message: 'Buscando CEP...',
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.base),
         AppTextField(
           controller: _addressCtrl,
-          label: 'Endereço *',
-          hint: 'Rua, número',
+          label: 'Logradouro *',
+          hint: 'Rua, avenida, etc',
           prefixIcon: Icons.home_outlined,
           textInputAction: TextInputAction.next,
           validator: (v) =>
@@ -766,46 +1096,47 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
+              flex: 2,
               child: AppTextField(
-                controller: _neighborhoodCtrl,
-                label: 'Bairro *',
-                hint: 'Seu bairro',
+                controller: _numeroCtrl,
+                label: 'Número *',
+                hint: 'Ex: 123',
+                keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Obrigatório' : null,
+                onChanged: _onNumeroChanged,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Campo obrigatório'
+                    : null,
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.base),
             Expanded(
+              flex: 3,
               child: AppTextField(
-                controller: _cityCtrl,
-                label: 'Cidade *',
-                hint: 'Sua cidade',
+                controller: _complementoCtrl,
+                label: 'Complemento',
+                hint: 'Apto, bloco, etc',
                 textInputAction: TextInputAction.next,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Obrigatório' : null,
               ),
             ),
           ],
         ),
+        const SizedBox(height: AppSpacing.base),
+        AddressSelector(
+          onChanged: (id) {
+            setState(() => _bairroId = id);
+          },
+          initialEstadoId: _cepEstadoId,
+          initialCidadeId: _cepCidadeId,
+          initialBairroId: _cepBairroId,
+        ),
+
+        // Removed nearby cells visualization section
         _divider(),
         _sectionHeader('Sobre Você', Icons.info_outline),
         const SizedBox(height: AppSpacing.base),
-        if (wide)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildBaptizedSwitch()),
-              const SizedBox(width: AppSpacing.base),
-              Expanded(child: _buildCellSwitch()),
-            ],
-          )
-        else ...[
-          _buildBaptizedSwitch(),
-          const SizedBox(height: AppSpacing.base),
-          _buildCellSwitch(),
-        ],
-        if (_attendsCell) ...[
+        _buildCellSwitch(),
+        if (_attendsCell && !_cellsLoading) ...[
           const SizedBox(height: AppSpacing.sm),
           _CellSelector(
             cells: _cells,
@@ -813,21 +1144,25 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
             selectedCellId: _selectedCellId,
             customCellSelected: _customCellSelected,
             customCellCtrl: _customCellCtrl,
-            onCellSelected: (id, isCustom) => setState(() {
-              _selectedCellId = isCustom ? null : id;
-              _customCellSelected = isCustom;
-              if (!isCustom) _customCellCtrl.clear();
-            }),
+            cepLatitude: _cepLatitude,
+            cepLongitude: _cepLongitude,
+            selectedCellDetails: _selectedCellDetails,
+            selectedCellLoading: _selectedCellLoading,
+            onCellSelected: (id, isCustom) {
+              setState(() {
+                _selectedCellId = isCustom ? null : id;
+                _customCellSelected = isCustom;
+                if (!isCustom) {
+                  _customCellCtrl.clear();
+                  if (id != null) _loadSelectedCellDetails(id);
+                } else {
+                  _selectedCellDetails = null;
+                }
+              });
+            },
           ),
         ],
         const SizedBox(height: AppSpacing.base),
-        AppTextField(
-          controller: _knownPersonCtrl,
-          label: 'Conhece alguém na igreja? (opcional)',
-          hint: 'Nome da pessoa',
-          prefixIcon: Icons.people_outline,
-          textInputAction: TextInputAction.next,
-        ),
         _divider(),
         _sectionHeader('Como posso ajudar você?', Icons.favorite_outline),
         const SizedBox(height: AppSpacing.xs),
@@ -851,6 +1186,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                       _interests.add(opt);
                     } else {
                       _interests.remove(opt);
+                      if (opt == 'Outros') _otherInterestCtrl.clear();
                     }
                   }),
                   selectedColor: AppColors.primary.withValues(alpha: 0.15),
@@ -867,6 +1203,16 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
               )
               .toList(),
         ),
+        if (_interests.contains('Outros')) ...[
+          const SizedBox(height: AppSpacing.sm),
+          AppTextField(
+            controller: _otherInterestCtrl,
+            label: 'Especifique outros interesses',
+            hint: 'Descreva brevemente',
+            maxLines: 2,
+            prefixIcon: Icons.edit_outlined,
+          ),
+        ],
         const SizedBox(height: AppSpacing.xl2),
         AppButton(
           label: 'Enviar Cadastro',
@@ -876,29 +1222,6 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
         ),
         const SizedBox(height: AppSpacing.xl),
       ],
-    );
-  }
-
-  Widget _buildBaptizedSwitch() {
-    return AppCard(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.water_outlined, color: AppColors.primary),
-          const SizedBox(width: AppSpacing.sm),
-          const Expanded(
-            child: Text('Já é batizado(a)?', style: AppTypography.bodyMedium),
-          ),
-          Switch(
-            value: _isBaptized,
-            onChanged: (v) => setState(() => _isBaptized = v),
-            activeColor: AppColors.primary,
-          ),
-        ],
-      ),
     );
   }
 
@@ -914,7 +1237,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           const SizedBox(width: AppSpacing.sm),
           const Expanded(
             child: Text(
-              'Frequenta alguma célula?',
+              'Deseja participar de alguma célula?',
               style: AppTypography.bodyMedium,
             ),
           ),
@@ -928,7 +1251,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                 _customCellCtrl.clear();
               }
             }),
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
           ),
         ],
       ),
@@ -955,7 +1278,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
 // Cell Selector widget
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CellSelector extends StatelessWidget {
+class _CellSelector extends StatefulWidget {
   const _CellSelector({
     required this.cells,
     required this.loading,
@@ -963,6 +1286,10 @@ class _CellSelector extends StatelessWidget {
     required this.customCellSelected,
     required this.customCellCtrl,
     required this.onCellSelected,
+    this.cepLatitude,
+    this.cepLongitude,
+    this.selectedCellDetails,
+    this.selectedCellLoading = false,
   });
 
   final List<_CellOption> cells;
@@ -971,10 +1298,29 @@ class _CellSelector extends StatelessWidget {
   final bool customCellSelected;
   final TextEditingController customCellCtrl;
   final void Function(String? id, bool isCustom) onCellSelected;
+  final double? cepLatitude;
+  final double? cepLongitude;
+  final Map<String, dynamic>? selectedCellDetails;
+  final bool selectedCellLoading;
+
+  @override
+  State<_CellSelector> createState() => _CellSelectorState();
+}
+
+class _CellSelectorState extends State<_CellSelector> {
+  String? _selectedCellType;
+  bool _showOnlyAvailable = false;
+  final PopupController _popupController = PopupController();
+
+  @override
+  void dispose() {
+    _popupController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
+    if (widget.loading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(AppSpacing.sm),
@@ -983,42 +1329,339 @@ class _CellSelector extends StatelessWidget {
       );
     }
 
-    final String? currentValue = customCellSelected
+    // Get unique cell types
+    final cellTypes = widget.cells.map((c) => c.cellType).toSet().toList();
+
+    // Filter cells by type and availability
+    var filteredCells = _selectedCellType == null
+        ? widget.cells
+        : widget.cells.where((c) => c.cellType == _selectedCellType).toList();
+
+    if (_showOnlyAvailable) {
+      filteredCells = filteredCells.where((c) => c.isAvailable).toList();
+    }
+
+    final String? currentValue = widget.customCellSelected
         ? '__custom__'
-        : selectedCellId;
+        : widget.selectedCellId;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _DropdownField<String>(
-          label: 'Qual célula você frequenta? *',
-          value: currentValue,
-          hint: 'Selecione uma célula',
-          items: [...cells.map((c) => c.id), '__custom__'],
-          itemLabel: (v) {
-            if (v == '__custom__') return 'Outra (não está na lista)';
-            final cell = cells.firstWhere((c) => c.id == v);
-            return cell.display;
-          },
-          onChanged: (v) {
-            if (v == '__custom__') {
-              onCellSelected(null, true);
-            } else {
-              onCellSelected(v, false);
-            }
-          },
+        // Cell type filter
+        if (cellTypes.length > 1) ...[
+          Text('Filtrar por tipo de célula:', style: AppTypography.bodySmall),
+          const SizedBox(height: AppSpacing.xs),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                FilterChip(
+                  label: const Text('Todos'),
+                  selected: _selectedCellType == null,
+                  onSelected: (_) => setState(() => _selectedCellType = null),
+                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                  checkmarkColor: AppColors.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                ...cellTypes.map(
+                  (type) => Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.xs),
+                    child: FilterChip(
+                      label: Text(type),
+                      selected: _selectedCellType == type,
+                      onSelected: (_) =>
+                          setState(() => _selectedCellType = type),
+                      selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                      checkmarkColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.base),
+        ],
+
+        // Filter: Show only available cells
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Mostrar apenas células com vagas',
+                  style: AppTypography.bodySmall,
+                ),
+              ),
+              Switch(
+                value: _showOnlyAvailable,
+                onChanged: (v) => setState(() => _showOnlyAvailable = v),
+                activeThumbColor: AppColors.primary,
+              ),
+            ],
+          ),
         ),
-        if (customCellSelected) ...[
-          const SizedBox(height: AppSpacing.sm),
-          AppTextField(
-            controller: customCellCtrl,
-            label: 'Nome da célula *',
-            hint: 'Digite o nome da célula',
-            prefixIcon: Icons.edit_outlined,
-            textInputAction: TextInputAction.next,
+        const SizedBox(height: AppSpacing.base),
+
+        // List view (cell selector)
+        _buildListView(filteredCells, currentValue),
+        const SizedBox(height: AppSpacing.base),
+
+        // Map view (always visible)
+        _buildMapView(filteredCells),
+      ],
+    );
+  }
+
+  Widget _buildMapView(List<_CellOption> filteredCells) {
+    // If a cell is selected and we have its details, show only that cell
+    if (widget.selectedCellId != null && widget.selectedCellDetails != null) {
+      final cellLat = (widget.selectedCellDetails!['latitude'] as num?)
+          ?.toDouble();
+      final cellLng = (widget.selectedCellDetails!['longitude'] as num?)
+          ?.toDouble();
+
+      if (cellLat == null || cellLng == null) {
+        return AppCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Text(
+            'Localização da célula não disponível',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        );
+      }
+
+      final cellName =
+          widget.selectedCellDetails!['name'] as String? ?? 'Célula';
+      final leaderName =
+          widget.selectedCellDetails!['leaderName'] as String? ?? 'Sem líder';
+      final cellTime = widget.selectedCellDetails!['time'] as String? ?? '';
+      final cellAddress =
+          widget.selectedCellDetails!['address'] as String? ?? '';
+
+      return SizedBox(
+        height: 350,
+        child: FlutterMap(
+          key: ValueKey<String>('map_${cellLat}_$cellLng'),
+          options: MapOptions(
+            initialCenter: LatLng(cellLat, cellLng),
+            initialZoom: 15,
+            maxZoom: 18,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.example.app',
+            ),
+            PopupMarkerLayer(
+              options: PopupMarkerLayerOptions(
+                popupController: _popupController,
+                markers: [
+                  Marker(
+                    key: ValueKey(widget.selectedCellId!),
+                    point: LatLng(cellLat, cellLng),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(50),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(
+                        Icons.groups,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                  ),
+                ],
+                popupDisplayOptions: PopupDisplayOptions(
+                  builder: (BuildContext ctx, Marker marker) => Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            cellName,
+                            style: AppTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs2),
+                          _PopupInfoRow(label: 'Líder:', value: leaderName),
+                          const SizedBox(height: AppSpacing.xs2),
+                          _PopupInfoRow(
+                            label: 'Horário:',
+                            value: cellTime.isEmpty
+                                ? 'Não informado'
+                                : cellTime,
+                          ),
+                          const SizedBox(height: AppSpacing.xs2),
+                          _PopupInfoRow(
+                            label: 'Endereço:',
+                            value: cellAddress.isEmpty
+                                ? 'Não informado'
+                                : cellAddress,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Otherwise, show all cells
+    final validCells = filteredCells
+        .where((c) => c.latitude != null && c.longitude != null)
+        .toList();
+
+    if (validCells.isEmpty) {
+      return AppCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Text(
+          'Nenhuma célula com localização disponível',
+          textAlign: TextAlign.center,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    // Use CEP location as center if available, otherwise use São Paulo
+    final centerLat = widget.cepLatitude ?? -23.5505;
+    final centerLng = widget.cepLongitude ?? -46.6333;
+
+    return SizedBox(
+      height: 300,
+      child: FlutterMap(
+        key: ValueKey<String>('map_${centerLat}_$centerLng'),
+        options: MapOptions(
+          initialCenter: LatLng(centerLat, centerLng),
+          initialZoom: 13,
+          maxZoom: 18,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.app',
+          ),
+          PopupMarkerLayer(
+            options: PopupMarkerLayerOptions(
+              popupController: _popupController,
+              markers: validCells
+                  .map(
+                    (cell) => Marker(
+                      key: ValueKey(cell.id),
+                      point: LatLng(cell.latitude!, cell.longitude!),
+                      child: Icon(
+                        Icons.location_on,
+                        color: widget.selectedCellId == cell.id
+                            ? AppColors.error
+                            : AppColors.primary,
+                        size: 40,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              popupDisplayOptions: PopupDisplayOptions(
+                builder: (BuildContext ctx, Marker marker) {
+                  final cellId = (marker.key as ValueKey<String>).value;
+                  final cell = validCells.firstWhere((c) => c.id == cellId);
+                  final isSelected = widget.selectedCellId == cellId;
+                  final leaderName = isSelected
+                      ? (widget.selectedCellDetails?['leaderName']
+                                as String?) ??
+                            cell.leaderName
+                      : cell.leaderName;
+                  final cellTime = isSelected
+                      ? (widget.selectedCellDetails?['time'] as String?) ??
+                            'Selecione para ver detalhes'
+                      : 'Selecione para ver detalhes';
+                  final cellAddress = isSelected
+                      ? (widget.selectedCellDetails?['address'] as String?) ??
+                            'Selecione para ver detalhes'
+                      : 'Selecione para ver detalhes';
+
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            cell.name,
+                            style: AppTypography.bodyMedium.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs2),
+                          _PopupInfoRow(label: 'Líder:', value: leaderName),
+                          const SizedBox(height: AppSpacing.xs2),
+                          _PopupInfoRow(label: 'Horário:', value: cellTime),
+                          const SizedBox(height: AppSpacing.xs2),
+                          _PopupInfoRow(label: 'Endereço:', value: cellAddress),
+                          const SizedBox(height: AppSpacing.xs),
+                          AppButton(
+                            label: isSelected ? 'Selecionada ✓' : 'Selecionar',
+                            variant: isSelected
+                                ? AppButtonVariant.outline
+                                : AppButtonVariant.primary,
+                            isFullWidth: false,
+                            onPressed: () {
+                              widget.onCellSelected(cell.id, false);
+                              _popupController.hideAllPopups();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         ],
-      ],
+      ),
+    );
+  }
+
+  Widget _buildListView(List<_CellOption> filteredCells, String? currentValue) {
+    return _DropdownField<String>(
+      label: 'Qual celula voce frequenta? *',
+      value: currentValue,
+      hint: 'Selecione uma celula',
+      items: [...filteredCells.map((c) => c.id), '__custom__'],
+      itemLabel: (v) {
+        if (v == '__custom__') return 'Outra (nao esta na lista)';
+        final cell = filteredCells.firstWhere((c) => c.id == v);
+        return cell.display;
+      },
+      onChanged: (v) {
+        if (v == '__custom__') {
+          widget.onCellSelected(null, true);
+        } else {
+          widget.onCellSelected(v, false);
+        }
+      },
     );
   }
 }
@@ -1026,6 +1669,38 @@ class _CellSelector extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Reusable sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
+
+class _PopupInfoRow extends StatelessWidget {
+  const _PopupInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTypography.labelSmall.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: Text(
+            value,
+            style: AppTypography.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _DatePickerField extends StatelessWidget {
   const _DatePickerField({

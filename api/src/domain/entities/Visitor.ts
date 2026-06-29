@@ -6,8 +6,13 @@ export interface Visitor {
   readonly phone: string;
   readonly email: string | null;
   readonly address: string | null;
+  readonly numero: string | null;
+  readonly complemento: string | null;
+  readonly bairroId: string | null;
+  // Derived from bairro relation for backward-compat display
   readonly neighborhood: string | null;
   readonly city: string | null;
+  readonly state: string | null;
   readonly originChurch: string | null;
   readonly birthDate: Date | null;
   readonly maritalStatus: string | null;
@@ -28,8 +33,9 @@ export interface CreateVisitorData {
   readonly phone: string;
   readonly email?: string | undefined;
   readonly address?: string | undefined;
-  readonly neighborhood?: string | undefined;
-  readonly city?: string | undefined;
+  readonly numero?: string | undefined;
+  readonly complemento?: string | undefined;
+  readonly bairroId?: string | undefined;
   readonly originChurch?: string | undefined;
   readonly birthDate?: Date | undefined;
   readonly maritalStatus?: string | undefined;

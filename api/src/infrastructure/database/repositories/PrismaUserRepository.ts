@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
-import type { IUserRepository, UpdateProfileData } from '@domain/repositories/IUserRepository';
-import type { Child, User, UserProfile, UserWithPassword } from '@domain/entities/User';
+import type { IUserRepository, UpdateProfileData, CreateUserData } from '@domain/repositories/IUserRepository';
+import type { Child, User, UserProfile, UserWithPassword, UserRole } from '@domain/entities/User';
 
 export class PrismaUserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -31,6 +31,60 @@ export class PrismaUserRepository implements IUserRepository {
     return { ...rest };
   }
 
+  async createUser(data: CreateUserData): Promise<User> {
+    const supervisorId =
+      data.role !== 'LIDER' && data.leaderIds?.[0] ? data.leaderIds[0] : undefined;
+
+    const user = await this.prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        role: data.role,
+        ...(data.phone ? { phone: data.phone } : {}),
+        ...(data.address ? { address: data.address } : {}),
+        ...(supervisorId ? { supervisorId } : {}),
+        ...(data.coordenacaoId ? { coordenacaoId: data.coordenacaoId } : {}),
+      },
+    });
+
+    // Handle cell associations for leaders
+    if (data.role === 'LIDER' && data.cellIds && data.cellIds.length > 0) {
+      await this.prisma.cell.updateMany({
+        where: { id: { in: data.cellIds } },
+        data: { leaderId: user.id },
+      });
+    }
+
+    // Handle leader associations for supervisors
+    if (data.role === 'SUPERVISOR' && data.leaderIds && data.leaderIds.length > 0) {
+      await this.prisma.user.updateMany({
+        where: { id: { in: data.leaderIds } },
+        data: { supervisorId: user.id },
+      });
+    }
+
+    // Handle associations for coordinators
+    if (data.role === 'COORDENADOR' && data.coordenacaoId) {
+      if (data.leaderIds && data.leaderIds.length > 0) {
+        await this.prisma.user.updateMany({
+          where: { id: { in: data.leaderIds } },
+          data: { coordenacaoId: data.coordenacaoId },
+        });
+      }
+
+      if (data.supervisorIds && data.supervisorIds.length > 0) {
+        await this.prisma.user.updateMany({
+          where: { id: { in: data.supervisorIds } },
+          data: { coordenacaoId: data.coordenacaoId },
+        });
+      }
+    }
+
+    const { password: _p, ...rest } = user;
+    return { ...rest };
+  }
+
   async listLeaders(): Promise<User[]> {
     const leaders = await this.prisma.user.findMany({
       where: { role: 'LIDER' },
@@ -46,6 +100,14 @@ export class PrismaUserRepository implements IUserRepository {
       orderBy: { name: 'asc' },
     });
     return supervisors.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
+  async listCoordinadores(): Promise<User[]> {
+    const coordinadores = await this.prisma.user.findMany({
+      where: { role: 'COORDENADOR' },
+      orderBy: { name: 'asc' },
+    });
+    return coordinadores.map(({ password: _p, ...rest }) => ({ ...rest }));
   }
 
   async findLeadersBySupervisorId(supervisorId: string): Promise<User[]> {
@@ -73,11 +135,19 @@ export class PrismaUserRepository implements IUserRepository {
   async getProfile(id: string): Promise<UserProfile | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { children: true },
+      include: {
+        children: true,
+        supervisor: { include: { coordenacao: true } },
+      },
     });
     if (!user) return null;
-    const { password: _p, children, ...rest } = user;
-    return { ...rest, children };
+    const { password: _p, children, supervisor, ...rest } = user;
+    return {
+      ...rest,
+      children,
+      coordenacaoName: supervisor?.coordenacao?.name ?? null,
+      coordenacaoColor: supervisor?.coordenacao?.color ?? null,
+    };
   }
 
   async updateProfile(id: string, data: UpdateProfileData): Promise<User> {
@@ -89,6 +159,9 @@ export class PrismaUserRepository implements IUserRepository {
         ...(data.address !== undefined && { address: data.address }),
         ...(data.birthDate !== undefined && { birthDate: data.birthDate }),
         ...(data.photoKey !== undefined && { photoKey: data.photoKey }),
+        ...(data.isMarried !== undefined && { isMarried: data.isMarried }),
+        ...(data.spouseName !== undefined && { spouseName: data.spouseName }),
+        ...(data.weddingDate !== undefined && { weddingDate: data.weddingDate }),
       },
     });
     const { password: _p, ...rest } = user;
@@ -121,5 +194,19 @@ export class PrismaUserRepository implements IUserRepository {
       }
     }
     return results;
+  }
+
+  async promoteUser(userId: string, role: UserRole): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { role },
+    });
+  }
+
+  async assignSupervisorToCoordenacao(supervisorId: string, coordenacaoId: string | null): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: supervisorId },
+      data: { coordenacaoId },
+    });
   }
 }

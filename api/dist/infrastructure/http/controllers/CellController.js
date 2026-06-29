@@ -11,9 +11,9 @@ const nearbySchema = zod_1.z.object({
 const createCellSchema = zod_1.z.object({
     name: zod_1.z.string().min(2),
     leaderId: zod_1.z.string().uuid(),
+    cellTypeId: zod_1.z.string().uuid().optional(),
     address: zod_1.z.string().min(3),
-    neighborhood: zod_1.z.string().min(2),
-    city: zod_1.z.string().min(2),
+    bairroId: zod_1.z.string().uuid().optional(),
     dayOfWeek: zod_1.z.enum(['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']),
     time: zod_1.z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve ser HH:MM'),
     maxCapacity: zod_1.z.coerce.number().int().positive().optional(),
@@ -23,9 +23,9 @@ const createCellSchema = zod_1.z.object({
 const updateCellSchema = zod_1.z.object({
     name: zod_1.z.string().min(2).optional(),
     leaderId: zod_1.z.string().uuid().optional(),
+    cellTypeId: zod_1.z.string().uuid().nullable().optional(),
     address: zod_1.z.string().min(3).optional(),
-    neighborhood: zod_1.z.string().min(2).optional(),
-    city: zod_1.z.string().min(2).optional(),
+    bairroId: zod_1.z.string().uuid().nullable().optional(),
     dayOfWeek: zod_1.z.enum(['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']).optional(),
     time: zod_1.z.string().regex(/^\d{2}:\d{2}$/, 'Horário deve ser HH:MM').optional(),
     maxCapacity: zod_1.z.coerce.number().int().nonnegative().optional(),
@@ -37,8 +37,7 @@ const createMemberSchema = zod_1.z.object({
     phone: zod_1.z.string().min(8),
     email: zod_1.z.string().email().optional(),
     address: zod_1.z.string().optional(),
-    neighborhood: zod_1.z.string().optional(),
-    city: zod_1.z.string().optional(),
+    bairroId: zod_1.z.string().uuid().optional(),
     leaderId: zod_1.z.string().uuid().optional(),
 });
 class CellController {
@@ -72,7 +71,19 @@ class CellController {
     };
     create = async (req, res) => {
         const data = createCellSchema.parse(req.body);
-        const cell = await this.cellRepo.create(data);
+        const createData = {
+            name: data.name,
+            leaderId: data.leaderId,
+            cellTypeId: data.cellTypeId ?? null,
+            address: data.address,
+            bairroId: data.bairroId ?? null,
+            dayOfWeek: data.dayOfWeek,
+            time: data.time,
+            ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
+            ...(data.latitude !== undefined && { latitude: data.latitude }),
+            ...(data.longitude !== undefined && { longitude: data.longitude }),
+        };
+        const cell = await this.cellRepo.create(createData);
         res.status(201).json({ cell });
     };
     update = async (req, res) => {
@@ -81,7 +92,19 @@ class CellController {
         const exists = await this.cellRepo.findById(id);
         if (!exists)
             throw AppError_1.AppError.notFound('Célula não encontrada');
-        const cell = await this.cellRepo.update(id, data);
+        const updateData = {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.leaderId !== undefined && { leaderId: data.leaderId }),
+            ...(data.cellTypeId !== undefined && { cellTypeId: data.cellTypeId }),
+            ...(data.address !== undefined && { address: data.address }),
+            ...(data.bairroId !== undefined && { bairroId: data.bairroId }),
+            ...(data.dayOfWeek !== undefined && { dayOfWeek: data.dayOfWeek }),
+            ...(data.time !== undefined && { time: data.time }),
+            ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
+            ...(data.latitude !== undefined && { latitude: data.latitude }),
+            ...(data.longitude !== undefined && { longitude: data.longitude }),
+        };
+        const cell = await this.cellRepo.update(id, updateData);
         res.json({ cell });
     };
     delete = async (req, res) => {
@@ -108,15 +131,18 @@ class CellController {
         const data = createMemberSchema.parse(req.body);
         const member = await this.cellMemberRepo.create({
             cellId: id,
-            ...data,
+            name: data.name,
+            phone: data.phone,
+            ...(data.email !== undefined ? { email: data.email } : {}),
+            ...(data.address !== undefined ? { address: data.address } : {}),
+            ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
+            ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
         });
         res.status(201).json({ member });
     };
     findByLeader = async (req, res) => {
-        const cell = await this.cellRepo.findByLeaderId(req.userId);
-        if (!cell)
-            throw AppError_1.AppError.notFound('Nenhuma célula associada a este líder');
-        res.json({ cell });
+        const cells = await this.cellRepo.findByLeaderId(req.userId);
+        res.json({ cells });
     };
 }
 exports.CellController = CellController;

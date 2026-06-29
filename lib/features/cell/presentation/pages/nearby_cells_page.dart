@@ -159,7 +159,7 @@ class _NearbyCellsPageState extends State<NearbyCellsPage> {
                       horizontal: AppSpacing.pagePaddingH,
                     ),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) =>
                         _CellCard(cell: filtered[index]),

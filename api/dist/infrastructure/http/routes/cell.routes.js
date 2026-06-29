@@ -5,6 +5,9 @@ const express_1 = require("express");
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 function cellRoutes(controller) {
     const router = (0, express_1.Router)();
+    // Public endpoint — no auth required (used by visitor self-registration form)
+    router.get('/public', controller.findAll);
+    // All other routes require authentication
     router.get('/nearby', auth_middleware_1.authMiddleware, controller.findNearby);
     router.get('/my-cell', auth_middleware_1.authMiddleware, controller.findByLeader);
     router.get('/', auth_middleware_1.authMiddleware, controller.findAll);

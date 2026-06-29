@@ -12,6 +12,9 @@ import { spiritualHistoryRoutes } from './routes/spiritual-history.routes';
 import { dashboardRoutes } from './routes/dashboard.routes';
 import { materialRoutes } from './routes/material.routes';
 import { userRoutes } from './routes/user.routes';
+import { coordenacaoRoutes } from './routes/coordenacao.routes';
+import { locationRoutes } from './routes/location.routes';
+import { cellTypeRoutes } from './routes/cell-type.routes';
 import { errorMiddleware } from './middlewares/error.middleware';
 import { requestLoggerMiddleware } from './middlewares/request-logger.middleware';
 import { openApiSpec } from '@shared/swagger/openapi.spec';
@@ -99,6 +102,9 @@ export function createApp(container: Container): Application {
   app.use(`${v1}/dashboard`, dashboardRoutes(container.dashboardController));
   app.use(`${v1}/materials`, materialRoutes(container.materialController));
   app.use(`${v1}/users`, userRoutes(container.userController));
+  app.use(`${v1}/coordenacoes`, coordenacaoRoutes(container.coordenacaoController));
+  app.use(`${v1}/location`, locationRoutes(container.locationController));
+  app.use(`${v1}/cell-types`, cellTypeRoutes(container.cellTypeController));
 
   // Error handler (must be last)
   app.use(errorMiddleware);

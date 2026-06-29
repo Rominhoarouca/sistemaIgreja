@@ -9,6 +9,8 @@ import { PrismaCellMemberRepository } from '@infrastructure/database/repositorie
 import { PrismaAttendanceRepository } from '@infrastructure/database/repositories/PrismaAttendanceRepository';
 import { PrismaSpiritualHistoryRepository } from '@infrastructure/database/repositories/PrismaSpiritualHistoryRepository';
 import { PrismaMaterialRepository } from '@infrastructure/database/repositories/PrismaMaterialRepository';
+import { PrismaCoordenacaoRepository } from '@infrastructure/database/repositories/PrismaCoordenacaoRepository';
+import { PrismaLocationRepository } from '@infrastructure/database/repositories/PrismaLocationRepository';
 
 // Storage
 import { MinioService } from '@infrastructure/storage/MinioService';
@@ -35,6 +37,9 @@ import { SpiritualHistoryController } from '@infrastructure/http/controllers/Spi
 import { DashboardController } from '@infrastructure/http/controllers/DashboardController';
 import { MaterialController } from '@infrastructure/http/controllers/MaterialController';
 import { UserController } from '@infrastructure/http/controllers/UserController';
+import { CoordenacaoController } from '@infrastructure/http/controllers/CoordenacaoController';
+import { LocationController } from '@infrastructure/http/controllers/LocationController';
+import { CellTypeController } from '@infrastructure/http/controllers/CellTypeController';
 
 // User use cases
 import { GetProfileUseCase } from '@application/usecases/user/GetProfileUseCase';
@@ -45,11 +50,14 @@ export interface Container {
   authController: AuthController;
   visitorController: VisitorController;
   cellController: CellController;
+  cellTypeController: CellTypeController;
   attendanceController: AttendanceController;
   spiritualHistoryController: SpiritualHistoryController;
   dashboardController: DashboardController;
   materialController: MaterialController;
   userController: UserController;
+  coordenacaoController: CoordenacaoController;
+  locationController: LocationController;
 }
 
 export function createContainer(): Container {
@@ -67,6 +75,8 @@ export function createContainer(): Container {
   const attendanceRepo = new PrismaAttendanceRepository(prisma);
   const spiritualHistoryRepo = new PrismaSpiritualHistoryRepository(prisma);
   const materialRepo = new PrismaMaterialRepository(prisma);
+  const coordenacaoRepo = new PrismaCoordenacaoRepository(prisma);
+  const locationRepo = new PrismaLocationRepository(prisma);
 
   // Auth use cases
   const loginUseCase = new LoginUseCase(userRepo, refreshTokenRepo);
@@ -118,22 +128,28 @@ export function createContainer(): Container {
     cellMemberRepo,
   );
   const cellController = new CellController(getNearbyCellsUseCase, cellRepo, cellMemberRepo);
-  const attendanceController = new AttendanceController(registerAttendanceUseCase, attendanceRepo);
+  const attendanceController = new AttendanceController(registerAttendanceUseCase, attendanceRepo, minioService);
   const spiritualHistoryController = new SpiritualHistoryController(addSpiritualEventUseCase, spiritualHistoryRepo);
   const dashboardController = new DashboardController(getDashboardStatsUseCase, visitorRepo);
-  const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo);
+  const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo, prisma);
   const userController = new UserController(getProfileUseCase, updateProfileUseCase, userRepo);
+  const coordenacaoController = new CoordenacaoController(coordenacaoRepo, userRepo);
+  const locationController = new LocationController(locationRepo);
+  const cellTypeController = new CellTypeController(prisma);
 
   return {
     prisma,
     authController,
     visitorController,
     cellController,
+    cellTypeController,
     attendanceController,
     spiritualHistoryController,
     dashboardController,
     materialController,
     userController,
+    coordenacaoController,
+    locationController,
   };
 }
 

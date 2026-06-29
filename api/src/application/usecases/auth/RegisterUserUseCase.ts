@@ -31,7 +31,11 @@ export class RegisterUserUseCase {
       phone: null,
       address: null,
       birthDate: null,
+      isMarried: false,
+      spouseName: null,
+      weddingDate: null,
       supervisorId: null,
+      coordenacaoId: null,
       description: null,
     });
 

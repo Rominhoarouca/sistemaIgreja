@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
@@ -8,6 +10,60 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/address_selector.dart';
+
+/// Show a snackbar above any modal sheet by using the root navigator's context.
+void _showTopSnackBar(
+  BuildContext context,
+  String message, {
+  Color backgroundColor = AppColors.error,
+}) {
+  final rootCtx = Navigator.of(context, rootNavigator: true).context;
+  ScaffoldMessenger.maybeOf(rootCtx)
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: backgroundColor),
+    );
+}
+
+// ─── Cell menu item data ─────────────────────────────────────────────────────
+class _CellMenuItem {
+  const _CellMenuItem({
+    required this.id,
+    required this.name,
+    this.typeName,
+    this.typeId,
+    required this.dayOfWeek,
+    required this.time,
+  });
+
+  final String id;
+  final String name;
+  final String? typeName;
+  final String? typeId;
+  final String dayOfWeek;
+  final String time;
+
+  factory _CellMenuItem.fromJson(Map<String, dynamic> json) => _CellMenuItem(
+    id: json['id'] as String,
+    name: json['name'] as String? ?? '',
+    typeName: json['cellTypeName'] as String?,
+    typeId: json['cellTypeId'] as String?,
+    dayOfWeek: json['dayOfWeek'] as String? ?? '',
+    time: json['time'] as String? ?? '',
+  );
+
+  String get dayLabel => switch (dayOfWeek) {
+    'segunda' => 'Seg',
+    'terca' => 'Ter',
+    'quarta' => 'Qua',
+    'quinta' => 'Qui',
+    'sexta' => 'Sex',
+    'sabado' => 'Sáb',
+    'domingo' => 'Dom',
+    _ => dayOfWeek,
+  };
+}
 
 /// Leader Panel — main hub for cell leaders
 /// Shows: forwarded visitors, attendance, materials, spiritual history
@@ -20,6 +76,13 @@ class LeaderHomePage extends StatefulWidget {
 
 class _LeaderHomePageState extends State<LeaderHomePage> {
   int _selectedTab = 0;
+  String? _coordenacaoName;
+  Color? _coordenacaoColor;
+
+  // Cell menu state
+  List<_CellMenuItem> _cells = [];
+  _CellMenuItem? _selectedCell;
+  bool _loadingCells = true;
 
   static const _tabs = [
     NavigationDestination(
@@ -50,11 +113,105 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadCoordInfo();
+    _loadCells();
+  }
+
+  Future<void> _loadCells() async {
+    try {
+      final dio = DioClient(AuthStorage()).dio;
+      final resp = await dio.get('/cells/my-cell');
+      final cellsRaw =
+          (resp.data as Map<String, dynamic>)['cells'] as List? ?? [];
+      if (!mounted) return;
+      setState(() {
+        _cells = cellsRaw
+            .map((c) => _CellMenuItem.fromJson(c as Map<String, dynamic>))
+            .toList();
+        _loadingCells = false;
+        // Auto-select if only one cell
+        if (_cells.length == 1) _selectedCell = _cells.first;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingCells = false);
+    }
+  }
+
+  Future<void> _loadCoordInfo() async {
+    try {
+      final dio = DioClient(AuthStorage()).dio;
+      final resp = await dio.get('/users/me');
+      final user =
+          (resp.data as Map<String, dynamic>)['user'] as Map<String, dynamic>?;
+      if (user == null || !mounted) return;
+      final colorHex = user['coordenacaoColor'] as String?;
+      final name = user['coordenacaoName'] as String?;
+      if (colorHex != null && name != null) {
+        setState(() {
+          _coordenacaoName = name;
+          _coordenacaoColor = Color(
+            int.parse(colorHex.replaceFirst('#', '0xFF')),
+          );
+        });
+      }
+    } catch (_) {
+      // Non-fatal — banner just won't show
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 720;
 
+    // ── Loading cells ───────────────────────────────────────────────────────
+    if (_loadingCells) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Painel do Líder')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // ── Cell selector (when multiple cells or no cell selected) ─────────────
+    if (_selectedCell == null) {
+      return _CellSelectorView(
+        cells: _cells,
+        coordenacaoName: _coordenacaoName,
+        coordenacaoColor: _coordenacaoColor,
+        onSelect: (cell) {
+          setState(() {
+            _selectedCell = cell;
+            _selectedTab = 0;
+          });
+        },
+      );
+    }
+
+    // ── Cell detail: tabs scoped to selected cell ───────────────────────────
+    final cell = _selectedCell!;
+
     final appBar = AppBar(
-      title: const Text('Painel do Líder'),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(cell.name, style: AppTypography.titleSmall),
+          if (cell.typeName != null)
+            Text(
+              cell.typeName!,
+              style: AppTypography.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+        ],
+      ),
+      leading: _cells.length > 1
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => setState(() => _selectedCell = null),
+            )
+          : null,
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_outlined),
@@ -69,15 +226,56 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
     );
 
     final tabContent = IndexedStack(
+      key: ValueKey(cell.id),
       index: _selectedTab,
-      children: const [
-        _LeaderVisitorsTab(),
-        _CellMembersTab(),
-        _AttendanceTab(),
-        _MaterialsTab(),
-        _SpiritualHistoryTab(),
+      children: [
+        _LeaderVisitorsTab(cellId: cell.id),
+        _CellMembersTab(cellId: cell.id),
+        _AttendanceTab(cellId: cell.id),
+        _MaterialsTab(cellId: cell.id),
+        _SpiritualHistoryTab(cellId: cell.id),
       ],
     );
+
+    final coordBanner = _coordenacaoColor != null
+        ? Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.pagePaddingH,
+              vertical: AppSpacing.xs,
+            ),
+            color: _coordenacaoColor!.withValues(alpha: 0.15),
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _coordenacaoColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  _coordenacaoName ?? '',
+                  style: AppTypography.labelSmall.copyWith(
+                    color: _coordenacaoColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          )
+        : null;
+
+    final bodyWithBanner = coordBanner != null
+        ? Column(
+            children: [
+              coordBanner,
+              Expanded(child: tabContent),
+            ],
+          )
+        : tabContent;
 
     if (isWide) {
       return Scaffold(
@@ -117,7 +315,7 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
               ],
             ),
             const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: tabContent),
+            Expanded(child: bodyWithBanner),
           ],
         ),
       );
@@ -125,7 +323,7 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
 
     return Scaffold(
       appBar: appBar,
-      body: tabContent,
+      body: bodyWithBanner,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         onDestinationSelected: (i) => setState(() => _selectedTab = i),
@@ -136,11 +334,174 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CELL SELECTOR VIEW
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _CellSelectorView extends StatelessWidget {
+  const _CellSelectorView({
+    required this.cells,
+    required this.onSelect,
+    this.coordenacaoName,
+    this.coordenacaoColor,
+  });
+
+  final List<_CellMenuItem> cells;
+  final void Function(_CellMenuItem) onSelect;
+  final String? coordenacaoName;
+  final Color? coordenacaoColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Minhas Células'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => context.push('/notifications'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            onPressed: () => context.push('/profile'),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (coordenacaoColor != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.pagePaddingH,
+                vertical: AppSpacing.xs,
+              ),
+              color: coordenacaoColor!.withValues(alpha: 0.15),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: coordenacaoColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    coordenacaoName ?? '',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: coordenacaoColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: cells.isEmpty
+                ? Center(
+                    child: AppEmptyState(
+                      title: 'Nenhuma célula vinculada',
+                      subtitle:
+                          'Aguarde o supervisor vincular uma célula à sua conta.',
+                      icon: Icons.group_work_outlined,
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+                    itemCount: cells.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (ctx, i) {
+                      final cell = cells[i];
+                      return AppCard(
+                        onTap: () => onSelect(cell),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(
+                                  AppSpacing.radiusSm,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.group_work_outlined,
+                                color: AppColors.primary,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    cell.name,
+                                    style: AppTypography.titleSmall,
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs2),
+                                  if (cell.typeName != null)
+                                    Container(
+                                      margin: const EdgeInsets.only(
+                                        bottom: AppSpacing.xs2,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          AppSpacing.xs,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        cell.typeName!,
+                                        style: AppTypography.labelSmall
+                                            .copyWith(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ),
+                                  Text(
+                                    '${cell.dayLabel} • ${cell.time}',
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.grey400,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TAB 1: VISITORS
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _LeaderVisitorsTab extends StatefulWidget {
-  const _LeaderVisitorsTab();
+  const _LeaderVisitorsTab({required this.cellId});
+
+  final String cellId;
 
   @override
   State<_LeaderVisitorsTab> createState() => _LeaderVisitorsTabState();
@@ -152,10 +513,6 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
   String _query = '';
   bool _loading = true;
   String? _error;
-  // Primary cell id (first cell of leader) for assigning visitors
-  String? _cellId;
-  // All cell ids this leader manages
-  List<String> _myCellIds = [];
   List<_VisitorData> _allVisitors = [];
 
   @override
@@ -177,32 +534,17 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        _dio.get('/cells/my-cell'),
-        _dio.get('/visitors'),
-      ]);
-      final cellResp = results[0];
-      final visitorsResp = results[1];
-      // Backend now returns { cells: [...] }
-      final cellsRaw = (cellResp.data as Map<String, dynamic>)['cells'];
-      final List<dynamic> cellList = cellsRaw is List ? cellsRaw : <dynamic>[];
-      final myCellIds = cellList
-          .map((c) => (c as Map<String, dynamic>)['id'] as String)
-          .toList();
+      final visitorsResp = await _dio.get(
+        '/visitors',
+        queryParameters: {'cellId': widget.cellId},
+      );
       final data = (visitorsResp.data as Map<String, dynamic>)['data'] as List;
       if (!mounted) return;
       setState(() {
-        _myCellIds = myCellIds;
-        _cellId = myCellIds.isNotEmpty ? myCellIds.first : null;
         _allVisitors = data
             .map((e) => _VisitorData.fromJson(e as Map<String, dynamic>))
             .toList();
         _loading = false;
-        if (myCellIds.isEmpty) {
-          _error =
-              'Nenhuma célula vinculada ao seu perfil.\n'
-              'Aguarde o supervisor vincular uma célula à sua conta.';
-        }
       });
     } on DioException catch (e) {
       if (!mounted) return;
@@ -215,46 +557,12 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
     }
   }
 
-  List<_VisitorData> get _myCellVisitors {
-    if (_myCellIds.isEmpty) return [];
+  List<_VisitorData> get _cellVisitors {
     final q = _query.toLowerCase();
-    return _allVisitors.where((v) {
-      if (!_myCellIds.contains(v.cellId)) return false;
-      if (q.isEmpty) return true;
-      return v.name.toLowerCase().contains(q) || v.phone.contains(q);
-    }).toList();
-  }
-
-  List<_VisitorData> get _otherVisitors {
-    final q = _query.toLowerCase();
-    return _allVisitors.where((v) {
-      if (_myCellIds.contains(v.cellId)) return false;
-      if (q.isEmpty) return true;
-      return v.name.toLowerCase().contains(q) || v.phone.contains(q);
-    }).toList();
-  }
-
-  Future<void> _assignToCell(_VisitorData visitor) async {
-    final cid = _cellId;
-    if (cid == null) return;
-    try {
-      await _dio.patch(
-        '/visitors/${visitor.id}/assign-cell',
-        data: {'cellId': cid},
-      );
-      _loadData();
-    } on DioException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao vincular visitante',
-          ),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
+    if (q.isEmpty) return _allVisitors;
+    return _allVisitors
+        .where((v) => v.name.toLowerCase().contains(q) || v.phone.contains(q))
+        .toList();
   }
 
   @override
@@ -284,8 +592,7 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       );
     }
 
-    final myCellList = _myCellVisitors;
-    final otherList = _otherVisitors;
+    final visitorList = _cellVisitors;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -302,7 +609,7 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
                     onChanged: (v) => setState(() => _query = v),
                   ),
                   const SizedBox(height: AppSpacing.base),
-                  AppSectionHeader(title: 'Visitantes da Minha Célula'),
+                  AppSectionHeader(title: 'Visitantes da Célula'),
                   const SizedBox(height: AppSpacing.sm),
                 ]),
               ),
@@ -311,66 +618,25 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.pagePaddingH,
               ),
-              sliver: myCellList.isEmpty
+              sliver: visitorList.isEmpty
                   ? SliverToBoxAdapter(
                       child: AppEmptyState(
                         title: 'Nenhum visitante na célula',
                         subtitle:
-                            'Cadastre um novo visitante ou vincule um visitante já cadastrado.',
+                            'Cadastre um novo visitante usando o botão abaixo.',
                         icon: Icons.people_outline,
                         actionLabel: 'Novo visitante',
                         action: () => _showNewVisitorSheet(context),
                       ),
                     )
                   : SliverList.separated(
-                      itemCount: myCellList.length,
-                      separatorBuilder: (_, __) =>
+                      itemCount: visitorList.length,
+                      separatorBuilder: (_, _) =>
                           const SizedBox(height: AppSpacing.sm),
                       itemBuilder: (context, i) => _VisitorListTile(
-                        visitor: myCellList[i],
-                        onOpenDetails: () => _openVisitorDetails(myCellList[i]),
-                      ),
-                    ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.pagePaddingH,
-                AppSpacing.xl,
-                AppSpacing.pagePaddingH,
-                AppSpacing.sm,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: AppSectionHeader(title: 'Outros Visitantes'),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pagePaddingH,
-              ),
-              sliver: otherList.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          top: AppSpacing.base,
-                          bottom: AppSpacing.xl,
-                        ),
-                        child: Text(
-                          'Nenhum outro visitante encontrado',
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    )
-                  : SliverList.separated(
-                      itemCount: otherList.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, i) => _VisitorListTile(
-                        visitor: otherList[i],
-                        showAssignButton: true,
-                        onOpenDetails: () => _openVisitorDetails(otherList[i]),
-                        onAssign: () => _assignToCell(otherList[i]),
+                        visitor: visitorList[i],
+                        onOpenDetails: () =>
+                            _openVisitorDetails(visitorList[i]),
                       ),
                     ),
             ),
@@ -395,7 +661,7 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _NewVisitorSheet(dio: _dio, cellId: _cellId),
+      builder: (_) => _NewVisitorSheet(dio: _dio, cellId: widget.cellId),
     );
     if (created == true) _loadData();
   }
@@ -407,8 +673,11 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) =>
-          _VisitorDetailSheet(visitor: visitor, dio: _dio, cellId: _cellId),
+      builder: (_) => _VisitorDetailSheet(
+        visitor: visitor,
+        dio: _dio,
+        cellId: widget.cellId,
+      ),
     );
 
     if (changed == true) {
@@ -467,17 +736,10 @@ class _VisitorData {
 }
 
 class _VisitorListTile extends StatelessWidget {
-  const _VisitorListTile({
-    required this.visitor,
-    required this.onOpenDetails,
-    this.showAssignButton = false,
-    this.onAssign,
-  });
+  const _VisitorListTile({required this.visitor, required this.onOpenDetails});
 
   final _VisitorData visitor;
   final VoidCallback onOpenDetails;
-  final bool showAssignButton;
-  final VoidCallback? onAssign;
 
   @override
   Widget build(BuildContext context) {
@@ -499,24 +761,14 @@ class _VisitorListTile extends StatelessWidget {
               ],
             ),
           ),
-          if (showAssignButton && onAssign != null)
-            AppButton(
-              label: 'Vincular',
-              variant: AppButtonVariant.ghost,
-              size: AppButtonSize.sm,
-              isFullWidth: false,
-              prefixIcon: Icons.link_outlined,
-              onPressed: onAssign,
-            )
-          else
-            AppButton(
-              label: 'Ver detalhes',
-              variant: AppButtonVariant.ghost,
-              size: AppButtonSize.sm,
-              isFullWidth: false,
-              suffixIcon: Icons.chevron_right,
-              onPressed: onOpenDetails,
-            ),
+          AppButton(
+            label: 'Ver detalhes',
+            variant: AppButtonVariant.ghost,
+            size: AppButtonSize.sm,
+            isFullWidth: false,
+            suffixIcon: Icons.chevron_right,
+            onPressed: onOpenDetails,
+          ),
         ],
       ),
     );
@@ -539,15 +791,14 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _neighborhoodCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  String? _bairroId;
   bool _saving = false;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _neighborhoodCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
   }
@@ -561,10 +812,9 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
         data: {
           'name': _nameCtrl.text.trim(),
           'phone': _phoneCtrl.text.trim(),
-          if (_neighborhoodCtrl.text.trim().isNotEmpty)
-            'neighborhood': _neighborhoodCtrl.text.trim(),
           if (_addressCtrl.text.trim().isNotEmpty)
             'address': _addressCtrl.text.trim(),
+          if (_bairroId != null) 'bairroId': _bairroId,
           if (widget.cellId != null) 'cellId': widget.cellId,
         },
       );
@@ -573,14 +823,10 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao cadastrar visitante',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao cadastrar visitante',
       );
     }
   }
@@ -651,21 +897,18 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
                 ),
                 const SizedBox(height: AppSpacing.base),
                 TextFormField(
-                  controller: _neighborhoodCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Bairro',
-                    prefixIcon: Icon(Icons.location_city_outlined),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.base),
-                TextFormField(
                   controller: _addressCtrl,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
-                    labelText: 'Endereço',
+                    labelText: 'Endereço (opcional)',
                     prefixIcon: Icon(Icons.location_on_outlined),
                   ),
+                ),
+                const SizedBox(height: AppSpacing.base),
+                AddressSelector(
+                  dio: widget.dio,
+                  isRequired: false,
+                  onChanged: (id) => setState(() => _bairroId = id),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 AppButton(
@@ -725,14 +968,10 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _assigningCell = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao atualizar célula',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao atualizar célula',
       );
     }
   }
@@ -758,14 +997,10 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _updatingStatus = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao atualizar status',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao atualizar status',
       );
     }
   }
@@ -786,14 +1021,10 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _converting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao converter visitante em membro',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao converter visitante em membro',
       );
     }
   }
@@ -1246,7 +1477,9 @@ class _StatusChip extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _CellMembersTab extends StatefulWidget {
-  const _CellMembersTab();
+  const _CellMembersTab({required this.cellId});
+
+  final String cellId;
 
   @override
   State<_CellMembersTab> createState() => _CellMembersTabState();
@@ -1280,20 +1513,12 @@ class _CellMember {
   );
 }
 
-class _CellInfo {
-  final String id;
-  final String name;
-
-  const _CellInfo({required this.id, required this.name});
-}
-
 class _CellMembersTabState extends State<_CellMembersTab> {
   late final Dio _dio;
   bool _loading = true;
   String? _error;
   final _searchCtrl = TextEditingController();
   String _query = '';
-  List<_CellInfo> _cells = [];
   List<_CellMember> _members = [];
 
   @override
@@ -1315,44 +1540,23 @@ class _CellMembersTabState extends State<_CellMembersTab> {
       _error = null;
     });
     try {
-      final cellResp = await _dio.get('/cells/my-cell');
-      final cellsRaw =
-          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-      final cells = cellsRaw
+      final membResp = await _dio.get('/cells/${widget.cellId}/members');
+      final membList =
+          (membResp.data as Map<String, dynamic>)['members'] as List? ?? [];
+      final members = membList
           .map(
-            (c) => _CellInfo(
-              id: (c as Map<String, dynamic>)['id'] as String,
-              name: c['name'] as String? ?? '',
+            (m) => _CellMember.fromJson(
+              m as Map<String, dynamic>,
+              widget.cellId,
+              '',
             ),
           )
           .toList();
 
-      final allMembers = <_CellMember>[];
-      for (final cell in cells) {
-        final membResp = await _dio.get('/cells/${cell.id}/members');
-        final membList =
-            (membResp.data as Map<String, dynamic>)['members'] as List? ?? [];
-        allMembers.addAll(
-          membList.map(
-            (m) => _CellMember.fromJson(
-              m as Map<String, dynamic>,
-              cell.id,
-              cell.name,
-            ),
-          ),
-        );
-      }
-
       if (!mounted) return;
       setState(() {
-        _cells = cells;
-        _members = allMembers;
+        _members = members;
         _loading = false;
-        if (cells.isEmpty) {
-          _error =
-              'Nenhuma célula vinculada ao seu perfil.\n'
-              'Aguarde o supervisor vincular uma célula à sua conta.';
-        }
       });
     } on DioException catch (e) {
       if (!mounted) return;
@@ -1373,7 +1577,7 @@ class _CellMembersTabState extends State<_CellMembersTab> {
         .toList();
   }
 
-  Future<void> _addMember(String cellId) async {
+  Future<void> _addMember() async {
     final added = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -1381,7 +1585,7 @@ class _CellMembersTabState extends State<_CellMembersTab> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AddMemberSheet(dio: _dio, cellId: cellId),
+      builder: (_) => _AddMemberSheet(dio: _dio, cellId: widget.cellId),
     );
     if (added == true) _loadData();
   }
@@ -1465,13 +1669,6 @@ class _CellMembersTabState extends State<_CellMembersTab> {
                                   color: AppColors.textSecondary,
                                 ),
                               ),
-                              if (_cells.length > 1)
-                                Text(
-                                  m.cellName,
-                                  style: AppTypography.bodySmall.copyWith(
-                                    color: AppColors.primary,
-                                  ),
-                                ),
                             ],
                           ),
                         ),
@@ -1483,34 +1680,12 @@ class _CellMembersTabState extends State<_CellMembersTab> {
           ],
         ),
       ),
-      floatingActionButton: _cells.isEmpty
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _cells.length == 1
-                  ? _addMember(_cells.first.id)
-                  : _showCellPicker(context),
-              icon: const Icon(Icons.person_add_outlined),
-              label: const Text('Adicionar membro'),
-            ),
-    );
-  }
-
-  Future<void> _showCellPicker(BuildContext context) async {
-    final picked = await showDialog<String>(
-      context: context,
-      builder: (_) => SimpleDialog(
-        title: const Text('Selecionar célula'),
-        children: _cells
-            .map(
-              (c) => SimpleDialogOption(
-                onPressed: () => Navigator.pop(context, c.id),
-                child: Text(c.name),
-              ),
-            )
-            .toList(),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addMember,
+        icon: const Icon(Icons.person_add_outlined),
+        label: const Text('Adicionar membro'),
       ),
     );
-    if (picked != null) _addMember(picked);
   }
 }
 
@@ -1532,6 +1707,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  String? _bairroId;
   bool _saving = false;
 
   @override
@@ -1556,6 +1732,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
             'email': _emailCtrl.text.trim(),
           if (_addressCtrl.text.trim().isNotEmpty)
             'address': _addressCtrl.text.trim(),
+          if (_bairroId != null) 'bairroId': _bairroId,
         },
       );
       if (!mounted) return;
@@ -1563,14 +1740,10 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao adicionar membro',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao adicionar membro',
       );
     }
   }
@@ -1629,9 +1802,15 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
               label: 'Endereço (opcional)',
               controller: _addressCtrl,
             ),
+            const SizedBox(height: AppSpacing.sm),
+            AddressSelector(
+              dio: widget.dio,
+              isRequired: false,
+              onChanged: (id) => setState(() => _bairroId = id),
+            ),
             const SizedBox(height: AppSpacing.base),
             AppButton(
-              label: 'Salvar',
+              label: _saving ? 'Salvando...' : 'Salvar',
               onPressed: _saving ? null : _save,
               isLoading: _saving,
             ),
@@ -1647,7 +1826,9 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _AttendanceTab extends StatefulWidget {
-  const _AttendanceTab();
+  const _AttendanceTab({required this.cellId});
+
+  final String cellId;
 
   @override
   State<_AttendanceTab> createState() => _AttendanceTabState();
@@ -1657,7 +1838,6 @@ class _AttendanceTabState extends State<_AttendanceTab> {
   late final Dio _dio;
   bool _loading = true;
   String? _error;
-  String? _cellId;
   List<Map<String, dynamic>> _meetings = [];
 
   @override
@@ -1673,27 +1853,14 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       _error = null;
     });
     try {
-      final cellResp = await _dio.get('/cells/my-cell');
-      final cellsRaw =
-          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-      if (cellsRaw.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _error =
-              'Nenhuma célula vinculada ao seu perfil.\n'
-              'Aguarde o supervisor vincular uma célula à sua conta.';
-          _loading = false;
-        });
-        return;
-      }
-      final cellId = (cellsRaw.first as Map<String, dynamic>)['id'] as String;
-      final meetingsResp = await _dio.get('/attendance/cell/$cellId/meetings');
+      final meetingsResp = await _dio.get(
+        '/attendance/cell/${widget.cellId}/meetings',
+      );
       final meetings =
           ((meetingsResp.data as Map<String, dynamic>)['meetings'] as List)
               .cast<Map<String, dynamic>>();
       if (!mounted) return;
       setState(() {
-        _cellId = cellId;
         _meetings = meetings;
         _loading = false;
       });
@@ -1790,23 +1957,19 @@ class _AttendanceTabState extends State<_AttendanceTab> {
   }
 
   void _showNewMeetingSheet(BuildContext context) {
-    final cid = _cellId;
-    if (cid == null) return;
     showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _NewMeetingSheet(dio: _dio, cellId: cid),
+      builder: (_) => _NewMeetingSheet(dio: _dio, cellId: widget.cellId),
     ).then((created) {
       if (created == true) _loadData();
     });
   }
 
   Future<void> _openMeetingDetails(Map<String, dynamic> meeting) async {
-    final cid = _cellId;
-    if (cid == null) return;
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -1815,7 +1978,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
       ),
       builder: (_) => _MeetingAttendanceSheet(
         dio: _dio,
-        cellId: cid,
+        cellId: widget.cellId,
         meetingDateIso: meeting['meetingDate'] as String,
       ),
     );
@@ -1876,6 +2039,151 @@ class _MeetingSummaryCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Photo Section Widget
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PhotoSection extends StatelessWidget {
+  const _PhotoSection({
+    required this.photo,
+    required this.existingPhotoUrl,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final XFile? photo;
+  final String? existingPhotoUrl;
+  final VoidCallback onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    // New photo selected locally
+    if (photo != null) {
+      return AppCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+              child: Image.file(
+                File(photo!.path),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.photo_outlined,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Foto do encontro selecionada',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Remover'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                    ),
+                    onPressed: onRemove,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Already has photo saved in server
+    if (existingPhotoUrl != null) {
+      return AppCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+              child: Image.network(
+                existingPhotoUrl!,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => const SizedBox(
+                  height: 80,
+                  child: Center(child: Icon(Icons.broken_image_outlined)),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline,
+                    size: 16,
+                    color: AppColors.success,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Foto do encontro',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text('Trocar'),
+                    onPressed: onPick,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // No photo yet
+    return OutlinedButton.icon(
+      icon: const Icon(Icons.add_a_photo_outlined),
+      label: const Text('Adicionar foto do encontro (opcional)'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 48),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.sm),
+        ),
+      ),
+      onPressed: onPick,
+    );
+  }
+}
+
 class _NewMeetingSheet extends StatefulWidget {
   const _NewMeetingSheet({required this.dio, required this.cellId});
 
@@ -1902,14 +2210,10 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao criar encontro',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao criar encontro',
       );
     }
   }
@@ -2013,6 +2317,10 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
   Set<String> _presentIds = <String>{};
   Set<String> _initialPresentIds = <String>{};
 
+  // Optional photo for this meeting
+  XFile? _photo;
+  String? _existingPhotoUrl;
+
   @override
   void initState() {
     super.initState();
@@ -2036,11 +2344,15 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
           '/attendance/cell/${widget.cellId}',
           queryParameters: {'date': widget.meetingDateIso},
         ),
+        widget.dio.get(
+          '/attendance/cell/${widget.cellId}/meetings/${Uri.encodeComponent(widget.meetingDateIso)}/photo',
+        ),
       ]);
 
       final visitorsResp = results[0];
       final membersResp = results[1];
       final attendanceResp = results[2];
+      final photoResp = results[3];
 
       final visitorsData = visitorsResp.data as Map<String, dynamic>;
       final rawVisitors =
@@ -2090,6 +2402,8 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
         _participants = participants;
         _presentIds = presentIds;
         _initialPresentIds = Set<String>.from(presentIds);
+        _existingPhotoUrl =
+            (photoResp.data as Map<String, dynamic>)['photoUrl'] as String?;
         _loading = false;
       });
     } on DioException catch (e) {
@@ -2156,7 +2470,7 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
       return _presentIds.contains(id) != _initialPresentIds.contains(id);
     }).toList();
 
-    if (changedParticipants.isEmpty) {
+    if (changedParticipants.isEmpty && _photo == null) {
       if (!mounted) return;
       Navigator.of(context).pop(false);
       return;
@@ -2164,36 +2478,76 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
 
     setState(() => _saving = true);
     try {
-      await Future.wait(
-        changedParticipants.map((p) {
-          final id = p['id'] as String;
-          final isMember = (p['_type'] as String?) == 'member';
-          return widget.dio.post(
-            '/attendance',
-            data: {
-              if (isMember) 'memberId': id else 'visitorId': id,
-              'cellId': widget.cellId,
-              'meetingDate': widget.meetingDateIso,
-              'isPresent': _presentIds.contains(id),
-            },
-          );
-        }),
-      );
+      // 1. Save attendance changes
+      if (changedParticipants.isNotEmpty) {
+        await Future.wait(
+          changedParticipants.map((p) {
+            final id = p['id'] as String;
+            final isMember = (p['_type'] as String?) == 'member';
+            return widget.dio.post(
+              '/attendance',
+              data: {
+                if (isMember) 'memberId': id else 'visitorId': id,
+                'cellId': widget.cellId,
+                'meetingDate': widget.meetingDateIso,
+                'isPresent': _presentIds.contains(id),
+              },
+            );
+          }),
+        );
+      }
+
+      // 2. Upload photo if selected
+      if (_photo != null) {
+        final bytes = await File(_photo!.path).readAsBytes();
+        final formData = FormData.fromMap({
+          'photo': MultipartFile.fromBytes(bytes, filename: _photo!.name),
+        });
+        await widget.dio.post(
+          '/attendance/cell/${widget.cellId}/meetings/${Uri.encodeComponent(widget.meetingDateIso)}/photo',
+          data: formData,
+        );
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao salvar presenças',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao salvar presenças',
       );
+    }
+  }
+
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Câmera'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Galeria'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final picked = await picker.pickImage(source: source, imageQuality: 80);
+    if (picked != null && mounted) {
+      setState(() => _photo = picked);
     }
   }
 
@@ -2261,6 +2615,15 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
                   isFullWidth: false,
                   prefixIcon: Icons.person_add_outlined,
                   onPressed: _showAddVisitorSheet,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
+                // ── Optional photo ────────────────────────────────
+                _PhotoSection(
+                  photo: _photo,
+                  existingPhotoUrl: _existingPhotoUrl,
+                  onPick: _pickPhoto,
+                  onRemove: () => setState(() => _photo = null),
                 ),
                 const SizedBox(height: AppSpacing.base),
                 if (_loading)
@@ -2372,7 +2735,9 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _MaterialsTab extends StatefulWidget {
-  const _MaterialsTab();
+  const _MaterialsTab({required this.cellId});
+
+  final String cellId;
 
   @override
   State<_MaterialsTab> createState() => _MaterialsTabState();
@@ -2434,37 +2799,18 @@ class _MaterialsTabState extends State<_MaterialsTab> {
       _error = null;
     });
     try {
-      // Get leader's cells first
-      final cellResp = await _dio.get('/cells/my-cell');
-      final cellsRaw =
-          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-      final cellIds = cellsRaw
-          .map((c) => (c as Map<String, dynamic>)['id'] as String)
-          .toList();
-
-      // Load materials for each cell
-      final allMaterials = <_MaterialData>[];
-      for (final cellId in cellIds) {
-        final resp = await _dio.get(
-          '/materials',
-          queryParameters: {'cellId': cellId},
-        );
-        final data =
-            (resp.data as Map<String, dynamic>)['materials'] as List? ?? [];
-        allMaterials.addAll(
-          data.map((e) => _MaterialData.fromJson(e as Map<String, dynamic>)),
-        );
-      }
-
+      final resp = await _dio.get(
+        '/materials',
+        queryParameters: {'cellId': widget.cellId},
+      );
+      final data =
+          (resp.data as Map<String, dynamic>)['materials'] as List? ?? [];
       if (!mounted) return;
       setState(() {
-        _materials = allMaterials;
+        _materials = data
+            .map((e) => _MaterialData.fromJson(e as Map<String, dynamic>))
+            .toList();
         _loading = false;
-        if (cellIds.isEmpty) {
-          _error =
-              'Nenhuma célula vinculada ao seu perfil.\n'
-              'Aguarde o supervisor vincular uma célula à sua conta.';
-        }
       });
     } on DioException catch (e) {
       if (!mounted) return;
@@ -2495,12 +2841,7 @@ class _MaterialsTabState extends State<_MaterialsTab> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _opening.remove(material.id));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erro ao abrir o arquivo'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _showTopSnackBar(context, 'Erro ao abrir o arquivo');
       return;
     }
     if (!mounted) return;
@@ -2663,7 +3004,9 @@ class _MaterialCard extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _SpiritualHistoryTab extends StatefulWidget {
-  const _SpiritualHistoryTab();
+  const _SpiritualHistoryTab({required this.cellId});
+
+  final String cellId;
 
   @override
   State<_SpiritualHistoryTab> createState() => _SpiritualHistoryTabState();
@@ -2673,7 +3016,6 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
   late final Dio _dio;
   bool _loading = true;
   String? _error;
-  String? _cellId;
   List<Map<String, dynamic>> _events = [];
 
   static const _typeLabels = {
@@ -2697,27 +3039,14 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
       _error = null;
     });
     try {
-      final cellResp = await _dio.get('/cells/my-cell');
-      final cellsRaw =
-          (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-      if (cellsRaw.isEmpty) {
-        if (!mounted) return;
-        setState(() {
-          _error =
-              'Nenhuma célula vinculada ao seu perfil.\n'
-              'Aguarde o supervisor vincular uma célula à sua conta.';
-          _loading = false;
-        });
-        return;
-      }
-      final cellId = (cellsRaw.first as Map<String, dynamic>)['id'] as String;
-      final histResp = await _dio.get('/spiritual-history/cell/$cellId');
+      final histResp = await _dio.get(
+        '/spiritual-history/cell/${widget.cellId}',
+      );
       final history =
           ((histResp.data as Map<String, dynamic>)['history'] as List)
               .cast<Map<String, dynamic>>();
       if (!mounted) return;
       setState(() {
-        _cellId = cellId;
         _events = history;
         _loading = false;
       });
@@ -2805,15 +3134,13 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
   }
 
   void _showAddSheet(BuildContext context) {
-    final cid = _cellId;
-    if (cid == null) return;
     showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AddHistoryEventSheet(dio: _dio, cellId: cid),
+      builder: (_) => _AddHistoryEventSheet(dio: _dio, cellId: widget.cellId),
     ).then((added) {
       if (added == true) _loadData();
     });
@@ -3074,14 +3401,10 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao registrar evento',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Erro ao registrar evento',
       );
     }
   }
@@ -3137,7 +3460,7 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
                 )
               else
                 DropdownButtonFormField<String>(
-                  value: _selectedVisitorId,
+                  initialValue: _selectedVisitorId,
                   items: _visitors
                       .map(
                         (v) => DropdownMenuItem(
@@ -3171,7 +3494,7 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
               ),
               const SizedBox(height: AppSpacing.xs),
               DropdownButtonFormField<String>(
-                value: _selectedType,
+                initialValue: _selectedType,
                 items: _types
                     .map(
                       (t) => DropdownMenuItem(value: t.$1, child: Text(t.$2)),

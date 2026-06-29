@@ -13,4 +13,6 @@ export interface IAttendanceRepository {
   getAverageAttendanceRate(): Promise<number>;
   findMeetingsByCellId(cellId: string): Promise<MeetingSummary[]>;
   createMeeting(cellId: string, meetingDate: Date, createdById: string): Promise<void>;
+  updateMeetingPhoto(cellId: string, meetingDate: Date, photoKey: string): Promise<void>;
+  getMeetingPhotoKey(cellId: string, meetingDate: Date): Promise<string | null>;
 }

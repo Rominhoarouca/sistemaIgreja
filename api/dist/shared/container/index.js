@@ -11,6 +11,8 @@ const PrismaCellMemberRepository_1 = require("@infrastructure/database/repositor
 const PrismaAttendanceRepository_1 = require("@infrastructure/database/repositories/PrismaAttendanceRepository");
 const PrismaSpiritualHistoryRepository_1 = require("@infrastructure/database/repositories/PrismaSpiritualHistoryRepository");
 const PrismaMaterialRepository_1 = require("@infrastructure/database/repositories/PrismaMaterialRepository");
+const PrismaCoordenacaoRepository_1 = require("@infrastructure/database/repositories/PrismaCoordenacaoRepository");
+const PrismaLocationRepository_1 = require("@infrastructure/database/repositories/PrismaLocationRepository");
 // Storage
 const MinioService_1 = require("@infrastructure/storage/MinioService");
 // Use Cases
@@ -34,6 +36,9 @@ const SpiritualHistoryController_1 = require("@infrastructure/http/controllers/S
 const DashboardController_1 = require("@infrastructure/http/controllers/DashboardController");
 const MaterialController_1 = require("@infrastructure/http/controllers/MaterialController");
 const UserController_1 = require("@infrastructure/http/controllers/UserController");
+const CoordenacaoController_1 = require("@infrastructure/http/controllers/CoordenacaoController");
+const LocationController_1 = require("@infrastructure/http/controllers/LocationController");
+const CellTypeController_1 = require("@infrastructure/http/controllers/CellTypeController");
 // User use cases
 const GetProfileUseCase_1 = require("@application/usecases/user/GetProfileUseCase");
 const UpdateProfileUseCase_1 = require("@application/usecases/user/UpdateProfileUseCase");
@@ -50,6 +55,8 @@ function createContainer() {
     const attendanceRepo = new PrismaAttendanceRepository_1.PrismaAttendanceRepository(prisma);
     const spiritualHistoryRepo = new PrismaSpiritualHistoryRepository_1.PrismaSpiritualHistoryRepository(prisma);
     const materialRepo = new PrismaMaterialRepository_1.PrismaMaterialRepository(prisma);
+    const coordenacaoRepo = new PrismaCoordenacaoRepository_1.PrismaCoordenacaoRepository(prisma);
+    const locationRepo = new PrismaLocationRepository_1.PrismaLocationRepository(prisma);
     // Auth use cases
     const loginUseCase = new LoginUseCase_1.LoginUseCase(userRepo, refreshTokenRepo);
     const refreshTokenUseCase = new RefreshTokenUseCase_1.RefreshTokenUseCase(userRepo, refreshTokenRepo);
@@ -75,20 +82,26 @@ function createContainer() {
     const authController = new AuthController_1.AuthController(loginUseCase, refreshTokenUseCase, registerUserUseCase, refreshTokenRepo, userRepo);
     const visitorController = new VisitorController_1.VisitorController(registerVisitorUseCase, getVisitorsUseCase, updateVisitorStatusUseCase, visitorRepo, cellMemberRepo);
     const cellController = new CellController_1.CellController(getNearbyCellsUseCase, cellRepo, cellMemberRepo);
-    const attendanceController = new AttendanceController_1.AttendanceController(registerAttendanceUseCase, attendanceRepo);
+    const attendanceController = new AttendanceController_1.AttendanceController(registerAttendanceUseCase, attendanceRepo, minioService);
     const spiritualHistoryController = new SpiritualHistoryController_1.SpiritualHistoryController(addSpiritualEventUseCase, spiritualHistoryRepo);
     const dashboardController = new DashboardController_1.DashboardController(getDashboardStatsUseCase, visitorRepo);
-    const materialController = new MaterialController_1.MaterialController(uploadMaterialUseCase, materialRepo, minioService);
+    const materialController = new MaterialController_1.MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo, prisma);
     const userController = new UserController_1.UserController(getProfileUseCase, updateProfileUseCase, userRepo);
+    const coordenacaoController = new CoordenacaoController_1.CoordenacaoController(coordenacaoRepo, userRepo);
+    const locationController = new LocationController_1.LocationController(locationRepo);
+    const cellTypeController = new CellTypeController_1.CellTypeController(prisma);
     return {
         prisma,
         authController,
         visitorController,
         cellController,
+        cellTypeController,
         attendanceController,
         spiritualHistoryController,
         dashboardController,
         materialController,
         userController,
+        coordenacaoController,
+        locationController,
     };
 }

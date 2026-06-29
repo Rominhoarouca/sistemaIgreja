@@ -16,9 +16,13 @@ export function userRoutes(controller: UserController): Router {
   router.patch('/me', upload.single('photo'), controller.updateProfile);
   router.get('/leaders', requireSupervisorOrAdmin, controller.findLeaders);
   router.get('/supervisors', requireAdmin, controller.findSupervisors);
+  router.get('/coordinadores', requireAdmin, controller.findCoordinadores);
   router.get('/my-leaders', requireSupervisorOrAdmin, controller.getMyLeaders);
+  router.post('/create', requireAdmin, controller.createUser);
   router.patch('/leaders/:leaderId/supervisor', requireAdmin, controller.assignLeaderSupervisor);
+  router.patch('/leaders/:leaderId/promote', requireAdmin, controller.promoteLeader);
   router.patch('/leaders/:leaderId', requireAdmin, controller.updateLeaderDescription);
+  router.patch('/supervisors/:supervisorId/coordenacao', requireAdmin, controller.assignSupervisorCoordenacao);
 
   return router;
 }

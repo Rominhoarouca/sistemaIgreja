@@ -30,6 +30,18 @@ class PrismaUserRepository {
         const { password: _p, ...rest } = user;
         return { ...rest };
     }
+    async createUser(data) {
+        const user = await this.prisma.user.create({
+            data: {
+                name: data.name,
+                email: data.email,
+                password: data.password,
+                role: data.role,
+            },
+        });
+        const { password: _p, ...rest } = user;
+        return { ...rest };
+    }
     async listLeaders() {
         const leaders = await this.prisma.user.findMany({
             where: { role: 'LIDER' },
@@ -37,15 +49,56 @@ class PrismaUserRepository {
         });
         return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
     }
+    async listSupervisors() {
+        const supervisors = await this.prisma.user.findMany({
+            where: { role: 'SUPERVISOR' },
+            orderBy: { name: 'asc' },
+        });
+        return supervisors.map(({ password: _p, ...rest }) => ({ ...rest }));
+    }
+    async listCoordinadores() {
+        const coordinadores = await this.prisma.user.findMany({
+            where: { role: 'COORDENADOR' },
+            orderBy: { name: 'asc' },
+        });
+        return coordinadores.map(({ password: _p, ...rest }) => ({ ...rest }));
+    }
+    async findLeadersBySupervisorId(supervisorId) {
+        const leaders = await this.prisma.user.findMany({
+            where: { role: 'LIDER', supervisorId },
+            orderBy: { name: 'asc' },
+        });
+        return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
+    }
+    async assignSupervisor(leaderId, supervisorId) {
+        await this.prisma.user.update({
+            where: { id: leaderId },
+            data: { supervisorId },
+        });
+    }
+    async updateLeaderDescription(leaderId, description) {
+        await this.prisma.user.update({
+            where: { id: leaderId },
+            data: { description },
+        });
+    }
     async getProfile(id) {
         const user = await this.prisma.user.findUnique({
             where: { id },
-            include: { children: true },
+            include: {
+                children: true,
+                supervisor: { include: { coordenacao: true } },
+            },
         });
         if (!user)
             return null;
-        const { password: _p, children, ...rest } = user;
-        return { ...rest, children };
+        const { password: _p, children, supervisor, ...rest } = user;
+        return {
+            ...rest,
+            children,
+            coordenacaoName: supervisor?.coordenacao?.name ?? null,
+            coordenacaoColor: supervisor?.coordenacao?.color ?? null,
+        };
     }
     async updateProfile(id, data) {
         const user = await this.prisma.user.update({
@@ -56,6 +109,9 @@ class PrismaUserRepository {
                 ...(data.address !== undefined && { address: data.address }),
                 ...(data.birthDate !== undefined && { birthDate: data.birthDate }),
                 ...(data.photoKey !== undefined && { photoKey: data.photoKey }),
+                ...(data.isMarried !== undefined && { isMarried: data.isMarried }),
+                ...(data.spouseName !== undefined && { spouseName: data.spouseName }),
+                ...(data.weddingDate !== undefined && { weddingDate: data.weddingDate }),
             },
         });
         const { password: _p, ...rest } = user;
@@ -84,6 +140,18 @@ class PrismaUserRepository {
             }
         }
         return results;
+    }
+    async promoteUser(userId, role) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { role },
+        });
+    }
+    async assignSupervisorToCoordenacao(supervisorId, coordenacaoId) {
+        await this.prisma.user.update({
+            where: { id: supervisorId },
+            data: { coordenacaoId },
+        });
     }
 }
 exports.PrismaUserRepository = PrismaUserRepository;

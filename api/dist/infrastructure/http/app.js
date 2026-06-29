@@ -17,11 +17,17 @@ const spiritual_history_routes_1 = require("./routes/spiritual-history.routes");
 const dashboard_routes_1 = require("./routes/dashboard.routes");
 const material_routes_1 = require("./routes/material.routes");
 const user_routes_1 = require("./routes/user.routes");
+const coordenacao_routes_1 = require("./routes/coordenacao.routes");
+const location_routes_1 = require("./routes/location.routes");
+const cell_type_routes_1 = require("./routes/cell-type.routes");
 const error_middleware_1 = require("./middlewares/error.middleware");
 const request_logger_middleware_1 = require("./middlewares/request-logger.middleware");
 const openapi_spec_1 = require("@shared/swagger/openapi.spec");
 function createApp(container) {
     const app = (0, express_1.default)();
+    // Disable ETags — all API responses are dynamic/authenticated, 304 would
+    // return an empty body which breaks JSON parsing in clients.
+    app.set('etag', false);
     // Security — relax CSP only for Swagger UI
     app.use((0, helmet_1.default)({
         contentSecurityPolicy: {
@@ -33,11 +39,27 @@ function createApp(container) {
             },
         },
     }));
-    app.use((0, cors_1.default)({
-        origin: process.env['ALLOWED_ORIGINS']?.split(',') ?? '*',
+    // Configure CORS. If ALLOWED_ORIGINS is a comma-separated list, enable
+    // credentials (cookies/authorization) only when a specific origin is used.
+    const allowedOrigins = process.env['ALLOWED_ORIGINS']?.split(',').map((s) => s.trim()) ?? ['*'];
+    const corsOptions = {
+        origin: (origin, callback) => {
+            // Allow requests with no origin (e.g. curl, mobile apps)
+            if (!origin)
+                return callback(null, true);
+            if (allowedOrigins.includes('*') || allowedOrigins.includes(origin))
+                return callback(null, true);
+            return callback(new Error('CORS_NOT_ALLOWED'));
+        },
         methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
-    }));
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+        credentials: !allowedOrigins.includes('*'),
+        exposedHeaders: ['Authorization'],
+        optionsSuccessStatus: 200,
+    };
+    app.use((0, cors_1.default)(corsOptions));
+    // Ensure preflight requests are handled
+    app.options('*', (0, cors_1.default)(corsOptions));
     // Body parsing
     app.use(express_1.default.json({ limit: '10mb' }));
     app.use(express_1.default.urlencoded({ extended: true }));
@@ -74,6 +96,9 @@ function createApp(container) {
     app.use(`${v1}/dashboard`, (0, dashboard_routes_1.dashboardRoutes)(container.dashboardController));
     app.use(`${v1}/materials`, (0, material_routes_1.materialRoutes)(container.materialController));
     app.use(`${v1}/users`, (0, user_routes_1.userRoutes)(container.userController));
+    app.use(`${v1}/coordenacoes`, (0, coordenacao_routes_1.coordenacaoRoutes)(container.coordenacaoController));
+    app.use(`${v1}/location`, (0, location_routes_1.locationRoutes)(container.locationController));
+    app.use(`${v1}/cell-types`, (0, cell_type_routes_1.cellTypeRoutes)(container.cellTypeController));
     // Error handler (must be last)
     app.use(error_middleware_1.errorMiddleware);
     return app;

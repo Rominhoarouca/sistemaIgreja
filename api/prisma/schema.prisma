@@ -15,6 +15,7 @@ enum UserRole {
   ADMIN
   LIDER
   SUPERVISOR
+  COORDENADOR
 }
 
 enum VisitorStatus {
@@ -61,14 +62,20 @@ model User {
   phone        String?
   address      String?
   birthDate    DateTime? @map("birth_date")
-  supervisorId String?  @map("supervisor_id")
-  description  String?
+  isMarried    Boolean   @default(false) @map("is_married")
+  spouseName   String?   @map("spouse_name")
+  weddingDate  DateTime? @map("wedding_date")
+  supervisorId    String?  @map("supervisor_id")
+  coordenacaoId   String?  @map("coordenacao_id")
+  description     String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   cells              Cell[]             @relation("CellLeader")
   supervisor         User?              @relation("SupervisorLeaders", fields: [supervisorId], references: [id])
   subordinates       User[]             @relation("SupervisorLeaders")
+  coordenacao        Coordenacao?       @relation("CoordenacaoSupervisores", fields: [coordenacaoId], references: [id])
+  coordenacaoLiderada Coordenacao?      @relation("CoordenacaoCoordinador")
   visitors           Visitor[]          @relation("LeaderVisitors")
   spiritualHistories SpiritualHistory[] @relation("RecordedBy")
   materials          Material[]         @relation("UploadedBy")
@@ -78,6 +85,21 @@ model User {
   cellMeetings       CellMeeting[]      @relation("CreatedMeetings")
 
   @@map("users")
+}
+
+// ── Coordenacao ──────────────────────────────────────────────────────────────
+model Coordenacao {
+  id            String   @id @default(uuid())
+  name          String
+  color         String   // hex color e.g. "#3F51B5"
+  coordinadorId String   @unique @map("coordinador_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  coordinador  User   @relation("CoordenacaoCoordinador", fields: [coordinadorId], references: [id])
+  supervisores User[] @relation("CoordenacaoSupervisores")
+
+  @@map("coordenacoes")
 }
 
 model Child {
@@ -104,14 +126,71 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// ── Localização ──────────────────────────────────────────────────────────────
+model Estado {
+  id        String   @id @default(uuid())
+  name      String
+  uf        String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cidades Cidade[]
+
+  @@map("estados")
+}
+
+model Cidade {
+  id        String   @id @default(uuid())
+  name      String
+  estadoId  String   @map("estado_id")
+  latitude  Float?   // Geolocation: center point of city
+  longitude Float?   // Geolocation: center point of city
+  createdAt DateTime @default(now()) @map("created_at")
+
+  estado  Estado   @relation(fields: [estadoId], references: [id], onDelete: Cascade)
+  bairros Bairro[]
+
+  @@unique([name, estadoId])
+  @@map("cidades")
+}
+
+model Bairro {
+  id        String   @id @default(uuid())
+  name      String
+  cidadeId  String   @map("cidade_id")
+  latitude  Float?   // Geolocation: center point of neighborhood
+  longitude Float?   // Geolocation: center point of neighborhood
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cidade      Cidade       @relation(fields: [cidadeId], references: [id], onDelete: Cascade)
+  cells       Cell[]
+  visitors    Visitor[]
+  cellMembers CellMember[]
+
+  @@unique([name, cidadeId])
+  @@map("bairros")
+}
+
+// ── Cell Types ────────────────────────────────────────────────────────────────
+model CellType {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  cells Cell[]
+
+  @@map("cell_types")
+}
+
 // ── Cells ────────────────────────────────────────────────────────────────────
 model Cell {
   id          String    @id @default(uuid())
   name        String
   leaderId    String    @map("leader_id")
+  cellTypeId  String?   @map("cell_type_id")
   address     String
-  neighborhood String
-  city        String
+  bairroId    String?   @map("bairro_id")
   dayOfWeek   DayOfWeek @map("day_of_week")
   time        String    // "HH:MM"
   maxCapacity Int       @default(20) @map("max_capacity")
@@ -121,6 +200,8 @@ model Cell {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   leader     User         @relation("CellLeader", fields: [leaderId], references: [id])
+  cellType   CellType?    @relation(fields: [cellTypeId], references: [id])
+  bairro     Bairro?      @relation(fields: [bairroId], references: [id])
   members    CellMember[]
   visitors   Visitor[]
   attendances Attendance[]
@@ -137,8 +218,9 @@ model Visitor {
   phone          String
   email          String?
   address        String?
-  neighborhood   String?
-  city           String?
+  numero         String?       // Número do endereço
+  complemento    String?       // Complemento do endereço
+  bairroId       String?       @map("bairro_id")
   originChurch   String?       @map("origin_church")
   birthDate      DateTime?     @map("birth_date")
   maritalStatus  String?       @map("marital_status")
@@ -154,6 +236,7 @@ model Visitor {
 
   leader           User?              @relation("LeaderVisitors", fields: [leaderId], references: [id])
   cell             Cell?              @relation(fields: [cellId], references: [id])
+  bairro           Bairro?            @relation(fields: [bairroId], references: [id])
   convertedMember  CellMember?        @relation("VisitorConvertedMember")
   referredBy       Visitor?           @relation("Referrals", fields: [referredById], references: [id])
   referrals        Visitor[]          @relation("Referrals")
@@ -171,14 +254,14 @@ model CellMember {
   phone           String
   email           String?
   address         String?
-  neighborhood    String?
-  city            String?
+  bairroId        String?  @map("bairro_id")
   leaderId        String?  @map("leader_id")
   sourceVisitorId String?  @unique @map("source_visitor_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   cell          Cell         @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  bairro        Bairro?      @relation(fields: [bairroId], references: [id])
   leader        User?        @relation(fields: [leaderId], references: [id])
   sourceVisitor Visitor?     @relation("VisitorConvertedMember", fields: [sourceVisitorId], references: [id])
   attendances   Attendance[] @relation("MemberAttendances")
@@ -194,6 +277,7 @@ model CellMeeting {
   cellId      String   @map("cell_id")
   meetingDate DateTime @map("meeting_date") @db.Date
   createdById String   @map("created_by_id")
+  photoKey    String?  @map("photo_key")
   createdAt   DateTime @default(now()) @map("created_at")
 
   cell      Cell @relation(fields: [cellId], references: [id], onDelete: Cascade)

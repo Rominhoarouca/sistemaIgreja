@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/address_selector.dart';
 
 /// Visitor Registration page — RF01
-/// Collects: name, phone, email (opt), address, neighborhood, city, visitDate (opt), originChurch (opt)
+/// Collects: name, phone, email (opt), address, bairroId (via AddressSelector), originChurch (opt)
 class VisitorRegisterPage extends StatefulWidget {
   const VisitorRegisterPage({super.key});
 
@@ -16,9 +17,8 @@ class _VisitorRegisterPageState extends State<VisitorRegisterPage> {
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
-  final _neighborhoodCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
   final _churchCtrl = TextEditingController();
+  String? _bairroId;
   // ignore: prefer_final_fields
   bool _isLoading = false;
 
@@ -28,8 +28,6 @@ class _VisitorRegisterPageState extends State<VisitorRegisterPage> {
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
     _addressCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
     _churchCtrl.dispose();
     super.dispose();
   }
@@ -139,9 +137,9 @@ class _VisitorRegisterPageState extends State<VisitorRegisterPage> {
 
                     AppTextField(
                       controller: _addressCtrl,
-                      label: 'Endereço *',
-                      hint: 'Rua, número',
-                      prefixIcon: Icons.location_on_outlined,
+                      label: 'Rua / número *',
+                      hint: 'Ex: Rua das Flores, 123',
+                      prefixIcon: Icons.signpost_outlined,
                       textInputAction: TextInputAction.next,
                       validator: (v) => (v == null || v.trim().isEmpty)
                           ? 'Campo obrigatório'
@@ -149,32 +147,8 @@ class _VisitorRegisterPageState extends State<VisitorRegisterPage> {
                     ),
                     const SizedBox(height: AppSpacing.base),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppTextField(
-                            controller: _neighborhoodCtrl,
-                            label: 'Bairro *',
-                            hint: 'Seu bairro',
-                            textInputAction: TextInputAction.next,
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Obrigatório'
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: AppTextField(
-                            controller: _cityCtrl,
-                            label: 'Cidade *',
-                            hint: 'Sua cidade',
-                            textInputAction: TextInputAction.next,
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Obrigatório'
-                                : null,
-                          ),
-                        ),
-                      ],
+                    AddressSelector(
+                      onChanged: (id) => setState(() => _bairroId = id),
                     ),
 
                     const SizedBox(height: AppSpacing.xl),

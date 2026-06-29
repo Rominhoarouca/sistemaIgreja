@@ -67,7 +67,7 @@ class AppEmptyState extends StatelessWidget {
                       child: Image.asset(
                         'assets/images/logo App.png',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
+                        errorBuilder: (_, _, _) => Icon(
                           Icons.church_outlined,
                           size: 48,
                           color: AppColors.primary,

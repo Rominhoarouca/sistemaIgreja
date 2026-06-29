@@ -1,6 +1,23 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaCellRepository = void 0;
+const bairroInclude = {
+    bairro: {
+        select: {
+            id: true,
+            name: true,
+            cidade: { select: { id: true, name: true, estado: { select: { id: true, name: true, uf: true } } } },
+        },
+    },
+    cellType: { select: { id: true, name: true } },
+};
+function deriveLocation(bairro) {
+    return {
+        neighborhood: bairro?.name ?? '',
+        city: bairro?.cidade.name ?? '',
+        state: bairro?.cidade.estado.uf ?? '',
+    };
+}
 class PrismaCellRepository {
     prisma;
     constructor(prisma) {
@@ -9,13 +26,13 @@ class PrismaCellRepository {
     async findById(id) {
         const row = await this.prisma.cell.findUnique({
             where: { id },
-            include: { leader: { select: { name: true } }, _count: { select: { members: true } } },
+            include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
         });
         return row ? this.mapRow(row) : null;
     }
     async findAll() {
         const rows = await this.prisma.cell.findMany({
-            include: { leader: { select: { name: true } }, _count: { select: { members: true } } },
+            include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
             orderBy: { name: 'asc' },
         });
         return rows.map((r) => this.mapRow(r));
@@ -29,8 +46,7 @@ class PrismaCellRepository {
         c.name,
         c.leader_id,
         c.address,
-        c.neighborhood,
-        c.city,
+        c.bairro_id,
         c.day_of_week,
         c.time,
         c.max_capacity,
@@ -63,39 +79,61 @@ class PrismaCellRepository {
       ) <= ${radiusKm}
       ORDER BY distance_km ASC
     `;
-        return rows.map((r) => ({
-            id: r.id,
-            name: r.name,
-            leaderId: r.leader_id,
-            address: r.address,
-            neighborhood: r.neighborhood,
-            city: r.city,
-            dayOfWeek: r.day_of_week,
-            time: r.time,
-            maxCapacity: r.max_capacity,
-            currentCount: Number(r.member_count),
-            latitude: r.latitude,
-            longitude: r.longitude,
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-            distanceKm: Number(r.distance_km.toFixed(2)),
-        }));
+        // Fetch bairros for nearby cells in bulk
+        const bairroIds = rows.map((r) => r.bairro_id).filter((id) => id != null);
+        const bairrosMap = new Map();
+        if (bairroIds.length > 0) {
+            const bairros = await this.prisma.bairro.findMany({
+                where: { id: { in: bairroIds } },
+                select: {
+                    id: true, name: true,
+                    cidade: { select: { id: true, name: true, estado: { select: { id: true, name: true, uf: true } } } },
+                },
+            });
+            for (const b of bairros)
+                bairrosMap.set(b.id, b);
+        }
+        return rows.map((r) => {
+            const bairro = r.bairro_id ? (bairrosMap.get(r.bairro_id) ?? null) : null;
+            const loc = deriveLocation(bairro);
+            return {
+                id: r.id,
+                name: r.name,
+                leaderId: r.leader_id,
+                cellTypeId: null,
+                cellTypeName: null,
+                address: r.address,
+                bairroId: r.bairro_id,
+                neighborhood: loc.neighborhood,
+                city: loc.city,
+                state: loc.state,
+                dayOfWeek: r.day_of_week,
+                time: r.time,
+                maxCapacity: r.max_capacity,
+                currentCount: Number(r.member_count),
+                latitude: r.latitude,
+                longitude: r.longitude,
+                createdAt: r.created_at,
+                updatedAt: r.updated_at,
+                distanceKm: Number(r.distance_km.toFixed(2)),
+            };
+        });
     }
     async create(data) {
         const row = await this.prisma.cell.create({
             data: {
                 name: data.name,
                 leaderId: data.leaderId,
+                ...(data.cellTypeId !== undefined && data.cellTypeId !== null ? { cellTypeId: data.cellTypeId } : {}),
                 address: data.address,
-                neighborhood: data.neighborhood,
-                city: data.city,
+                ...(data.bairroId !== undefined && data.bairroId !== null ? { bairroId: data.bairroId } : {}),
                 dayOfWeek: data.dayOfWeek,
                 time: data.time,
                 maxCapacity: data.maxCapacity ?? 20,
                 latitude: data.latitude ?? null,
                 longitude: data.longitude ?? null,
             },
-            include: { leader: { select: { name: true } }, _count: { select: { members: true } } },
+            include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
         });
         return this.mapRow(row);
     }
@@ -105,16 +143,16 @@ class PrismaCellRepository {
             data: {
                 ...(data.name !== undefined && { name: data.name }),
                 ...(data.leaderId !== undefined && { leaderId: data.leaderId }),
+                ...(data.cellTypeId !== undefined && { cellTypeId: data.cellTypeId }),
                 ...(data.address !== undefined && { address: data.address }),
-                ...(data.neighborhood !== undefined && { neighborhood: data.neighborhood }),
-                ...(data.city !== undefined && { city: data.city }),
+                ...(data.bairroId !== undefined && { bairroId: data.bairroId }),
                 ...(data.dayOfWeek !== undefined && { dayOfWeek: data.dayOfWeek }),
                 ...(data.time !== undefined && { time: data.time }),
                 ...(data.maxCapacity !== undefined && { maxCapacity: data.maxCapacity }),
                 ...(data.latitude !== undefined && { latitude: data.latitude }),
                 ...(data.longitude !== undefined && { longitude: data.longitude }),
             },
-            include: { leader: { select: { name: true } }, _count: { select: { members: true } } },
+            include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
         });
         return this.mapRow(row);
     }
@@ -125,21 +163,27 @@ class PrismaCellRepository {
         return this.prisma.cell.count();
     }
     async findByLeaderId(leaderId) {
-        const row = await this.prisma.cell.findFirst({
+        const rows = await this.prisma.cell.findMany({
             where: { leaderId },
-            include: { leader: { select: { name: true } }, _count: { select: { members: true } } },
+            include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
+            orderBy: { name: 'asc' },
         });
-        return row ? this.mapRow(row) : null;
+        return rows.map((r) => this.mapRow(r));
     }
     mapRow(row) {
+        const loc = deriveLocation(row.bairro ?? null);
         return {
             id: row.id,
             name: row.name,
             leaderId: row.leaderId,
-            leaderName: row.leader?.name,
+            ...(row.leader?.name !== undefined && { leaderName: row.leader.name }),
+            cellTypeId: row.cellTypeId ?? null,
+            ...(row.cellType?.name !== undefined && { cellTypeName: row.cellType.name }),
             address: row.address,
-            neighborhood: row.neighborhood,
-            city: row.city,
+            bairroId: row.bairroId,
+            neighborhood: loc.neighborhood,
+            city: loc.city,
+            state: loc.state,
             dayOfWeek: row.dayOfWeek,
             time: row.time,
             maxCapacity: row.maxCapacity,
