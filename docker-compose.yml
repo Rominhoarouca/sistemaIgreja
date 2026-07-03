@@ -6,6 +6,7 @@
 # Flutter PWA:  http://localhost/              (produção)
 # API Health:   http://localhost/health
 # Swagger UI:   http://localhost/docs
+# Landing Page: http://localhost:8080          (landing page pública)
 # PgAdmin:      http://localhost:5050          (apenas profile tools)
 # MinIO:        http://localhost:9001          (console web, sem nginx exposto)
 #
@@ -165,6 +166,18 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # ─── Landing Page ────────────────────────────────────────────────────────
+  landing:
+    build:
+      context: ./landingPage
+      dockerfile: Dockerfile
+    container_name: sistema_igreja_landing
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    networks:
+      - sistema_igreja_net
 
   # ─── PgAdmin (gerenciamento visual do banco) ──────────────────────────────
   # Uso: docker compose --profile tools up pgadmin

@@ -1,0 +1,84 @@
+flowchart LR
+  %% Public (unauthenticated) routes
+  subgraph Public
+    login["Login\nlib/features/auth/presentation/pages/login_page.dart\n/login"]
+    register["Register\nlib/features/auth/presentation/pages/register_page.dart\n/register"]
+    forgot["ForgotPassword\nlib/features/auth/presentation/pages/forgot_password_page.dart\n/forgot-password"]
+    visitor_self["VisitorSelfRegister\nlib/features/visitor/presentation/pages/visitor_self_register_page.dart\n/cadastro"]
+    visitor_register["VisitorRegister\nlib/features/visitor/presentation/pages/visitor_register_page.dart\n/visitor/register"]
+  end
+
+  %% Authenticated homes
+  subgraph Authenticated
+    admin_dashboard["AdminDashboard\nlib/features/dashboard/presentation/pages/admin_dashboard_page.dart\n/admin"]
+    supervisor_home["SupervisorHome\nlib/features/supervisor/presentation/pages/supervisor_home_page.dart\n/supervisor"]
+    leader_home["LeaderHome\nlib/features/leader/presentation/pages/leader_home_page.dart\n/leader"]
+  end
+
+  %% Shared / secondary pages
+  profile["Profile\nlib/features/auth/presentation/pages/profile_page.dart\n/profile"]
+  change_password["ChangePassword\nlib/features/auth/presentation/pages/change_password_page.dart\n/change-password"]
+  notifications["Notifications\nlib/features/notifications/presentation/pages/notifications_page.dart\n/notifications"]
+  about["About\nlib/features/about/presentation/pages/about_page.dart\n/about"]
+  nearby_cells["NearbyCells\nlib/features/cell/presentation/pages/nearby_cells_page.dart\n/visitor/cells?name="]
+
+  admin_materials["AdminMaterials\nlib/features/materials/presentation/pages/admin_materials_page.dart\n/admin/materials"]
+  admin_leaders["AdminLeaders\nlib/features/admin/presentation/pages/admin_leaders_page.dart\n/admin/leaders"]
+  admin_supervisors["AdminSupervisors\nlib/features/admin/presentation/pages/admin_supervisors_page.dart\n/admin/supervisors"]
+  admin_coordenacoes["AdminCoordenacoes\nlib/features/admin/presentation/pages/admin_coordenacoes_page.dart\n/admin/coordenacoes"]
+  admin_location["AdminLocation\nlib/features/admin/presentation/pages/admin_location_page.dart\n/admin/location"]
+  admin_cell_types["AdminCellTypes\nlib/features/admin/presentation/pages/admin_cell_types_page.dart\n/admin/cell-types"]
+  admin_whatsapp["AdminWhatsapp\nlib/features/whatsapp/presentation/pages/admin_whatsapp_page.dart\n/admin/whatsapp"]
+  admin_users_register["AdminUsersRegister\nlib/features/admin/presentation/pages/admin_users_register_page.dart\n/admin/users/register"]
+
+  dashboard_tab["DashboardTab\nlib/features/dashboard/presentation/pages/dashboard_tab.dart"]
+  chart_detail["ChartDetail\nlib/features/dashboard/presentation/pages/chart_detail_page.dart"]
+  leader_selector["LeaderSelector\nlib/features/dashboard/presentation/pages/leader_selector_page.dart"]
+  new_leader_sheet["NewLeaderSheet\nlib/features/dashboard/presentation/pages/new_leader_sheet.dart"]
+  new_cell_sheet["NewCellSheet\nlib/features/dashboard/presentation/pages/new_cell_sheet.dart"]
+  new_visitor_sheet["NewVisitorSheet\nlib/features/dashboard/presentation/pages/new_visitor_sheet.dart"]
+  admin_dashboard_sheets["AdminDashboardSheets\nlib/features/dashboard/presentation/pages/admin_dashboard_sheets.dart"]
+
+  %% Navigation edges
+  login --> register
+  login --> forgot
+  login --> visitor_self
+  login --> visitor_register
+
+  login -->|auth=ADMIN| admin_dashboard
+  login -->|auth=SUPERVISOR| supervisor_home
+  login -->|auth=LEADER| leader_home
+
+  admin_dashboard --> admin_materials
+  admin_dashboard --> admin_leaders
+  admin_dashboard --> admin_supervisors
+  admin_dashboard --> admin_coordenacoes
+  admin_dashboard --> admin_location
+  admin_dashboard --> admin_cell_types
+  admin_dashboard --> admin_whatsapp
+  admin_dashboard --> admin_users_register
+  admin_dashboard --> dashboard_tab
+
+  dashboard_tab --> chart_detail
+  dashboard_tab --> leader_selector
+  dashboard_tab --> new_leader_sheet
+  dashboard_tab --> new_cell_sheet
+  dashboard_tab --> new_visitor_sheet
+  dashboard_tab --> admin_dashboard_sheets
+
+  leader_home --> profile
+  supervisor_home --> profile
+  admin_dashboard --> profile
+
+  profile --> change_password
+  profile --> notifications
+  profile --> about
+
+  visitor_self --> nearby_cells
+  visitor_register --> nearby_cells
+
+  %% Styling hints (optional)
+  classDef public fill:#f9f,stroke:#333,stroke-width:1px;
+  class Public public;
+  class Authenticated fill:#efe,stroke:#333,stroke-width:1px;
+  class Authenticated Authenticated;
