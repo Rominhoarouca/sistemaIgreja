@@ -688,7 +688,7 @@ class _CoordenacaoFormSheetState extends State<_CoordenacaoFormSheet> {
                     color: c,
                     shape: BoxShape.circle,
                     border: selected
-                        ? Border.all(color: AppColors.textPrimary, width: 3)
+                        ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
                         : null,
                   ),
                   child: selected

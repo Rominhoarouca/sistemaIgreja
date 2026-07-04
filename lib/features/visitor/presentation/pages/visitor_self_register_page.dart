@@ -73,8 +73,13 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   // ── Dio (no auth) ──────────────────────────────────────────────────────────
   late final Dio _dio;
 
-  // ── Form ───────────────────────────────────────────────────────────────────
-  final _formKey = GlobalKey<FormState>();
+  // ── Form (wizard de 3 passos) ──────────────────────────────────────────────
+  int _currentStep = 0;
+  final _stepKeys = [
+    GlobalKey<FormState>(),
+    GlobalKey<FormState>(),
+    GlobalKey<FormState>(),
+  ];
 
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -347,7 +352,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   // Future<void> _loadSelectedCellDetails was here
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!(_stepKeys[_currentStep].currentState?.validate() ?? false)) return;
 
     // Extra validation: cell selection when attends
     if (_attendsCell && !_customCellSelected && _selectedCellId == null) {
@@ -418,632 +423,342 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Build
+  // Build — wizard de 3 passos (design_handoff_sistema_igreja)
   // ─────────────────────────────────────────────────────────────────────────
+
+  static const _stepTitles = ['Dados pessoais', 'Endereço', 'Sobre você'];
 
   @override
   Widget build(BuildContext context) {
     if (_success) return _SuccessScreen();
-    if (MediaQuery.of(context).size.width >= 720.0) {
-      return _buildWideLayout(context);
-    }
+    final isWide = MediaQuery.sizeOf(context).width >= 720.0;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          // ── Header ────────────────────────────────────────────────────
-          AppGradientHeader(
-            height: 190,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.pagePaddingH,
-                  vertical: AppSpacing.md,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bem-vindo!',
-                      style: AppTypography.headlineMedium.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Preencha seus dados para se cadastrar\nna nossa comunidade.',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ── Form ──────────────────────────────────────────────────────
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pagePaddingH,
-                vertical: AppSpacing.pagePaddingV,
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionHeader('Dados Pessoais', Icons.person_outline),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Nome
-                    AppTextField(
-                      controller: _nameCtrl,
-                      label: 'Nome completo *',
-                      hint: 'Ex: João da Silva',
-                      prefixIcon: Icons.person_outline,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Campo obrigatório'
-                          : null,
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Telefone
-                    AppTextField(
-                      controller: _phoneCtrl,
-                      label: 'Telefone / WhatsApp *',
-                      hint: '(00) 00000-0000',
-                      prefixIcon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.next,
-                      inputFormatters: [
-                        MaskTextInputFormatter(
-                          mask: '(##) #####-####',
-                          filter: {'#': RegExp(r'[0-9]')},
-                        ),
-                      ],
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) {
-                          return 'Campo obrigatório';
-                        }
-                        final cleaned = v.replaceAll(RegExp(r'\D'), '');
-                        return cleaned.length < 10 ? 'Telefone inválido' : null;
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Data de Nascimento
-                    _DatePickerField(
-                      label: 'Data de Nascimento *',
-                      value: _birthDate,
-                      onTap: _pickBirthDate,
-                      validator: () =>
-                          _birthDate == null ? 'Campo obrigatório' : null,
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Estado Civil (opcional)
-                    _DropdownField<String>(
-                      label: 'Estado Civil (opcional)',
-                      value: _maritalStatus,
-                      hint: 'Selecione',
-                      items: _maritalOptions,
-                      itemLabel: (v) => v,
-                      onChanged: (v) => setState(() => _maritalStatus = v),
-                    ),
-
-                    _divider(),
-                    _sectionHeader('Endereço', Icons.location_on_outlined),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // CEP com auto lookup
-                    Stack(
-                      children: [
-                        AppTextField(
-                          controller: _cepCtrl,
-                          label: 'CEP (auto busca apos 8 digitos)',
-                          hint: '00000-000',
-                          prefixIcon: Icons.location_on_outlined,
-                          suffixIcon: _cepLoading
-                              ? null
-                              : Icons.search_outlined,
-                          keyboardType: TextInputType.number,
-                          textInputAction: TextInputAction.next,
-                          onChanged: _onCepChanged,
-                          inputFormatters: [
-                            MaskTextInputFormatter(
-                              mask: '#####-###',
-                              filter: {'#': RegExp(r'[0-9]')},
-                            ),
-                          ],
-                          enabled: !_cepLoading,
-                        ),
-                        if (_cepLoading)
-                          Positioned(
-                            right: 50,
-                            top: 0,
-                            bottom: 0,
-                            child: Center(
-                              child: Tooltip(
-                                message: 'Buscando CEP...',
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Endereço
-                    AppTextField(
-                      controller: _addressCtrl,
-                      label: 'Logradouro *',
-                      hint: 'Rua, avenida, etc',
-                      prefixIcon: Icons.home_outlined,
-                      textInputAction: TextInputAction.next,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Campo obrigatório'
-                          : null,
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Número e Complemento lado a lado
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: AppTextField(
-                            controller: _numeroCtrl,
-                            label: 'Número *',
-                            hint: 'Ex: 123',
-                            keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.next,
-                            onChanged: _onNumeroChanged,
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Campo obrigatório'
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.base),
-                        Expanded(
-                          flex: 3,
-                          child: AppTextField(
-                            controller: _complementoCtrl,
-                            label: 'Complemento',
-                            hint: 'Apto, bloco, etc',
-                            textInputAction: TextInputAction.next,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.base),
-
-                    AddressSelector(
-                      onChanged: (id) {
-                        setState(() => _bairroId = id);
-                      },
-                      initialEstadoId: _cepEstadoId,
-                      initialCidadeId: _cepCidadeId,
-                      initialBairroId: _cepBairroId,
-                    ),
-
-                    // Removed nearby cells visualization section
-                    _divider(),
-                    _sectionHeader('Sobre Você', Icons.info_outline),
-                    const SizedBox(height: AppSpacing.base),
-
-                    // Deseja participar de célula?
-                    AppCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.home_outlined,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          const Expanded(
-                            child: Text(
-                              'Deseja participar de alguma célula?',
-                              style: AppTypography.bodyMedium,
-                            ),
-                          ),
-                          Switch(
-                            value: _attendsCell,
-                            onChanged: (v) => setState(() {
-                              _attendsCell = v;
-                              if (!v) {
-                                _selectedCellId = null;
-                                _customCellSelected = false;
-                                _customCellCtrl.clear();
-                              }
-                            }),
-                            activeThumbColor: AppColors.primary,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    if (_attendsCell) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      _CellSelector(
-                        cells: _cells,
-                        loading: _cellsLoading,
-                        selectedCellId: _selectedCellId,
-                        customCellSelected: _customCellSelected,
-                        customCellCtrl: _customCellCtrl,
-                        cepLatitude: _cepLatitude,
-                        cepLongitude: _cepLongitude,
-                        selectedCellDetails: _selectedCellDetails,
-                        selectedCellLoading: _selectedCellLoading,
-                        onCellSelected: (id, isCustom) {
-                          setState(() {
-                            _selectedCellId = isCustom ? null : id;
-                            _customCellSelected = isCustom;
-                            if (!isCustom) {
-                              _customCellCtrl.clear();
-                              if (id != null) _loadSelectedCellDetails(id);
-                            } else {
-                              _selectedCellDetails = null;
-                            }
-                          });
-                        },
-                      ),
-                    ],
-
-                    _divider(),
-                    _sectionHeader(
-                      'Como posso ajudar você?',
-                      Icons.favorite_outline,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Selecione todas as opções que se aplicam',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
-                      children: _interestOptions
-                          .map(
-                            (opt) => FilterChip(
-                              label: Text(opt),
-                              selected: _interests.contains(opt),
-                              onSelected: (selected) => setState(() {
-                                if (selected) {
-                                  _interests.add(opt);
-                                } else {
-                                  _interests.remove(opt);
-                                  if (opt == 'Outros') {
-                                    _otherInterestCtrl.clear();
-                                  }
-                                }
-                              }),
-                              selectedColor: AppColors.primary.withValues(
-                                alpha: 0.15,
-                              ),
-                              checkmarkColor: AppColors.primary,
-                              labelStyle: AppTypography.bodySmall.copyWith(
-                                color: _interests.contains(opt)
-                                    ? AppColors.primary
-                                    : AppColors.textPrimary,
-                                fontWeight: _interests.contains(opt)
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    if (_interests.contains('Outros')) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      AppTextField(
-                        controller: _otherInterestCtrl,
-                        label: 'Especifique outros interesses',
-                        hint: 'Descreva brevemente',
-                        maxLines: 2,
-                        prefixIcon: Icons.edit_outlined,
-                      ),
-                    ],
-
-                    const SizedBox(height: AppSpacing.xl2),
-
-                    AppButton(
-                      label: 'Enviar Cadastro',
-                      isLoading: _submitting,
-                      onPressed: _submit,
-                      prefixIcon: Icons.send_outlined,
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Wide layout (tablet / desktop) ──────────────────────────────────────
-  Widget _buildWideLayout(BuildContext context) {
-    final screenH = MediaQuery.of(context).size.height;
-    return Scaffold(
-      backgroundColor: AppColors.primaryDark,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1020),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xl2,
-                vertical: AppSpacing.xl,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                child: Material(
-                  elevation: 12,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: screenH * 0.9),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildBrandingPanel(),
-                        Expanded(
-                          child: ColoredBox(
-                            color: AppColors.background,
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xl2,
-                                vertical: AppSpacing.xl,
-                              ),
-                              child: Form(
-                                key: _formKey,
-                                child: _buildFormContent(wide: true),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(isWide),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isWide
+                        ? AppSpacing.xl2
+                        : AppSpacing.pagePaddingH,
+                    vertical: AppSpacing.lg,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      child: _buildCard(context),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBrandingPanel() {
-    return Container(
-      width: 300,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDark],
-        ),
+  Widget _buildHeader(bool isWide) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pagePaddingH,
+        AppSpacing.lg,
+        AppSpacing.pagePaddingH,
+        AppSpacing.sm,
       ),
-      padding: const EdgeInsets.all(AppSpacing.xl2),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: AppSpacing.md),
           Container(
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              color: AppColors.white.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             ),
-            child: const Icon(Icons.church, color: AppColors.white, size: 30),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              'assets/images/logo.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) =>
+                  const Icon(Icons.church_outlined, color: AppColors.gold),
+            ),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
           Text(
-            'Bem-vindo!',
-            style: AppTypography.headlineMedium.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.w700,
-            ),
+            'Que alegria receber você!',
+            textAlign: TextAlign.center,
+            style: (isWide
+                    ? AppTypography.headlineSmall
+                    : AppTypography.titleLarge)
+                .copyWith(color: AppColors.white),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xs),
           Text(
-            'Preencha seus dados e faça parte da nossa comunidade.',
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.white.withValues(alpha: 0.85),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xl2),
-          ...[
-            ('Cadastro simples e rápido', Icons.flash_on_outlined),
-            ('Sem necessidade de login', Icons.lock_open_outlined),
-            ('Nossa equipe entrará em contato', Icons.support_agent_outlined),
-            ('Fique por dentro dos eventos', Icons.calendar_today_outlined),
-          ].map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Row(
-                children: [
-                  Icon(
-                    item.$2,
-                    color: AppColors.white.withValues(alpha: 0.75),
-                    size: 18,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      item.$1,
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            '\u00a9 ${DateTime.now().year} Sistema Igreja',
+            'Preencha seus dados para se conectar à nossa comunidade.',
+            textAlign: TextAlign.center,
             style: AppTypography.bodySmall.copyWith(
-              color: AppColors.white.withValues(alpha: 0.45),
+              color: AppColors.white.withValues(alpha: .7),
             ),
           ),
+          const SizedBox(height: AppSpacing.base),
+          _buildStepper(isWide),
         ],
       ),
     );
   }
 
-  Widget _buildFormContent({required bool wide}) {
+  /// Stepper de 3 passos — dot dourado ativo; barra de progresso no mobile.
+  Widget _buildStepper(bool isWide) {
+    if (!isWide) {
+      return Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+            child: LinearProgressIndicator(
+              value: (_currentStep + 1) / 3,
+              minHeight: 6,
+              backgroundColor: AppColors.white.withValues(alpha: .15),
+              valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Passo ${_currentStep + 1} de 3 · ${_stepTitles[_currentStep]}',
+            style: AppTypography.labelMedium.copyWith(
+              color: AppColors.white.withValues(alpha: .75),
+            ),
+          ),
+        ],
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < 3; i++) ...[
+          if (i > 0)
+            Container(
+              width: 44,
+              height: 2,
+              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              color: i <= _currentStep
+                  ? AppColors.gold
+                  : AppColors.white.withValues(alpha: .2),
+            ),
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: i <= _currentStep
+                      ? AppColors.gold
+                      : AppColors.white.withValues(alpha: .12),
+                  border: Border.all(
+                    color: i <= _currentStep
+                        ? AppColors.gold
+                        : AppColors.white.withValues(alpha: .3),
+                  ),
+                ),
+                child: i < _currentStep
+                    ? const Icon(Icons.check, size: 14, color: AppColors.navy900)
+                    : Text(
+                        '${i + 1}',
+                        style: AppTypography.labelSmall.copyWith(
+                          color: i <= _currentStep
+                              ? AppColors.navy900
+                              : AppColors.white.withValues(alpha: .7),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                _stepTitles[i],
+                style: AppTypography.labelMedium.copyWith(
+                  color: i == _currentStep
+                      ? AppColors.white
+                      : AppColors.white.withValues(alpha: .55),
+                  fontWeight: i == _currentStep
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCard(BuildContext context) {
+    final steps = [_buildStepPersonal(), _buildStepAddress(), _buildStepAbout()];
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusXl2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.cardPadding),
+        child: Form(
+          key: _stepKeys[_currentStep],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: KeyedSubtree(
+                  key: ValueKey(_currentStep),
+                  child: steps[_currentStep],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Row(
+                children: [
+                  if (_currentStep > 0)
+                    Expanded(
+                      child: SizedBox(
+                        height: AppSpacing.buttonHeightMd,
+                        child: OutlinedButton(
+                          onPressed: _submitting ? null : _previousStep,
+                          child: const Text('Voltar'),
+                        ),
+                      ),
+                    ),
+                  if (_currentStep > 0) const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: AppSpacing.buttonHeightMd,
+                      child: _currentStep < 2
+                          ? FilledButton(
+                              onPressed: _nextStep,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: AppColors.white,
+                                textStyle: AppTypography.buttonLabel,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSpacing.radiusMd,
+                                  ),
+                                ),
+                              ),
+                              child: const Text('Continuar'),
+                            )
+                          : AppButton(
+                              label: 'Concluir',
+                              isLoading: _submitting,
+                              onPressed: _submit,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _nextStep() {
+    if (!(_stepKeys[_currentStep].currentState?.validate() ?? false)) return;
+    if (_currentStep == 0 && _birthDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Informe sua data de nascimento.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    setState(() => _currentStep++);
+  }
+
+  void _previousStep() => setState(() => _currentStep--);
+
+  // ── Passo 1 · Dados pessoais ───────────────────────────────────────────────
+
+  Widget _buildStepPersonal() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader('Dados Pessoais', Icons.person_outline),
         const SizedBox(height: AppSpacing.base),
-        if (wide) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: AppTextField(
-                  controller: _nameCtrl,
-                  label: 'Nome completo *',
-                  hint: 'Ex: João da Silva',
-                  prefixIcon: Icons.person_outline,
-                  textInputAction: TextInputAction.next,
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Campo obrigatório'
-                      : null,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.base),
-              Expanded(
-                flex: 2,
-                child: AppTextField(
-                  controller: _phoneCtrl,
-                  label: 'Telefone / WhatsApp *',
-                  hint: '(00) 00000-0000',
-                  prefixIcon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                  inputFormatters: [
-                    MaskTextInputFormatter(
-                      mask: '(##) #####-####',
-                      filter: {'#': RegExp(r'[0-9]')},
-                    ),
-                  ],
-                  validator: (v) => (v == null || v.trim().length < 8)
-                      ? 'Informe um telefone válido'
-                      : null,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.base),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _DatePickerField(
-                  label: 'Data de Nascimento *',
-                  value: _birthDate,
-                  onTap: _pickBirthDate,
-                  validator: () =>
-                      _birthDate == null ? 'Campo obrigatório' : null,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.base),
-              Expanded(
-                child: _DropdownField<String>(
-                  label: 'Estado Civil (opcional)',
-                  value: _maritalStatus,
-                  hint: 'Selecione',
-                  items: _maritalOptions,
-                  itemLabel: (v) => v,
-                  onChanged: (v) => setState(() => _maritalStatus = v),
-                ),
-              ),
-            ],
-          ),
-        ] else ...[
-          AppTextField(
-            controller: _nameCtrl,
-            label: 'Nome completo *',
-            hint: 'Ex: João da Silva',
-            prefixIcon: Icons.person_outline,
-            textInputAction: TextInputAction.next,
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
-          ),
-          const SizedBox(height: AppSpacing.base),
-          AppTextField(
-            controller: _phoneCtrl,
-            label: 'Telefone / WhatsApp *',
-            hint: '(00) 00000-0000',
-            prefixIcon: Icons.phone_outlined,
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.next,
-            inputFormatters: [
-              MaskTextInputFormatter(
-                mask: '(##) #####-####',
-                filter: {'#': RegExp(r'[0-9]')},
-              ),
-            ],
-            validator: (v) => (v == null || v.trim().length < 8)
-                ? 'Informe um telefone válido'
-                : null,
-          ),
-          const SizedBox(height: AppSpacing.base),
-          _DatePickerField(
-            label: 'Data de Nascimento *',
-            value: _birthDate,
-            onTap: _pickBirthDate,
-            validator: () => _birthDate == null ? 'Campo obrigatório' : null,
-          ),
-          const SizedBox(height: AppSpacing.base),
-          _DropdownField<String>(
-            label: 'Estado Civil (opcional)',
-            value: _maritalStatus,
-            hint: 'Selecione',
-            items: _maritalOptions,
-            itemLabel: (v) => v,
-            onChanged: (v) => setState(() => _maritalStatus = v),
-          ),
-        ],
-        _divider(),
+        AppTextField(
+          controller: _nameCtrl,
+          label: 'Nome completo *',
+          hint: 'Ex: João da Silva',
+          prefixIcon: Icons.person_outline,
+          textInputAction: TextInputAction.next,
+          validator: (v) =>
+              (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
+        ),
+        const SizedBox(height: AppSpacing.fieldGap),
+        AppTextField(
+          controller: _phoneCtrl,
+          label: 'Telefone / WhatsApp *',
+          hint: '(00) 00000-0000',
+          prefixIcon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.next,
+          inputFormatters: [
+            MaskTextInputFormatter(
+              mask: '(##) #####-####',
+              filter: {'#': RegExp(r'[0-9]')},
+            ),
+          ],
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Campo obrigatório';
+            final cleaned = v.replaceAll(RegExp(r'\D'), '');
+            return cleaned.length < 10 ? 'Telefone inválido' : null;
+          },
+        ),
+        const SizedBox(height: AppSpacing.fieldGap),
+        _DatePickerField(
+          label: 'Data de Nascimento *',
+          value: _birthDate,
+          onTap: _pickBirthDate,
+          validator: () => _birthDate == null ? 'Campo obrigatório' : null,
+        ),
+        const SizedBox(height: AppSpacing.fieldGap),
+        _DropdownField<String>(
+          label: 'Estado Civil (opcional)',
+          value: _maritalStatus,
+          hint: 'Selecione',
+          items: _maritalOptions,
+          itemLabel: (v) => v,
+          onChanged: (v) => setState(() => _maritalStatus = v),
+        ),
+      ],
+    );
+  }
+
+  // ── Passo 2 · Endereço ─────────────────────────────────────────────────────
+
+  Widget _buildStepAddress() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         _sectionHeader('Endereço', Icons.location_on_outlined),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Seu endereço nos ajuda a localizar células próximas de você.',
+          style: AppTypography.bodySmall.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
         const SizedBox(height: AppSpacing.base),
-        // CEP com auto lookup
         Stack(
           children: [
             AppTextField(
               controller: _cepCtrl,
-              label: 'CEP (auto busca apos 8 digitos)',
+              label: 'CEP (busca automática)',
               hint: '00000-000',
               prefixIcon: Icons.location_on_outlined,
               suffixIcon: _cepLoading ? null : Icons.search_outlined,
@@ -1059,7 +774,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
               enabled: !_cepLoading,
             ),
             if (_cepLoading)
-              Positioned(
+              const Positioned(
                 right: 50,
                 top: 0,
                 bottom: 0,
@@ -1081,7 +796,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
               ),
           ],
         ),
-        const SizedBox(height: AppSpacing.base),
+        const SizedBox(height: AppSpacing.fieldGap),
         AppTextField(
           controller: _addressCtrl,
           label: 'Logradouro *',
@@ -1091,7 +806,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           validator: (v) =>
               (v == null || v.trim().isEmpty) ? 'Campo obrigatório' : null,
         ),
-        const SizedBox(height: AppSpacing.base),
+        const SizedBox(height: AppSpacing.fieldGap),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1109,7 +824,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                     : null,
               ),
             ),
-            const SizedBox(width: AppSpacing.base),
+            const SizedBox(width: AppSpacing.fieldGap),
             Expanded(
               flex: 3,
               child: AppTextField(
@@ -1121,7 +836,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.base),
+        const SizedBox(height: AppSpacing.fieldGap),
         AddressSelector(
           onChanged: (id) {
             setState(() => _bairroId = id);
@@ -1130,13 +845,20 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           initialCidadeId: _cepCidadeId,
           initialBairroId: _cepBairroId,
         ),
+      ],
+    );
+  }
 
-        // Removed nearby cells visualization section
-        _divider(),
+  // ── Passo 3 · Sobre você ───────────────────────────────────────────────────
+
+  Widget _buildStepAbout() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         _sectionHeader('Sobre Você', Icons.info_outline),
         const SizedBox(height: AppSpacing.base),
         _buildCellSwitch(),
-        if (_attendsCell && !_cellsLoading) ...[
+        if (_attendsCell) ...[
           const SizedBox(height: AppSpacing.sm),
           _CellSelector(
             cells: _cells,
@@ -1163,19 +885,20 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           ),
         ],
         const SizedBox(height: AppSpacing.base),
-        _divider(),
+        const Divider(),
+        const SizedBox(height: AppSpacing.base),
         _sectionHeader('Como posso ajudar você?', Icons.favorite_outline),
         const SizedBox(height: AppSpacing.xs),
         Text(
           'Selecione todas as opções que se aplicam',
           style: AppTypography.bodySmall.copyWith(
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
           children: _interestOptions
               .map(
                 (opt) => FilterChip(
@@ -1189,12 +912,17 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                       if (opt == 'Outros') _otherInterestCtrl.clear();
                     }
                   }),
-                  selectedColor: AppColors.primary.withValues(alpha: 0.15),
-                  checkmarkColor: AppColors.primary,
+                  showCheckmark: false,
+                  side: BorderSide(
+                    color: _interests.contains(opt)
+                        ? AppColors.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
+                    width: _interests.contains(opt) ? 1.5 : 1,
+                  ),
                   labelStyle: AppTypography.bodySmall.copyWith(
                     color: _interests.contains(opt)
                         ? AppColors.primary
-                        : AppColors.textPrimary,
+                        : Theme.of(context).colorScheme.onSurface,
                     fontWeight: _interests.contains(opt)
                         ? FontWeight.w600
                         : FontWeight.normal,
@@ -1213,14 +941,6 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
             prefixIcon: Icons.edit_outlined,
           ),
         ],
-        const SizedBox(height: AppSpacing.xl2),
-        AppButton(
-          label: 'Enviar Cadastro',
-          isLoading: _submitting,
-          onPressed: _submit,
-          prefixIcon: Icons.send_outlined,
-        ),
-        const SizedBox(height: AppSpacing.xl),
       ],
     );
   }
@@ -1235,7 +955,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
         children: [
           const Icon(Icons.home_outlined, color: AppColors.primary),
           const SizedBox(width: AppSpacing.sm),
-          const Expanded(
+          Expanded(
             child: Text(
               'Deseja participar de alguma célula?',
               style: AppTypography.bodyMedium,
@@ -1262,16 +982,11 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
     return Row(
       children: [
         Icon(icon, size: 18, color: AppColors.primary),
-        const SizedBox(width: AppSpacing.xs),
+        const SizedBox(width: AppSpacing.sm),
         Text(title, style: AppTypography.titleMedium),
       ],
     );
   }
-
-  Widget _divider() => const Padding(
-    padding: EdgeInsets.symmetric(vertical: AppSpacing.base),
-    child: Divider(),
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1840,7 +1555,7 @@ class _SuccessScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: Padding(

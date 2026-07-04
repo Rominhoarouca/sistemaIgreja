@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../colors/app_colors.dart';
 import '../../shadows/app_shadows.dart';
 import '../../spacing/app_spacing.dart';
+import '../../typography/app_typography.dart';
 
 /// Design System — Surface Card (base container)
 class AppCard extends StatelessWidget {
@@ -65,7 +66,8 @@ class AppCard extends StatelessWidget {
 
 enum AppCardElevation { none, flat, raised, floating }
 
-/// Stat Card — used in Dashboard
+/// Stat Card (KPI) — used in Dashboard.
+/// Valor em Sora 30px (26px em telas estreitas) + delta pill opcional.
 class StatCard extends StatelessWidget {
   const StatCard({
     super.key,
@@ -74,17 +76,23 @@ class StatCard extends StatelessWidget {
     required this.icon,
     this.color = AppColors.primary,
     this.subtitle,
+    this.deltaPositive = true,
   });
 
   final String label;
   final String value;
   final IconData icon;
   final Color color;
+
+  /// Delta exibido como pill (ex.: "+12%"). Verde quando [deltaPositive].
   final String? subtitle;
+  final bool deltaPositive;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final compact = MediaQuery.sizeOf(context).width < 1024;
 
     return AppCard(
       child: Column(
@@ -97,33 +105,64 @@ class StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  color: isDark ? AppColors.chipDark : AppColors.chip,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
-                child: Icon(icon, color: color, size: AppSpacing.iconMd),
+                child: Icon(
+                  icon,
+                  color: isDark ? AppColors.linkDark : color,
+                  size: AppSpacing.iconSm,
+                ),
               ),
               if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.w600,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: deltaPositive
+                        ? (isDark
+                              ? AppColors.successDarkBg
+                              : AppColors.successLight)
+                        : (isDark
+                              ? AppColors.errorDarkBg
+                              : AppColors.errorLight),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+                  ),
+                  child: Text(
+                    subtitle!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: deltaPositive
+                          ? (isDark
+                                ? AppColors.successDarkFg
+                                : AppColors.success)
+                          : (isDark ? AppColors.errorDarkFg : AppColors.error),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style:
+                  (compact
+                          ? AppTypography.kpiValueMobile
+                          : AppTypography.kpiValue)
+                      .copyWith(color: theme.colorScheme.onSurface),
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

@@ -6,6 +6,7 @@ export 'typography/app_typography.dart';
 export 'spacing/app_spacing.dart';
 export 'shadows/app_shadows.dart';
 export 'theme/app_theme.dart';
+export 'theme/theme_controller.dart';
 export 'components/buttons/app_button.dart';
 export 'components/cards/app_card.dart';
 export 'components/inputs/app_text_field.dart';

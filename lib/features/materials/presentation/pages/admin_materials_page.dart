@@ -343,7 +343,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
           ),
         ],
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -534,7 +534,7 @@ class _MaterialTargetsPage extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
         child: Column(

@@ -18,7 +18,8 @@
     "lint": "eslint src tests --ext .ts",
     "type-check": "tsc --noEmit",
     "publishAPI": "cd .. && bash scripts/publish_api.sh",
-    "publishAPP": "cd .. && bash scripts/publish_app.sh"
+    "publishAPP": "cd .. && bash scripts/publish_app.sh",
+    "publishLanding": "cd .. && bash scripts/publish_landing.sh"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

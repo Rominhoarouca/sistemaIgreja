@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../design_system/design_system.dart';
 import '../widgets/detail_row.dart';
 import '../widgets/visitor_widgets.dart';
 
 /// SRP: responsável apenas por exibir os detalhes completos de um visitante.
 class VisitorDetailsSheet extends StatelessWidget {
-  const VisitorDetailsSheet({super.key, required this.visitor});
+  const VisitorDetailsSheet({
+    super.key,
+    required this.visitor,
+    this.panel = false,
+  });
 
   final Map<String, dynamic> visitor;
+
+  /// Quando true, renderiza como painel lateral fixo (desktop) em vez de
+  /// bottom-sheet arrastável.
+  final bool panel;
 
   static String _textOrDash(Object? v) {
     final value = (v ?? '').toString().trim();
@@ -61,29 +70,9 @@ class VisitorDetailsSheet extends StatelessWidget {
       return 'há ${(diff.inDays / 7).round()} sem.';
     }
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, controller) => SingleChildScrollView(
-        controller: controller,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.grey300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
               Row(
                 children: [
                   AppAvatar(
@@ -250,11 +239,72 @@ class VisitorDetailsSheet extends StatelessWidget {
                   VisitorStatusChip(label: 'Inativo'),
                 ],
               ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // ── Ações ───────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: AppSpacing.buttonHeightMd,
+                child: FilledButton.icon(
+                  onPressed: () => _openWhatsApp(visitor['phone'] as String?),
+                  icon: const Icon(Icons.chat_outlined, size: 18),
+                  label: const Text('Enviar WhatsApp'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.whatsapp,
+                    foregroundColor: AppColors.white,
+                    textStyle: AppTypography.buttonLabel,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: AppSpacing.base),
             ],
-          ),
+          );
+
+    if (panel) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        child: content,
+      );
+    }
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, controller) => SingleChildScrollView(
+        controller: controller,
+        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        child: Column(
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.grey300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            content,
+          ],
         ),
       ),
+    );
+  }
+
+  static Future<void> _openWhatsApp(String? phone) async {
+    final digits = (phone ?? '').replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+    final normalized = digits.startsWith('55') ? digits : '55$digits';
+    await launchUrl(
+      Uri.parse('https://wa.me/$normalized'),
+      mode: LaunchMode.externalApplication,
     );
   }
 }

@@ -20,6 +20,9 @@ import '../widgets/visitor_widgets.dart';
 import 'chart_detail_page.dart';
 import 'admin_dashboard_sheets.dart';
 import 'dashboard_tab.dart';
+import 'more_menu_tab.dart';
+import '../widgets/admin_scaffold.dart';
+import '../../../../core/constants/app_constants.dart';
 
 // Alias para retrocompatibilidade com código legado no arquivo
 void _showTopSnackBar(
@@ -29,49 +32,83 @@ void _showTopSnackBar(
 }) => showDashboardSnackBar(context, message, backgroundColor: backgroundColor);
 
 /// Admin Dashboard — RF12
-/// Multi-tab interface: Dashboard, Visitantes, Células, Relatórios
-/// OCP: cada tab é aberta para extensão (nova tab = novo widget) sem modificar este arquivo.
+/// Multi-tab interface: Início, Visitantes, Células, Relatórios (+ Mais no mobile).
+/// No desktop o shell (sidebar navy) é provido por [AdminScaffold] via router.
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({super.key});
+  const AdminDashboardPage({super.key, this.initialTab = 0});
+
+  /// Aba inicial (vinda da query `?tab=` — usada pela sidebar desktop).
+  final int initialTab;
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  int _selectedIndex = 0;
+  late int _selectedIndex = widget.initialTab.clamp(0, 4);
 
   static const _tabTitles = [
-    'Dashboard',
+    'Visão geral',
     'Visitantes',
     'Células',
     'Relatórios',
+    'Mais',
   ];
+
+  void _switchTab(int i) {
+    if (AdminScaffold.isDesktop(context)) {
+      // Mantém a URL em sincronia com a sidebar.
+      context.go('${AppRoutes.adminDashboard}?tab=$i');
+    } else {
+      setState(() => _selectedIndex = i);
+    }
+  }
+
+  void _openNewVisitor() async {
+    final dio = DioClient(AuthStorage()).dio;
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => NewVisitorSheet(dio: dio),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 720;
+    final isDesktop = AdminScaffold.isDesktop(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final appBar = AppBar(
-      backgroundColor: AppColors.primary,
-      foregroundColor: AppColors.white,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _tabTitles[_selectedIndex],
-            style: AppTypography.titleLarge.copyWith(color: AppColors.white),
-          ),
-          if (_selectedIndex == 0)
-            Text(
-              'Visão geral da integração',
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.white.withValues(alpha: 0.75),
+      automaticallyImplyLeading: false,
+      title: Text(_tabTitles[_selectedIndex]),
+      actions: [
+        if (isDesktop && _selectedIndex != 4) ...[
+          SizedBox(
+            height: 42,
+            child: FilledButton.icon(
+              onPressed: _openNewVisitor,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Novo visitante'),
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: AppColors.white,
+                textStyle: AppTypography.buttonLabel,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
               ),
             ),
+          ),
+          const SizedBox(width: AppSpacing.md),
         ],
-      ),
-      actions: [
+        IconButton(
+          tooltip: isDark ? 'Modo claro' : 'Modo escuro',
+          icon: Icon(
+            isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+          ),
+          onPressed: () => ThemeController.instance.toggle(context),
+        ),
         IconButton(
           icon: const Icon(Icons.notifications_outlined),
           onPressed: () => context.push('/notifications'),
@@ -80,56 +117,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           icon: const Icon(Icons.account_circle_outlined),
           onPressed: () => context.push('/profile'),
         ),
+        const SizedBox(width: AppSpacing.sm),
       ],
     );
 
     final tabContent = IndexedStack(
       index: _selectedIndex,
       children: [
-        DashboardTab(onSwitchTab: (i) => setState(() => _selectedIndex = i)),
+        DashboardTab(onSwitchTab: _switchTab),
         const _VisitorsAdminTab(),
         const _CellsAdminTab(),
         const _ReportsTab(),
+        const MoreMenuTab(),
       ],
     );
 
-    if (isWide) {
-      return Scaffold(
-        appBar: appBar,
-        body: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-              labelType: NavigationRailLabelType.all,
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
-                  label: Text('Dashboard'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.people_outline),
-                  selectedIcon: Icon(Icons.people),
-                  label: Text('Visitantes'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.groups_2_outlined),
-                  selectedIcon: Icon(Icons.groups_2),
-                  label: Text('Células'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.description_outlined),
-                  selectedIcon: Icon(Icons.description),
-                  label: Text('Relatórios'),
-                ),
-              ],
-            ),
-            const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: tabContent),
-          ],
-        ),
-      );
+    if (isDesktop) {
+      // Sidebar fica no AdminScaffold; aqui só topbar + conteúdo.
+      return Scaffold(appBar: appBar, body: tabContent);
     }
 
     return Scaffold(
@@ -140,9 +145,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'Início',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
@@ -155,9 +160,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             label: 'Células',
           ),
           NavigationDestination(
-            icon: Icon(Icons.description_outlined),
-            selectedIcon: Icon(Icons.description),
+            icon: Icon(Icons.insert_chart_outlined_rounded),
+            selectedIcon: Icon(Icons.insert_chart_rounded),
             label: 'Relatórios',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.more_horiz),
+            selectedIcon: Icon(Icons.more_horiz),
+            label: 'Mais',
           ),
         ],
       ),
@@ -186,6 +196,16 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
   bool? _isBaptized;
   bool? _frequentacelula;
   String? _selectedAgeRange;
+  String? _statusFilter;
+  Map<String, dynamic>? _selectedVisitor; // painel de detalhe (desktop)
+
+  static const _statusFilters = [
+    (null, 'Todos'),
+    (AppConstants.statusNew, 'Novo'),
+    (AppConstants.statusFollowing, 'Em acompanhamento'),
+    (AppConstants.statusIntegrated, 'Integrado'),
+    (AppConstants.statusInactive, 'Não retornou'),
+  ];
 
   static const _ageRanges = [
     '18-25',
@@ -263,6 +283,13 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
           .toList();
     }
 
+    // Filtro por status (pills)
+    if (_statusFilter != null) {
+      filtered = filtered
+          .where((v) => (v['status'] as String? ?? 'novo') == _statusFilter)
+          .toList();
+    }
+
     // Filtro por bairro
     if (_selectedBairroId != null) {
       filtered = filtered
@@ -337,7 +364,10 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1024;
+    final theme = Theme.of(context);
+
+    final list = Stack(
       children: [
         _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -379,7 +409,27 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                       controller: _searchCtrl,
                       onChanged: (v) => setState(() => _query = v),
                     ),
-                    const SizedBox(height: AppSpacing.base),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // ── Filtros pill por status ─────────────────
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final (value, label) in _statusFilters) ...[
+                            FilterChip(
+                              label: Text(label),
+                              selected: _statusFilter == value,
+                              showCheckmark: false,
+                              onSelected: (_) =>
+                                  setState(() => _statusFilter = value),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
 
                     // ── Filters ─────────────────────────────────
                     SingleChildScrollView(
@@ -571,15 +621,65 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                   ],
                 ),
               ),
-        Positioned(
-          bottom: AppSpacing.xl,
-          right: AppSpacing.pagePaddingH,
-          child: FloatingActionButton.extended(
-            onPressed: _openNewVisitorSheet,
-            icon: const Icon(Icons.person_add_outlined),
-            label: const Text('Novo Visitante'),
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.white,
+        if (!isDesktop)
+          Positioned(
+            bottom: AppSpacing.xl,
+            right: AppSpacing.pagePaddingH,
+            child: FloatingActionButton.extended(
+              onPressed: _openNewVisitorSheet,
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Novo Visitante'),
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+            ),
+          ),
+      ],
+    );
+
+    if (!isDesktop || _selectedVisitor == null) return list;
+
+    // Desktop: lista + painel de detalhe fixo à direita (340px).
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: list),
+        Container(
+          width: AppSpacing.detailPanelWidth,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(
+              left: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.base,
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Text('Detalhes', style: AppTypography.titleSmall),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'Fechar',
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () =>
+                          setState(() => _selectedVisitor = null),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: VisitorDetailsSheet(
+                  visitor: _selectedVisitor!,
+                  panel: true,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -596,12 +696,18 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
   }
 
   Future<void> _openVisitorDetails(String visitorId) async {
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1024;
     try {
       final resp = await _dio.get('/visitors/$visitorId');
       final visitor =
           (resp.data as Map<String, dynamic>)['visitor']
               as Map<String, dynamic>;
       if (!mounted) return;
+      if (isDesktop) {
+        // Painel de detalhe fixo à direita (340px).
+        setState(() => _selectedVisitor = visitor);
+        return;
+      }
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -1388,7 +1494,7 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
           ),
         ],
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
         children: [

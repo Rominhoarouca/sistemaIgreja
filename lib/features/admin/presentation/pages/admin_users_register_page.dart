@@ -487,7 +487,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textOnPrimary,
@@ -780,7 +780,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                                 Text(
                                   'Coordenação',
                                   style: AppTypography.titleSmall.copyWith(
-                                    color: AppColors.textPrimary,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -828,7 +828,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                                 Text(
                                   'Coordenação',
                                   style: AppTypography.titleSmall.copyWith(
-                                    color: AppColors.textPrimary,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -917,7 +917,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     title,
     style: AppTypography.titleSmall.copyWith(
-      color: AppColors.textPrimary,
+      color: Theme.of(context).colorScheme.onSurface,
       fontWeight: FontWeight.w600,
     ),
   );

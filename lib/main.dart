@@ -32,6 +32,8 @@ Future<void> main() async {
 
   await runZonedGuarded(
     () async {
+      await ThemeController.instance.load();
+
       try {
         await setupInjection();
       } catch (e, st) {
@@ -70,14 +72,17 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
   Widget build(BuildContext context) {
     return BlocProvider<AuthBloc>.value(
       value: _authBloc,
-      child: MaterialApp.router(
-        title: 'Sistema Igreja',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.system,
-        routerConfig: _router,
-        scaffoldMessengerKey: scaffoldMessengerKey,
+      child: ListenableBuilder(
+        listenable: ThemeController.instance,
+        builder: (context, _) => MaterialApp.router(
+          title: 'Sistema Igreja',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeController.instance.mode,
+          routerConfig: _router,
+          scaffoldMessengerKey: scaffoldMessengerKey,
+        ),
       ),
     );
   }

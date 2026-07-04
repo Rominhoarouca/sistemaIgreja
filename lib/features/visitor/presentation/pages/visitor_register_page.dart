@@ -35,7 +35,7 @@ class _VisitorRegisterPageState extends State<VisitorRegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // ── Gradient header ────────────────────────────────────────────

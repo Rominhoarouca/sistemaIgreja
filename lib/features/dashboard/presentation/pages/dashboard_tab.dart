@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
@@ -11,6 +10,7 @@ import '../../domain/services/i_dashboard_service.dart';
 import '../widgets/integration_line_chart.dart';
 import 'chart_detail_page.dart';
 import 'admin_dashboard_sheets.dart';
+import '../widgets/visitor_widgets.dart';
 
 /// SRP: responsável apenas por exibir a aba de overview do dashboard.
 /// DIP: depende de IDashboardService, não de Dio diretamente.
@@ -30,6 +30,7 @@ class _DashboardTabState extends State<DashboardTab> {
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _months = [];
   List<Map<String, dynamic>> _cells = [];
+  List<Map<String, dynamic>> _recentVisitors = [];
 
   @override
   void initState() {
@@ -44,10 +45,12 @@ class _DashboardTabState extends State<DashboardTab> {
       _error = null;
     });
     try {
+      final dio = DioClient(AuthStorage()).dio;
       final results = await Future.wait([
         _dashboardService.getStats(),
         _dashboardService.getMonthlyStats(),
-        DioClient(AuthStorage()).dio.get('/cells'),
+        dio.get('/cells'),
+        dio.get('/visitors'),
       ]);
       if (!mounted) return;
       setState(() {
@@ -56,6 +59,12 @@ class _DashboardTabState extends State<DashboardTab> {
         final resp = results[2] as Response<dynamic>;
         _cells = ((resp.data as Map<String, dynamic>)['cells'] as List)
             .cast<Map<String, dynamic>>();
+        final visitorsResp = results[3] as Response<dynamic>;
+        _recentVisitors =
+            ((visitorsResp.data as Map<String, dynamic>)['data'] as List)
+                .cast<Map<String, dynamic>>()
+                .take(5)
+                .toList();
         _loading = false;
       });
     } on ServiceException catch (e) {
@@ -125,18 +134,22 @@ class _DashboardTabState extends State<DashboardTab> {
     final integrated = _stats['integratedVisitors'] as int? ?? 0;
     final avgAttendance = _stats['averageAttendanceRate'] as num? ?? 0;
 
+    final isDesktop = MediaQuery.sizeOf(context).width >= 1024;
+
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+        padding: EdgeInsets.all(
+          isDesktop ? AppSpacing.pagePaddingV : AppSpacing.pagePaddingH,
+        ),
         children: [
           GridView.custom(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppSpacing.sm,
-              mainAxisSpacing: AppSpacing.sm,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: isDesktop ? 4 : 2,
+              crossAxisSpacing: AppSpacing.base,
+              mainAxisSpacing: AppSpacing.base,
               mainAxisExtent: 148,
             ),
             childrenDelegate: SliverChildListDelegate([
@@ -167,6 +180,31 @@ class _DashboardTabState extends State<DashboardTab> {
             ]),
           ),
           const SizedBox(height: AppSpacing.xl),
+          AppSectionHeader(
+            title: 'Visitantes recentes',
+            actionLabel: 'Ver todos',
+            onAction: () => widget.onSwitchTab(1),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (_recentVisitors.isEmpty)
+            AppCard(
+              child: Text(
+                'Nenhum visitante cadastrado ainda.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ..._recentVisitors.map(
+              (v) => VisitorAdminTile(
+                name: (v['name'] as String?) ?? '—',
+                status: (v['status'] as String?) ?? AppConstants.statusNew,
+                time: (v['cellName'] as String?) ?? 'Sem célula',
+                onTap: () => widget.onSwitchTab(1),
+              ),
+            ),
+          const SizedBox(height: AppSpacing.base),
           AppSectionHeader(
             title: 'Crescimento de Integração',
             actionLabel: 'Ver relatório',
@@ -291,120 +329,15 @@ class _DashboardTabState extends State<DashboardTab> {
               ),
             ],
           ),
-          ..._buildQuickActionTiles(context),
           const SizedBox(height: AppSpacing.xl2),
         ],
       ),
     );
   }
 
-  List<Widget> _buildQuickActionTiles(BuildContext context) => [
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.folder_outlined,
-      iconColor: AppColors.primary,
-      title: 'Gerenciar Materiais',
-      subtitle: 'Enviar e organizar materiais para líderes',
-      onTap: () => context.push('/admin/materials'),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.people_outlined,
-      iconColor: AppColors.primary,
-      title: 'Líderes',
-      subtitle: 'Visualizar líderes, células e frequências',
-      onTap: () => context.push(AppRoutes.adminLeaders),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.manage_accounts_outlined,
-      iconColor: AppColors.secondary,
-      title: 'Supervisores',
-      subtitle: 'Gerenciar supervisores e seus líderes',
-      onTap: () => context.push(AppRoutes.adminSupervisors),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.account_tree_outlined,
-      iconColor: AppColors.accent,
-      title: 'Coordenações',
-      subtitle: 'Criar e gerenciar coordenações',
-      onTap: () => context.push(AppRoutes.adminCoordenacoes),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.location_city_outlined,
-      iconColor: Colors.teal,
-      title: 'Cidades e Bairros',
-      subtitle: 'Gerenciar localidades',
-      onTap: () => context.push(AppRoutes.adminLocation),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.category_outlined,
-      iconColor: Colors.deepPurple,
-      title: 'Tipos de Célula',
-      subtitle: 'Criar e gerenciar tipos de célula',
-      onTap: () => context.push(AppRoutes.adminCellTypes),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.chat_outlined,
-      iconColor: Color(0xFF25D366),
-      title: 'WhatsApp',
-      subtitle: 'Enviar mensagens em lote ou individual',
-      onTap: () => context.push(AppRoutes.adminWhatsapp),
-    ),
-    const SizedBox(height: AppSpacing.sm),
-    _QuickActionTile(
-      icon: Icons.person_add_outlined,
-      iconColor: Colors.indigo,
-      title: 'Novo Cadastro',
-      subtitle: 'Líderes, Supervisores e Coordenadores',
-      onTap: () => context.push(AppRoutes.adminUsersRegister),
-    ),
-  ];
 }
 
 // ── Private widgets ──────────────────────────────────────────────────────────
-
-class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppSpacing.sm),
-          ),
-          child: Icon(icon, color: iconColor),
-        ),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.grey400),
-        onTap: onTap,
-      ),
-    );
-  }
-}
 
 class _DashboardCellRow extends StatelessWidget {
   const _DashboardCellRow({

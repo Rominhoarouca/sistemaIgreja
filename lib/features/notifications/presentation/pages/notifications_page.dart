@@ -80,7 +80,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ),
         ],
       ),
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _notifications.isEmpty
           ? _EmptyState()
           : ListView.separated(

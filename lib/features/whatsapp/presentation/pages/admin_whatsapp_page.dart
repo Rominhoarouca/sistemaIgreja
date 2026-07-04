@@ -105,6 +105,10 @@ class _AdminWhatsappPageState extends State<AdminWhatsappPage>
   late final TabController _tabController;
   late final Dio _dio;
 
+  /// Template escolhido via "Usar" na aba Templates — consumido pela aba
+  /// de envio.
+  final _templateToUse = ValueNotifier<_MessageTemplate?>(null);
+
   @override
   void initState() {
     super.initState();
@@ -115,49 +119,44 @@ class _AdminWhatsappPageState extends State<AdminWhatsappPage>
   @override
   void dispose() {
     _tabController.dispose();
+    _templateToUse.dispose();
     super.dispose();
+  }
+
+  void _useTemplate(_MessageTemplate t) {
+    _templateToUse.value = t;
+    _tabController.animateTo(0);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textOnPrimary,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'WhatsApp',
-              style: AppTypography.titleLarge.copyWith(
-                color: AppColors.textOnPrimary,
-              ),
-            ),
+            const Text('WhatsApp'),
             Text(
               'Mensagens em lote e individuais',
               style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textOnPrimary.withValues(alpha: 0.75),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
         ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(icon: Icon(Icons.description_outlined), text: 'Templates'),
             Tab(icon: Icon(Icons.send_outlined), text: 'Enviar'),
+            Tab(icon: Icon(Icons.description_outlined), text: 'Templates'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _TemplatesTab(dio: _dio),
-          _SendTab(dio: _dio),
+          _SendTab(dio: _dio, templateToUse: _templateToUse),
+          _TemplatesTab(dio: _dio, onUse: _useTemplate),
         ],
       ),
     );
@@ -169,9 +168,12 @@ class _AdminWhatsappPageState extends State<AdminWhatsappPage>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _TemplatesTab extends StatefulWidget {
-  const _TemplatesTab({required this.dio});
+  const _TemplatesTab({required this.dio, required this.onUse});
 
   final Dio dio;
+
+  /// Chamado quando o usuário toca em "Usar" — leva o template ao composer.
+  final void Function(_MessageTemplate) onUse;
 
   @override
   State<_TemplatesTab> createState() => _TemplatesTabState();
@@ -267,7 +269,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(),
         backgroundColor: AppColors.primary,
@@ -295,6 +297,7 @@ class _TemplatesTabState extends State<_TemplatesTab> {
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
               itemBuilder: (_, i) => _TemplateCard(
                 template: _templates[i],
+                onUse: () => widget.onUse(_templates[i]),
                 onEdit: () => _openForm(template: _templates[i]),
                 onDelete: () => _deleteTemplate(_templates[i]),
               ),
@@ -310,11 +313,13 @@ class _TemplatesTabState extends State<_TemplatesTab> {
 class _TemplateCard extends StatelessWidget {
   const _TemplateCard({
     required this.template,
+    required this.onUse,
     required this.onEdit,
     required this.onDelete,
   });
 
   final _MessageTemplate template;
+  final VoidCallback onUse;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -322,7 +327,7 @@ class _TemplateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(color: AppColors.divider),
       ),
@@ -354,6 +359,14 @@ class _TemplateCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+                  TextButton.icon(
+                    onPressed: onUse,
+                    icon: const Icon(Icons.send_outlined, size: 16),
+                    label: const Text('Usar'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 20),
                     color: AppColors.grey500,
@@ -374,7 +387,7 @@ class _TemplateCard extends StatelessWidget {
               Text(
                 template.name,
                 style: AppTypography.titleMedium.copyWith(
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
@@ -441,7 +454,6 @@ class _TemplateFormSheetState extends State<_TemplateFormSheet> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _bodyCtrl;
   late String _category;
-  bool _showPreview = false;
 
   @override
   void initState() {
@@ -500,9 +512,9 @@ class _TemplateFormSheetState extends State<_TemplateFormSheet> {
       maxChildSize: 0.95,
       expand: false,
       builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(
             top: Radius.circular(AppSpacing.radiusXl),
           ),
         ),
@@ -537,16 +549,10 @@ class _TemplateFormSheetState extends State<_TemplateFormSheet> {
                     style: AppTypography.titleLarge,
                   ),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: () =>
-                        setState(() => _showPreview = !_showPreview),
-                    icon: Icon(
-                      _showPreview
-                          ? Icons.edit_outlined
-                          : Icons.visibility_outlined,
-                      size: 18,
-                    ),
-                    label: Text(_showPreview ? 'Editar' : 'Preview'),
+                  IconButton(
+                    tooltip: 'Fechar',
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
@@ -627,31 +633,33 @@ class _TemplateFormSheetState extends State<_TemplateFormSheet> {
                             .toList(),
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      // Body or preview
-                      if (_showPreview)
+                      // Mensagem + preview ao vivo
+                      TextFormField(
+                        controller: _bodyCtrl,
+                        maxLines: 8,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          labelText: 'Mensagem',
+                          hintText:
+                              'Olá {nome}, você está convidado para nossa célula {celula}...',
+                          alignLabelWithHint: true,
+                          prefixIcon: Padding(
+                            padding: EdgeInsets.only(bottom: 112),
+                            child: Icon(Icons.chat_outlined),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Informe a mensagem'
+                            : null,
+                      ),
+                      if (_bodyCtrl.text.trim().isNotEmpty) ...[
+                        const SizedBox(height: AppSpacing.base),
                         _MessagePreviewBubble(
                           message: _bodyCtrl.text,
                           sampleName: 'João Silva',
                           sampleCelula: 'Célula Esperança',
-                        )
-                      else
-                        TextFormField(
-                          controller: _bodyCtrl,
-                          maxLines: 8,
-                          decoration: const InputDecoration(
-                            labelText: 'Mensagem',
-                            hintText:
-                                'Olá {nome}, você está convidado para nossa célula {celula}...',
-                            alignLabelWithHint: true,
-                            prefixIcon: Padding(
-                              padding: EdgeInsets.only(bottom: 112),
-                              child: Icon(Icons.chat_outlined),
-                            ),
-                          ),
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Informe a mensagem'
-                              : null,
                         ),
+                      ],
                       const SizedBox(height: AppSpacing.xl),
                       SizedBox(
                         width: double.infinity,
@@ -688,9 +696,12 @@ enum _SendStep { selectRecipients, composeMessage, confirm }
 enum _SendMode { batch, individual }
 
 class _SendTab extends StatefulWidget {
-  const _SendTab({required this.dio});
+  const _SendTab({required this.dio, required this.templateToUse});
 
   final Dio dio;
+
+  /// Template vindo da aba Templates via "Usar".
+  final ValueNotifier<_MessageTemplate?> templateToUse;
 
   @override
   State<_SendTab> createState() => _SendTabState();
@@ -751,13 +762,31 @@ class _SendTabState extends State<_SendTab> {
     super.initState();
     _loadRecipients();
     _loadTemplates();
+    widget.templateToUse.addListener(_applyIncomingTemplate);
   }
 
   @override
   void dispose() {
+    widget.templateToUse.removeListener(_applyIncomingTemplate);
     _customMsgCtrl.dispose();
     _individualMsgCtrl.dispose();
     super.dispose();
+  }
+
+  /// Aplica template escolhido via "Usar" na aba Templates ao composer.
+  void _applyIncomingTemplate() {
+    final t = widget.templateToUse.value;
+    if (t == null) return;
+    setState(() {
+      _useTemplate = true;
+      _selectedTemplate = t;
+      _customMsgCtrl.text = t.body;
+      _individualUseTemplate = true;
+      _individualSelectedTemplate = t;
+      _individualMsgCtrl.text = t.body;
+    });
+    _loadTemplates();
+    widget.templateToUse.value = null;
   }
 
   Future<void> _loadTemplates() async {
@@ -939,7 +968,7 @@ class _SendTabState extends State<_SendTab> {
       children: [
         // Mode selector
         Container(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           padding: const EdgeInsets.all(AppSpacing.sm),
           child: Row(
             children: [
@@ -1169,7 +1198,7 @@ class _SendTabState extends State<_SendTab> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    const Text(
+                    Text(
                       'Abrindo WhatsApp…',
                       style: AppTypography.bodySmall,
                     ),
@@ -1252,7 +1281,7 @@ class _SendTabState extends State<_SendTab> {
       children: [
         // Filters bar
         Container(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.base,
             AppSpacing.sm,
@@ -1773,7 +1802,7 @@ class _StepIndicator extends StatelessWidget {
     final currentIdx = _SendStep.values.indexOf(current);
 
     return Container(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.base,
         vertical: AppSpacing.sm,
@@ -2036,7 +2065,7 @@ class _SectionHeader extends StatelessWidget {
       Text(
         title,
         style: AppTypography.titleSmall.copyWith(
-          color: AppColors.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -2087,7 +2116,7 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       padding: EdgeInsets.fromLTRB(
         AppSpacing.base,
         AppSpacing.sm,

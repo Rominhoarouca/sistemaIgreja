@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+body{margin:0;background:#EEF0F4;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+input::placeholder{color:var(--muted,#98A2B3)}
+input:focus{outline:none;border-color:var(--link,#1E3A8A) !important;box-shadow:0 0 0 3px rgba(30,58,138,.12)}
+select:focus{outline:none;border-color:var(--link,#1E3A8A) !important;box-shadow:0 0 0 3px rgba(30,58,138,.12)}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:safe center;overflow-x:auto;padding:28px 12px 60px;gap:20px;background:var(--page,#EEF0F4);{{ themeVars }}">
+
+<!-- Screen switcher (prototype chrome) -->
+<div style="display:flex;gap:6px;background:var(--surface,#FFFFFF);border:1px solid var(--border,#E4E7EC);border-radius:999px;padding:5px;box-shadow:0 1px 3px rgba(16,24,40,.06)">
+  <button onClick="{{ goLogin }}" style="{{ tabLoginStyle }}">Login</button>
+  <button onClick="{{ goDashboard }}" style="{{ tabDashStyle }}">Dashboard Admin</button>
+  <button onClick="{{ goCadastro }}" style="{{ tabCadStyle }}">Cadastro de Visitante</button>
+  <button onClick="{{ toggleDark }}" title="Alternar modo claro/escuro" style="border:none;border-radius:999px;width:34px;height:34px;font-size:15px;cursor:pointer;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)">{{ themeIcon }}</button>
+</div>
+
+<!-- ═══════════════ LOGIN ═══════════════ -->
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Login" style="width:1280px;max-width:96vw;height:780px;display:flex;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px -16px rgba(11,21,48,.35);background:var(--surface,#FFFFFF)">
+  <!-- Brand panel -->
+  <div style="width:46%;background:linear-gradient(160deg,#0B1530 0%,#122452 60%,#1E3A8A 100%);color:#FFFFFF;padding:56px;display:flex;flex-direction:column;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="assets/logo.png" alt="Logo" style="width:44px;height:44px;border-radius:12px">
+      <span style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;letter-spacing:.2px">Sistema Igreja</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="font-family:Sora,sans-serif;font-size:40px;font-weight:600;line-height:1.18;letter-spacing:-.5px">Cada visitante é<br>uma história que<br>começa aqui.</div>
+      <div style="font-size:16px;line-height:1.6;color:rgba(255,255,255,.72);max-width:400px">Recepção, acompanhamento e integração de visitantes em células — tudo em um só lugar.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.55)">
+      <span style="width:8px;height:8px;border-radius:99px;background:#E8A33D;display:inline-block"></span>
+      Plataforma para igrejas em células
+    </div>
+  </div>
+  <!-- Form panel -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:56px">
+    <div style="width:380px;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-family:Sora,sans-serif;font-size:26px;font-weight:600;color:var(--text,#101828)">Bem-vindo de volta</div>
+        <div style="font-size:15px;color:var(--text3,#667085)">Entre com suas credenciais para continuar.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">E-mail</label>
+          <input type="email" placeholder="voce@igreja.com.br" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Senha</label>
+          <input type="password" placeholder="••••••••" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2,#475467);cursor:pointer"><input type="checkbox" style="accent-color:var(--link,#1E3A8A);width:16px;height:16px">Lembrar de mim</label>
+          <a href="#" style="font-size:14px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Esqueci a senha</a>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <button onClick="{{ goDashboard }}" style="height:52px;border:none;border-radius:10px;background:#1E3A8A;color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:.2px" style-hover="background:#16307A">Entrar</button>
+        <div style="text-align:center;font-size:14px;color:var(--text3,#667085)">É visitante? <a href="#" onClick="{{ goCadastroLink }}" style="font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Faça seu cadastro</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ═══════════════ DASHBOARD ═══════════════ -->
+<sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Dashboard Admin" style="width:1440px;min-width:1280px;height:900px;display:flex;position:relative;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px -16px rgba(11,21,48,.35);background:#F7F8FA">
+
+  <!-- Sidebar -->
+  <div style="width:252px;flex:none;background:linear-gradient(180deg,#0B1530 0%,#101E42 100%);color:#FFFFFF;display:flex;flex-direction:column;padding:20px 14px;gap:6px">
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 18px">
+      <img src="assets/logo.png" alt="Logo" style="width:36px;height:36px;border-radius:10px">
+      <div style="display:flex;flex-direction:column">
+        <span style="font-family:Sora,sans-serif;font-size:14.5px;font-weight:600">Sistema Igreja</span>
+        <span style="font-size:11px;color:rgba(255,255,255,.5)">Painel administrativo</span>
+      </div>
+    </div>
+    <sc-for list="{{ navGroups }}" as="group" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:10px">
+        <div style="font-size:10.5px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.38);padding:6px 12px">{{ group.label }}</div>
+        <sc-for list="{{ group.items }}" as="item" hint-placeholder-count="3">
+          <button onClick="{{ item.onClick }}" style="{{ item.style }}" style-hover="background:rgba(255,255,255,.08);color:#FFFFFF">
+            <span style="font-size:16px;width:20px;text-align:center">{{ item.icon }}</span>
+            <span style="flex:1;text-align:left">{{ item.label }}</span>
+            <sc-if value="{{ item.count }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:11px;font-weight:600;background:rgba(232,163,61,.18);color:#E8A33D;border-radius:99px;padding:2px 8px">{{ item.count }}</span>
+            </sc-if>
+          </button>
+        </sc-for>
+      </div>
+    </sc-for>
+    <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;background:rgba(255,255,255,.06)">
+      <div style="width:36px;height:36px;border-radius:99px;background:#E8A33D;color:#0B1530;display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:14px">PR</div>
+      <div style="display:flex;flex-direction:column;flex:1;min-width:0">
+        <span style="font-size:13.5px;font-weight:600">Pr. Ricardo</span>
+        <span style="font-size:11.5px;color:rgba(255,255,255,.5)">Administrador</span>
+      </div>
+      <span style="color:rgba(255,255,255,.4);font-size:14px;cursor:pointer">⋯</span>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <!-- Topbar -->
+    <div style="height:68px;flex:none;background:var(--surface,#FFFFFF);border-bottom:1px solid #E9ECF2;display:flex;align-items:center;padding:0 28px;gap:16px">
+      <div style="font-family:Sora,sans-serif;font-size:17px;font-weight:600;color:var(--text,#101828)">{{ pageTitle }}</div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;height:40px;width:300px;border:1px solid var(--border,#E4E7EC);border-radius:10px;padding:0 14px;background:var(--surface2,#F9FAFB);color:var(--muted,#98A2B3);font-size:14px">
+        <span style="font-size:13px">⌕</span> Buscar visitante, célula…
+      </div>
+      <button onClick="{{ openVisitante }}" style="height:40px;padding:0 18px;border:none;border-radius:10px;background:#1E3A8A;color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="background:#16307A"><span style="font-size:16px">+</span> Novo visitante</button>
+    </div>
+
+    <!-- Content -->
+    <div style="flex:1;overflow-y:auto;padding:28px">
+
+    <sc-if value="{{ pageDashboard }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;gap:24px">
+
+      <!-- KPI row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <sc-for list="{{ kpis }}" as="kpi" hint-placeholder-count="4">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13px;font-weight:500;color:var(--text3,#667085)">{{ kpi.label }}</span>
+              <span style="font-size:15px">{{ kpi.icon }}</span>
+            </div>
+            <div style="font-family:Sora,sans-serif;font-size:30px;font-weight:600;color:var(--text,#101828);letter-spacing:-.5px">{{ kpi.value }}</div>
+            <div style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ kpi.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start">
+
+        <!-- Visitantes recentes -->
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+            <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">Visitantes recentes</div>
+            <a href="#" style="font-size:13.5px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Ver todos →</a>
+          </div>
+          <sc-for list="{{ visitantes }}" as="v" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--borderS,#F5F6F8);cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">
+              <div style="{{ v.avatarStyle }}">{{ v.initials }}</div>
+              <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+                <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ v.nome }}</span>
+                <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ v.meta }}</span>
+              </div>
+              <span style="font-size:12.5px;color:var(--text3,#667085);width:130px">{{ v.celula }}</span>
+              <span style="{{ v.badgeStyle }}">{{ v.status }}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <!-- Crescimento de Integração -->
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:22px;box-shadow:0 1px 2px rgba(16,24,40,.04);display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">Crescimento de Integração</div>
+              <a href="#" style="font-size:13px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Ver relatório →</a>
+            </div>
+            <div style="display:flex;gap:16px;font-size:12.5px;color:var(--text2,#475467)">
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:var(--barT,#1E3A8A);display:inline-block"></span>Total de visitantes</span>
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:var(--barI,#0E9F6E);display:inline-block"></span>Integrados</span>
+            </div>
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;height:140px;padding:0 4px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+              <sc-for list="{{ meses }}" as="mo" hint-placeholder-count="6">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end">
+                  <div style="display:flex;align-items:flex-end;gap:4px;flex:1">
+                    <div style="{{ mo.totalStyle }}"></div>
+                    <div style="{{ mo.integStyle }}"></div>
+                  </div>
+                  <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ mo.m }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font-size:12px;color:var(--muted,#98A2B3)">Últimos 6 meses · captação × integração</span>
+          </div>
+
+          <!-- Células ativas -->
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+              <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">Células Ativas</div>
+              <a href="#" style="font-size:13px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Gerenciar →</a>
+            </div>
+            <sc-for list="{{ celulas }}" as="c" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;padding:13px 22px;border-bottom:1px solid var(--borderS,#F5F6F8);cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">
+                <div style="width:34px;height:34px;border-radius:10px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:14px">⌂</div>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+                  <span style="font-size:13.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+                  <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ c.lider }}</span>
+                </div>
+                <span style="font-size:11.5px;font-weight:600;background:var(--okBg,#E7F6EF);color:var(--okFg,#0E9F6E);border-radius:99px;padding:3px 10px">{{ c.membros }}</span>
+              </div>
+            </sc-for>
+            <div style="padding:14px 22px;display:flex;gap:10px">
+              <button onClick="{{ openCelula }}" style="flex:1;height:38px;border:1px solid var(--border,#D0D5DD);border-radius:9px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">+ Nova Célula</button>
+              <button onClick="{{ openLider }}" style="flex:1;height:38px;border:1px solid var(--border,#D0D5DD);border-radius:9px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">+ Novo Líder</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── VISITANTES ── -->
+    <sc-if value="{{ pageVisitantes }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <input placeholder="Buscar por nome…" onChange="{{ onSearch }}" style="height:42px;width:280px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-for list="{{ vFilters }}" as="f" hint-placeholder-count="5">
+            <button onClick="{{ f.onClick }}" style="{{ f.style }}" style-hover="border-color:var(--link,#1E3A8A)">{{ f.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+        <!-- Lista -->
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+          <div style="display:grid;grid-template-columns:1fr 130px 150px 150px;gap:14px;padding:12px 20px;border-bottom:1px solid var(--borderS,#F0F2F5);font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted,#98A2B3)">
+            <span>Visitante</span><span>Telefone</span><span>Célula</span><span>Status</span>
+          </div>
+          <sc-for list="{{ visRows }}" as="v" hint-placeholder-count="6">
+            <div onClick="{{ v.onClick }}" style="{{ v.rowStyle }}" style-hover="background:var(--surface2,#F9FAFB)">
+              <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
+                <div style="{{ v.avatarStyle }}">{{ v.initials }}</div>
+                <div style="display:flex;flex-direction:column;gap:1px">
+                  <span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ v.nome }}</span>
+                  <span style="font-size:12px;color:var(--muted,#98A2B3)">Visitou {{ v.visita }}</span>
+                </div>
+              </div>
+              <span style="font-size:13px;color:var(--text2,#475467);width:130px;flex:none">{{ v.tel }}</span>
+              <span style="font-size:13px;color:var(--text2,#475467);width:150px;flex:none">{{ v.celula }}</span>
+              <span style="width:150px;flex:none;display:flex"><span style="{{ v.badgeStyle }}">{{ v.status }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <!-- Detalhe -->
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);padding:24px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="{{ selAvatarStyle }}">{{ selInitials }}</div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-family:Sora,sans-serif;font-size:16.5px;font-weight:600;color:var(--text,#101828)">{{ selNome }}</span>
+              <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ selVisita }}</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+            <div style="display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--muted,#98A2B3)">Telefone</span><span style="color:var(--text2,#344054);font-weight:500">{{ selTel }}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--muted,#98A2B3)">Célula</span><span style="color:var(--text2,#344054);font-weight:500">{{ selCelula }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:3px;font-size:13.5px"><span style="color:var(--muted,#98A2B3)">Endereço</span><span style="color:var(--text2,#344054);font-weight:500">{{ selEnd }}</span></div>
+            <a href="#" onClick="{{ openMapa }}" style="font-size:13px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Ver no mapa →</a>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+            <span style="font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted,#98A2B3)">Atualizar status</span>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ statusOpts }}" as="s" hint-placeholder-count="4">
+                <button onClick="{{ s.onClick }}" style="{{ s.style }}" style-hover="border-color:var(--link,#1E3A8A)">{{ s.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+            <button style="height:44px;border:none;border-radius:10px;background:#25D366;color:#FFFFFF;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:#1FB558">Enviar WhatsApp</button>
+            <sc-if value="{{ selConverted }}" hint-placeholder-val="{{ false }}">
+              <div style="border-radius:10px;background:var(--okBg,#E7F6EF);color:var(--okFg,#0E9F6E);font-size:13px;font-weight:600;padding:12px 14px;text-align:center">✓ Convertido em membro da célula</div>
+            </sc-if>
+            <button onClick="{{ convert }}" style="height:44px;border:1px solid var(--accentB,#1E3A8A);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:var(--chip,#EFF4FF)">Converter em membro</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── CÉLULAS ── -->
+    <sc-if value="{{ pageCelulas }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <input placeholder="Buscar célula…" style="height:42px;width:280px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+        <div style="flex:1"></div>
+        <button onClick="{{ openCelula }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:#1E3A8A;color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:#16307A">+ Nova Célula</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <sc-for list="{{ celulasPage }}" as="c" hint-placeholder-count="6">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:16px">⌂</div>
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+                <span style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+                <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ c.tipo }}</span>
+              </div>
+              <span style="font-size:11.5px;font-weight:600;background:var(--okBg,#E7F6EF);color:var(--okFg,#0E9F6E);border-radius:99px;padding:3px 10px">Ativa</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--text2,#475467)">
+              <span>★ Líder: {{ c.lider }}</span>
+              <span>◷ {{ c.dia }}</span>
+              <span>◎ {{ c.end }}</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--borderS,#F0F2F5);padding-top:12px">
+              <div style="display:flex;flex-direction:column;gap:1px">
+                <span style="font-size:13px;font-weight:600;color:var(--text,#101828)">{{ c.membros }}</span>
+                <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ c.cap }}</span>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button onClick="{{ c.onMembros }}" style="height:34px;padding:0 12px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">Membros</button>
+                <button onClick="{{ c.onEdit }}" style="height:34px;padding:0 12px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">Editar</button>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── RELATÓRIOS ── -->
+    <sc-if value="{{ pageRelatorios }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+        <sc-for list="{{ relCards }}" as="kpi" hint-placeholder-count="4">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13px;font-weight:500;color:var(--text3,#667085)">{{ kpi.label }}</span>
+              <span style="font-size:15px">{{ kpi.icon }}</span>
+            </div>
+            <div style="font-family:Sora,sans-serif;font-size:30px;font-weight:600;color:var(--text,#101828);letter-spacing:-.5px">{{ kpi.value }}</div>
+            <div style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ kpi.sub }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:24px;box-shadow:0 1px 2px rgba(16,24,40,.04);display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">Captação × Integração por mês</div>
+            <span style="font-size:12.5px;color:var(--muted,#98A2B3)">Últimos 6 meses</span>
+          </div>
+          <button style="height:38px;padding:0 16px;border:1px solid var(--border,#D0D5DD);border-radius:9px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="background:var(--surface2,#F9FAFB)">↓ Exportar relatório</button>
+        </div>
+        <div style="display:flex;gap:16px;font-size:12.5px;color:var(--text2,#475467)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:var(--barT,#1E3A8A);display:inline-block"></span>Total de visitantes</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:var(--barI,#0E9F6E);display:inline-block"></span>Integrados</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-around;height:260px;padding:0 4px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+          <sc-for list="{{ meses }}" as="mo" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+              <div style="display:flex;align-items:flex-end;gap:6px;flex:1">
+                <div style="{{ mo.totalStyle }}"></div>
+                <div style="{{ mo.integStyle }}"></div>
+              </div>
+              <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ mo.m }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── MATERIAIS ── -->
+    <sc-if value="{{ pageMateriais }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="border:1.5px dashed var(--border,#C7CEDB);border-radius:14px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:8px;background:var(--surface2,#FBFCFD);cursor:pointer" style-hover="border-color:var(--link,#1E3A8A);background:var(--chip2,#F5F8FF)">
+        <span style="font-size:22px">↑</span>
+        <span style="font-size:14.5px;font-weight:600;color:var(--text2,#344054)">Enviar novo material</span>
+        <span style="font-size:12.5px;color:var(--muted,#98A2B3)">Arraste um arquivo ou clique para selecionar · PDF, DOCX, PPTX</span>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+        <sc-for list="{{ materiais }}" as="m" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:14px;padding:15px 20px;border-bottom:1px solid var(--borderS,#F5F6F8)" style-hover="background:var(--surface2,#F9FAFB)">
+            <div style="width:40px;height:40px;border-radius:11px;background:var(--warnBg,#FDF3E1);color:var(--warnFg,#B54708);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">PDF</div>
+            <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0">
+              <span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ m.nome }}</span>
+              <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ m.celula }} · {{ m.data }}</span>
+            </div>
+            <span style="font-size:12.5px;color:var(--muted,#98A2B3);width:70px;text-align:right">{{ m.tam }}</span>
+            <button style="height:36px;padding:0 14px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">↓ Baixar</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── LÍDERES ── -->
+    <sc-if value="{{ pageLideres }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 14px;background:var(--surface,#FFFFFF)">
+          <span style="color:var(--muted,#98A2B3)">⌕</span>
+          <input placeholder="Pesquisar líder por nome ou e-mail…" onChange="{{ onLSearch }}" style="flex:1;border:none;background:transparent;font-size:14px;font-family:inherit;color:var(--text,#101828)">
+        </div>
+        <sc-for list="{{ lideres }}" as="l" hint-placeholder-count="5">
+          <div onClick="{{ l.onClick }}" style="{{ l.cardStyle }}" style-hover="border-color:var(--accentB,#1E3A8A)">
+            <div style="{{ l.avatarStyle }}">{{ l.initials }}</div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+              <span style="font-size:15px;font-weight:600;color:var(--text,#101828)">{{ l.nome }}</span>
+              <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ l.email }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+              <span style="{{ l.coordStyle }}">{{ l.coord }}</span>
+              <span style="font-size:12px;color:var(--text3,#667085)">{{ l.cels }} · {{ l.vis }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <!-- Detalhe do líder -->
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden;position:sticky;top:0">
+        <div style="padding:24px;display:flex;flex-direction:column;align-items:center;gap:12px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+          <div style="{{ selLAvatarStyle }}">{{ selLInitials }}</div>
+          <div style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;color:var(--text,#101828)">{{ selLNome }}</div>
+          <span style="{{ selLCoordStyle }}">Coordenação {{ selLCoord }}</span>
+        </div>
+        <div style="display:flex;gap:18px;padding:0 24px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+          <sc-for list="{{ lTabs }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <div style="padding:20px 24px">
+          <sc-if value="{{ isLTabDados }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <sc-for list="{{ slInfo }}" as="r" hint-placeholder-count="6">
+                  <div style="display:flex;justify-content:space-between;gap:12px;font-size:13.5px"><span style="color:var(--muted,#98A2B3);flex:none">{{ r.k }}</span><span style="color:var(--text2,#344054);font-weight:500;text-align:right">{{ r.v }}</span></div>
+                </sc-for>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:14px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted,#98A2B3)">Descrição</span>
+                  <a href="#" onClick="{{ openEditLider }}" style="font-size:12.5px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Editar</a>
+                </div>
+                <span style="font-size:13.5px;color:var(--text2,#475467);line-height:1.5">{{ slDesc }}</span>
+              </div>
+              <button onClick="{{ openEditLider }}" style="height:44px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">✎ Editar dados</button>
+              <button style="height:44px;border:1px solid var(--accentB,#1E3A8A);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:var(--chip,#EFF4FF)">↑ Promover a Supervisor</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isLTabCelulas }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <sc-for list="{{ slCells }}" as="c" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border,#E9ECF2);border-radius:11px;padding:13px 14px">
+                  <div style="width:34px;height:34px;border-radius:10px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:14px">⌂</div>
+                  <span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isLTabVisitantes }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0;text-align:center">
+              <div style="font-family:Sora,sans-serif;font-size:28px;font-weight:600;color:var(--text,#101828)">{{ slVis }}</div>
+              <span style="font-size:13px;color:var(--muted,#98A2B3)">visitantes acompanhados por este líder</span>
+              <a href="#" onClick="{{ openListaVis }}" style="font-size:13px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none;margin-top:4px">Ver lista completa →</a>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── SUPERVISORES ── -->
+    <sc-if value="{{ pageSupervisores }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <input placeholder="Buscar supervisor…" style="height:42px;width:280px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+        <div style="flex:1"></div>
+        <button onClick="{{ openSupervisor }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">+ Novo Supervisor</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <sc-for list="{{ supervisores }}" as="s" hint-placeholder-count="3">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="{{ s.avatarStyle }}">{{ s.initials }}</div>
+              <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                <span style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">{{ s.nome }}</span>
+                <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ s.email }}</span>
+              </div>
+              <button onClick="{{ s.onEdit }}" title="Editar supervisor" style="width:34px;height:34px;border-radius:9px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:13px;cursor:pointer;flex:none">✎</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="{{ s.coordStyle }}">Coord. {{ s.coord }}</span>
+              <span style="font-size:11.5px;font-weight:600;color:var(--text3,#667085)">{{ s.cels }}</span>
+            </div>
+            <div style="border-top:1px solid var(--borderS,#F0F2F5);padding-top:12px;display:flex;flex-direction:column;gap:4px">
+              <span style="font-size:11.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted,#98A2B3)">{{ s.qtd }}</span>
+              <span style="font-size:13px;color:var(--text2,#475467)">{{ s.lideres }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── COORDENAÇÕES ── -->
+    <sc-if value="{{ pageCoordenacoes }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:13.5px;color:var(--text3,#667085)">Organize supervisores e líderes por região</div>
+        <div style="flex:1"></div>
+        <button onClick="{{ openCoordenacao }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">+ Nova Coordenação</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">
+        <sc-for list="{{ coordenacoes }}" as="c" hint-placeholder-count="4">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+            <div style="width:14px;height:48px;border-radius:99px;background:{{ c.cor }};flex:none"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1">
+              <span style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+              <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ c.sups }} · {{ c.lids }}</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button onClick="{{ c.onEdit }}" style="height:34px;padding:0 12px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer">Editar</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── NOVO CADASTRO ── -->
+    <sc-if value="{{ pageNovoCadastro }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:900px;display:flex;flex-direction:column;gap:20px">
+      <!-- Tipo de Cadastro -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted,#98A2B3)">Tipo de Cadastro</span>
+        <div style="display:flex;gap:14px">
+          <sc-for list="{{ ncTipos }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">
+              <span style="{{ t.iconStyle }}">{{ t.icon }}</span>
+              <span style="{{ t.labelStyle }}">{{ t.t }}</span>
+              <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ t.desc }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+        <!-- Informações Pessoais -->
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">Informações Pessoais</div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome Completo</label><input placeholder="Nome do usuário" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">E-mail</label><input placeholder="usuario@igreja.com.br" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Telefone</label><input placeholder="(00) 00000-0000" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Senha Temporária <span style="color:#D92D20">*</span></label><input type="password" placeholder="Mínimo 6 caracteres" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        </div>
+        <!-- Dados de Endereço -->
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+          <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">Dados de Endereço</div>
+          <div style="display:grid;grid-template-columns:140px 1fr;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">CEP</label><input placeholder="00000-000" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Logradouro</label><input placeholder="Rua, avenida" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:140px 1fr;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Número</label><input placeholder="123" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Complemento</label><input placeholder="Apto, bloco" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Estado <span style="color:#D92D20">*</span></label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option><option>SP</option><option>RJ</option><option>MG</option></select></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Cidade <span style="color:#D92D20">*</span></label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option><option>São Paulo</option><option>Guarulhos</option><option>Osasco</option></select></div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Bairro <span style="color:#D92D20">*</span></label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option><option>Jardim Primavera</option><option>Centro</option><option>Vila Nova</option></select></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Associações por tipo -->
+      <sc-if value="{{ ncIsLider }}" hint-placeholder-val="{{ true }}">
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+          <div style="padding:18px 22px 12px;display:flex;flex-direction:column;gap:12px">
+            <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">{{ ncCelLabel }}</div>
+            <div style="display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;background:var(--surface2,#F9FAFB)"><span style="color:var(--muted,#98A2B3)">⌕</span><input placeholder="Buscar célula…" style="flex:1;border:none;background:transparent;font-size:14px;font-family:inherit;color:var(--text,#101828)"></div>
+          </div>
+          <sc-for list="{{ ncCels }}" as="it" hint-placeholder-count="4">
+            <div onClick="{{ it.onClick }}" style="display:flex;align-items:center;gap:14px;padding:13px 22px;border-top:1px solid var(--borderS,#F5F6F8);cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ it.nome }}</span><span style="font-size:12px;color:var(--muted,#98A2B3)">{{ it.sub }}</span></div>
+              <span style="{{ it.boxStyle }}">{{ it.check }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ ncIsSupervisor }}" hint-placeholder-val="{{ false }}">
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+          <div style="padding:18px 22px 12px;display:flex;flex-direction:column;gap:12px">
+            <div style="font-family:Sora,sans-serif;font-size:15.5px;font-weight:600;color:var(--text,#101828)">{{ ncLidLabel }}</div>
+            <div style="display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;background:var(--surface2,#F9FAFB)"><span style="color:var(--muted,#98A2B3)">⌕</span><input placeholder="Buscar líder…" style="flex:1;border:none;background:transparent;font-size:14px;font-family:inherit;color:var(--text,#101828)"></div>
+          </div>
+          <sc-for list="{{ ncLids }}" as="it" hint-placeholder-count="4">
+            <div onClick="{{ it.onClick }}" style="display:flex;align-items:center;gap:14px;padding:13px 22px;border-top:1px solid var(--borderS,#F5F6F8);cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ it.nome }}</span><span style="font-size:12px;color:var(--muted,#98A2B3)">{{ it.sub }}</span></div>
+              <span style="{{ it.boxStyle }}">{{ it.check }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ ncIsCoordenador }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+            <div style="padding:18px 22px 12px;display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">{{ ncLidLabel }}</div>
+              <div style="display:flex;align-items:center;gap:8px;height:42px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;background:var(--surface2,#F9FAFB)"><span style="color:var(--muted,#98A2B3)">⌕</span><input placeholder="Buscar líder…" style="flex:1;border:none;background:transparent;font-size:13.5px;font-family:inherit;color:var(--text,#101828)"></div>
+            </div>
+            <sc-for list="{{ ncLids }}" as="it" hint-placeholder-count="4">
+              <div onClick="{{ it.onClick }}" style="display:flex;align-items:center;gap:12px;padding:12px 22px;border-top:1px solid var(--borderS,#F5F6F8);cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-size:13.5px;font-weight:600;color:var(--text,#101828)">{{ it.nome }}</span><span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ it.sub }}</span></div>
+                <span style="{{ it.boxStyle }}">{{ it.check }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+              <div style="padding:18px 22px 12px;display:flex;flex-direction:column;gap:12px">
+                <div style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">{{ ncSupLabel }}</div>
+                <div style="display:flex;align-items:center;gap:8px;height:42px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 14px;background:var(--surface2,#F9FAFB)"><span style="color:var(--muted,#98A2B3)">⌕</span><input placeholder="Buscar supervisor…" style="flex:1;border:none;background:transparent;font-size:13.5px;font-family:inherit;color:var(--text,#101828)"></div>
+              </div>
+              <sc-for list="{{ ncSups }}" as="it" hint-placeholder-count="3">
+                <div onClick="{{ it.onClick }}" style="display:flex;align-items:center;gap:12px;padding:12px 22px;border-top:1px solid var(--borderS,#F5F6F8);cursor:pointer" style-hover="background:var(--surface2,#F9FAFB)">
+                  <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0"><span style="font-size:13.5px;font-weight:600;color:var(--text,#101828)">{{ it.nome }}</span><span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ it.sub }}</span></div>
+                  <span style="{{ it.boxStyle }}">{{ it.check }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);padding:18px 22px;display:flex;flex-direction:column;gap:12px">
+              <div style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">Coordenação</div>
+              <div style="border:1.5px dashed var(--border,#C7CEDB);border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--surface2,#F9FAFB)">
+                <span style="font-size:13px;color:var(--muted,#98A2B3)">Nenhuma coordenação vinculada</span>
+                <button onClick="{{ openCoordenacao }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">+ Criar Nova Coordenação</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- Ações -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onClick="{{ submitModal }}" style="height:52px;border:none;border-radius:12px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer">✓ Salvar Cadastro</button>
+        <button onClick="{{ ncLimpar }}" style="height:50px;border:1px solid var(--accentB,#1E3A8A);border-radius:12px;background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">↺ Limpar Formulário</button>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── TIPOS DE CÉLULA ── -->
+    <sc-if value="{{ pageTipos }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:13.5px;color:var(--text3,#667085)">Categorias usadas ao criar células</div>
+        <div style="flex:1"></div>
+        <button onClick="{{ openTipo }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">+ Novo Tipo</button>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+        <sc-for list="{{ tiposCelula }}" as="t" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--borderS,#F5F6F8)">
+            <div style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">◈</div>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1">
+              <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ t.nome }}</span>
+              <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ t.desc }}</span>
+            </div>
+            <span style="font-size:12px;font-weight:600;color:var(--text3,#667085)">{{ t.qtd }}</span>
+            <button onClick="{{ t.onEdit }}" style="height:34px;padding:0 12px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer">Editar</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── CIDADES E BAIRROS ── -->
+    <sc-if value="{{ pageLocal }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;gap:4px;background:var(--surface,#FFFFFF);border:1px solid var(--border,#E4E7EC);border-radius:11px;padding:4px">
+          <sc-for list="{{ locTabs }}" as="t" hint-placeholder-count="2">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+          </sc-for>
+        </div>
+        <div style="flex:1"></div>
+        <sc-if value="{{ isLocCidades }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ openCidade }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">+ Nova Cidade</button>
+        </sc-if>
+        <sc-if value="{{ isLocBairros }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ openBairro }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">+ Novo Bairro</button>
+        </sc-if>
+      </div>
+      <sc-if value="{{ isLocCidades }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+          <select style="height:46px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto;max-width:240px"><option>São Paulo (SP)</option></select>
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;overflow:hidden">
+            <sc-for list="{{ cidades }}" as="c" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:14px;padding:15px 20px;border-bottom:1px solid var(--borderS,#F5F6F8)">
+                <div style="width:38px;height:38px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">◎</div>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1"><span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span><span style="font-size:12px;color:var(--muted,#98A2B3)">{{ c.uf }} · {{ c.bairros }}</span></div>
+                <button onClick="{{ c.onEdit }}" style="height:32px;padding:0 12px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">Editar</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isLocBairros }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+          <div style="display:flex;gap:12px">
+            <select style="height:46px;flex:1;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Estado: SP</option></select>
+            <select style="height:46px;flex:1;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Cidade: São Paulo</option></select>
+          </div>
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;overflow:hidden">
+            <sc-for list="{{ bairros }}" as="b" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:14px;padding:15px 20px;border-bottom:1px solid var(--borderS,#F5F6F8)">
+                <div style="width:38px;height:38px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">◉</div>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1"><span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ b.nome }}</span><span style="font-size:12px;color:var(--muted,#98A2B3)">{{ b.cidade }}</span></div>
+                <button onClick="{{ b.onEdit }}" style="height:32px;padding:0 12px;border:1px solid var(--border,#D0D5DD);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer">Editar</button>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ── WHATSAPP ── -->
+    <sc-if value="{{ pageWhatsapp }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:720px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:11px;background:#E7F9EE;color:#1FA855;display:flex;align-items:center;justify-content:center;font-size:18px">✉</div>
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <span style="font-family:Sora,sans-serif;font-size:16px;font-weight:600;color:var(--text,#101828)">Mensagens WhatsApp</span>
+          <span style="font-size:12.5px;color:var(--muted,#98A2B3)">Envie em lote para um segmento ou para um contato individual</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;background:var(--surface,#FFFFFF);border:1px solid var(--border,#E4E7EC);border-radius:11px;padding:4px;width:fit-content">
+        <sc-for list="{{ waTabs }}" as="t" hint-placeholder-count="2">
+          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:18px;box-shadow:0 1px 2px rgba(16,24,40,.04)">
+        <sc-if value="{{ isWaLote }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Segmento de destinatários</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <sc-for list="{{ waSegmentos }}" as="s" hint-placeholder-count="4">
+                <div onClick="{{ s.onClick }}" style="{{ s.style }}">
+                  <span style="font-size:15px">☺</span>
+                  <span style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">{{ s.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isWaIndividual }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Destinatário</label>
+            <input placeholder="Buscar visitante ou número…" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+          </div>
+        </sc-if>
+        <sc-if value="{{ isWaCompose }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Usar template</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ waTplPick }}" as="t" hint-placeholder-count="3">
+                <button onClick="{{ t.onClick }}" style="border-radius:999px;padding:8px 14px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="border-color:var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF)">▤ {{ t.nome }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Mensagem</label>
+            <textarea value="{{ waMsg }}" onChange="{{ onWaMsg }}" placeholder="Escreva a mensagem… Use {nome} para personalizar." style="min-height:130px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:14px 16px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);resize:vertical;line-height:1.5"></textarea>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--borderS,#F0F2F5);padding-top:18px">
+            <span style="font-size:12.5px;color:var(--muted,#98A2B3)">Prévia enviada ao seu número antes do disparo</span>
+            <button style="height:48px;padding:0 24px;border:none;border-radius:10px;background:#25D366;color:#FFFFFF;font-family:Sora,sans-serif;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px">✈ Enviar mensagem</button>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ isWaTemplates }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font-size:13px;color:var(--muted,#98A2B3)">Modelos reutilizáveis para envio de mensagens</span>
+            <button onClick="{{ waTplNew }}" style="height:42px;padding:0 18px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13px;font-weight:600;cursor:pointer;flex:none">+ Novo Template</button>
+          </div>
+          <sc-for list="{{ waTplRows }}" as="t" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:14px;border:1px solid var(--border,#E9ECF2);border-radius:13px;padding:14px 16px">
+              <div style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">▤</div>
+              <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ t.nome }}</span><span style="{{ t.catStyle }}">{{ t.cat }}</span></div>
+                <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ t.msgShort }}</span>
+              </div>
+              <div style="display:flex;gap:8px;flex:none">
+                <button onClick="{{ t.onUse }}" style="height:34px;padding:0 12px;border:1px solid var(--accentB,#1E3A8A);border-radius:8px;background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer">Usar</button>
+                <button onClick="{{ t.onEdit }}" title="Editar template" style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:13px;cursor:pointer">✎</button>
+                <button onClick="{{ t.onDelete }}" title="Excluir template" style="width:34px;height:34px;border-radius:8px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:#D92D20;font-size:13px;cursor:pointer">✕</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── NOTIFICAÇÕES ── -->
+    <sc-if value="{{ pageNotif }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:680px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:13.5px;color:var(--text3,#667085)">Atividade recente do sistema</div>
+        <div style="flex:1"></div>
+        <a href="#" style="font-size:13px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Marcar todas como lidas</a>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.04);overflow:hidden">
+        <sc-for list="{{ notificacoes }}" as="n" hint-placeholder-count="4">
+          <div style="{{ n.rowStyle }}">
+            <div style="{{ n.iconStyle }}">{{ n.icon }}</div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:0">
+              <span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ n.titulo }}</span>
+              <span style="font-size:13px;color:var(--text2,#475467);line-height:1.45">{{ n.texto }}</span>
+            </div>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3);white-space:nowrap;flex:none">{{ n.tempo }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ── DEMAIS PÁGINAS ── -->
+    <sc-if value="{{ pageOther }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:100px 20px;text-align:center">
+      <div style="width:64px;height:64px;border-radius:18px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:26px">◈</div>
+      <div style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">{{ pageTitle }}</div>
+      <div style="font-size:14px;color:var(--text3,#667085);max-width:380px;line-height:1.55">Esta tela será redesenhada na próxima fase, mantendo todas as funcionalidades atuais.</div>
+    </div>
+    </sc-if>
+
+    </div>
+  </div>
+
+  <!-- ══ MODAIS DE CADASTRO ══ -->
+  <sc-if value="{{ modalVisitante }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;max-height:86%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Novo Visitante</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome *</label><input placeholder="Nome completo" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Telefone *</label><input placeholder="(11) 99999-9999" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">E-mail</label><input placeholder="email@exemplo.com" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Endereço</label><input placeholder="Rua, número" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Bairro</label><input placeholder="Bairro" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Cidade</label><input placeholder="São Paulo" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Cadastrar Visitante</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalCelula }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:560px;max-height:86%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Nova Célula</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome da Célula *</label><input placeholder="Ex: Célula Esperança" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Líder *</label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecionar líder</option><option>Carla Mendes</option><option>Marcos Dias</option><option>Paulo Nunes</option><option>Renata Campos</option><option>Tiago Fonseca</option><option>Débora Pires</option></select></div>
+      <div style="display:grid;grid-template-columns:170px 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">CEP <span style="font-weight:400;color:var(--muted,#98A2B3)">(auto busca)</span></label><input placeholder="00000-000" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Logradouro *</label><input placeholder="Rua, número" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Localização no Mapa</label>
+        <div style="height:120px;border:1.5px dashed var(--border,#C7CEDB);border-radius:12px;background:repeating-linear-gradient(45deg,var(--surface2,#F9FAFB),var(--surface2,#F9FAFB) 10px,var(--surface,#FFFFFF) 10px,var(--surface,#FFFFFF) 20px);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:12px;color:var(--muted,#98A2B3)">mapa · toque para marcar a localização</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 150px;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Dia da semana</label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Terça-feira</option><option>Segunda-feira</option><option>Quarta-feira</option><option>Quinta-feira</option><option>Sexta-feira</option><option>Sábado</option><option>Domingo</option></select></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Horário *</label><input value="19:00" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Tipo de Célula <span style="font-weight:400;color:var(--muted,#98A2B3)">(opcional)</span></label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Sem tipo</option><option>Adultos</option><option>Jovens</option><option>Casais</option><option>Infantil</option></select></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Criar Célula</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ MODAL TEMPLATE WHATSAPP ══ -->
+  <sc-if value="{{ waTplModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ waTplClose }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:580px;max-height:88%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">{{ waTplTitle }}</span>
+        <button onClick="{{ waTplClose }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome do template</label><input value="{{ tplNome }}" onChange="{{ onTplNome }}" placeholder="Ex: Boas-vindas" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Categoria</label><select value="{{ tplCat }}" onChange="{{ onTplCat }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Geral</option><option>Boas-vindas</option><option>Convite</option></select></div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Inserir variável</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ tplVars }}" as="v" hint-placeholder-count="6">
+            <button onClick="{{ v.onClick }}" style="border-radius:999px;padding:8px 14px;border:none;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);font-family:ui-monospace,monospace;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:var(--chip2,#F5F8FF)">+ {{ v.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Mensagem</label>
+        <textarea value="{{ tplMsg }}" onChange="{{ onTplMsg }}" placeholder="Escreva a mensagem do template…" style="min-height:120px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:14px 16px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);resize:vertical;line-height:1.5"></textarea>
+      </div>
+      <sc-if value="{{ tplHasPreview }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">👁 Preview</label>
+          <div style="border-radius:12px;border:1px solid var(--okBg,#D8F0E4);background:var(--okBg,#E7F6EF);padding:14px 16px;font-size:14px;color:var(--text,#101828);line-height:1.55">{{ tplPreview }}</div>
+        </div>
+      </sc-if>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ waTplClose }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ waTplSave }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">✓ Salvar Template</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ MODAIS DE EDIÇÃO ══ -->
+  <sc-if value="{{ modalEditCidade }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Cidade</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Estado</label><select value="{{ edUf }}" onChange="{{ onEdUf }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>SP</option><option>RJ</option><option>MG</option></select></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome da cidade</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalEditBairro }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Bairro</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Estado</label><select value="{{ edUf }}" onChange="{{ onEdUf }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>SP</option><option>RJ</option><option>MG</option></select></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Cidade</label><select value="{{ edCidade }}" onChange="{{ onEdCidade }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>São Paulo</option><option>Guarulhos</option><option>Osasco</option></select></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome do bairro</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalEditTipo }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Tipo de Célula</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Descrição</label><input value="{{ edDesc }}" onChange="{{ onEdDesc }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalEditCelula }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:560px;max-height:86%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Célula</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome da Célula</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Líder</label><select value="{{ edLider }}" onChange="{{ onEdLider }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Carla Mendes</option><option>Marcos Dias</option><option>Paulo Nunes</option><option>Renata Campos</option><option>Tiago Fonseca</option><option>Débora Pires</option></select></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Tipo</label><select value="{{ edTipo }}" onChange="{{ onEdTipo }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Adultos</option><option>Jovens</option><option>Casais</option><option>Infantil</option></select></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Endereço</label><input value="{{ edEnd }}" onChange="{{ onEdEnd }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Dia e horário</label><input value="{{ edDia }}" onChange="{{ onEdDia }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Localização no Mapa</label>
+        <div style="height:110px;border:1.5px dashed var(--border,#C7CEDB);border-radius:12px;background:repeating-linear-gradient(45deg,var(--surface2,#F9FAFB),var(--surface2,#F9FAFB) 10px,var(--surface,#FFFFFF) 10px,var(--surface,#FFFFFF) 20px);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,monospace;font-size:12px;color:var(--muted,#98A2B3)">mapa · toque para ajustar a localização</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalMembros }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:480px;max-height:86%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">{{ membrosTitle }}</span>
+          <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ membrosCount }}</span>
+        </div>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ membrosList }}" as="m" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border,#E9ECF2);border-radius:12px;padding:11px 14px">
+            <div style="width:38px;height:38px;border-radius:99px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:13px;flex:none">{{ m.initials }}</div>
+            <span style="flex:1;font-size:14px;font-weight:600;color:var(--text,#101828)">{{ m.nome }}</span>
+            <button onClick="{{ m.onRemove }}" title="Remover membro" style="width:32px;height:32px;border-radius:9px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:#D92D20;font-size:13px;cursor:pointer;flex:none">✕</button>
+          </div>
+        </sc-for>
+      </div>
+      <button onClick="{{ onAddMembro }}" style="height:46px;border:1.5px dashed var(--border,#C7CEDB);border-radius:12px;background:var(--surface2,#F9FAFB);color:var(--link,#1E3A8A);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">+ Adicionar membro</button>
+      <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Concluir</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalEditCoordenacao }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Coordenação</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Cor de identificação</label>
+        <div style="display:flex;gap:10px">
+          <sc-for list="{{ corOpts }}" as="c" hint-placeholder-count="6">
+            <button onClick="{{ c.onClick }}" style="{{ c.style }}"></button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalEditSupervisor }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Supervisor</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome completo</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">E-mail</label><input value="{{ edEmail }}" onChange="{{ onEdEmail }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Endereço</label><input value="{{ edEnd }}" onChange="{{ onEdEnd }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Coordenação</label><select value="{{ edCoord }}" onChange="{{ onEdCoord }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Norte</option><option>Sul</option><option>Leste</option><option>Oeste</option></select></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalEditLider }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:480px;max-height:86%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Editar Líder</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome completo</label><input value="{{ edNome }}" onChange="{{ onEdNome }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">E-mail</label><input value="{{ edEmail }}" onChange="{{ onEdEmail }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Telefone</label><input value="{{ edTel }}" onChange="{{ onEdTel }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Endereço</label><input value="{{ edEnd }}" onChange="{{ onEdEnd }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Supervisor</label><select value="{{ edSup }}" onChange="{{ onEdSup }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>André Prado</option><option>Beatriz Lopes</option><option>Carlos Vieira</option></select></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Descrição</label><textarea value="{{ edDesc }}" onChange="{{ onEdDesc }}" placeholder="Descreva a atuação deste líder…" style="min-height:96px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:12px 15px;font-size:14px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);resize:vertical;line-height:1.5"></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Salvar Alterações</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalListaVis }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;max-height:86%;overflow-y:auto;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">{{ lvTitle }}</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ lvRows }}" as="v" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border,#E9ECF2);border-radius:12px;padding:12px 14px">
+            <div style="{{ v.avatarStyle }}">{{ v.initials }}</div>
+            <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0">
+              <span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ v.nome }}</span>
+              <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ v.visita }}</span>
+            </div>
+            <span style="{{ v.badgeStyle }}">{{ v.status }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Fechar</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalMapa }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Localização</span>
+          <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ edNome }}</span>
+        </div>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border,#E9ECF2);border-radius:12px;padding:14px 16px;background:var(--surface2,#F9FAFB)">
+        <span style="width:38px;height:38px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none">◎</span>
+        <span style="font-size:14px;font-weight:500;color:var(--text2,#344054);line-height:1.45">{{ edEnd }}</span>
+      </div>
+      <div style="height:220px;border:1.5px dashed var(--border,#C7CEDB);border-radius:14px;background:repeating-linear-gradient(45deg,var(--surface2,#F9FAFB),var(--surface2,#F9FAFB) 10px,var(--surface,#FFFFFF) 10px,var(--surface,#FFFFFF) 20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+        <span style="font-size:26px">📍</span>
+        <span style="font-family:ui-monospace,monospace;font-size:12px;color:var(--muted,#98A2B3)">mapa interativo · integração Google Maps</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Fechar</button>
+        <button style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Abrir no Google Maps ↗</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalCoordenacao }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Nova Coordenação</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome *</label><input placeholder="Ex: Coordenação Centro" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Cor de identificação</label>
+        <div style="display:flex;gap:10px">
+          <sc-for list="{{ corOpts }}" as="c" hint-placeholder-count="6">
+            <button onClick="{{ c.onClick }}" style="{{ c.style }}"></button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Criar Coordenação</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalTipo }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Novo Tipo de Célula</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome *</label><input placeholder="Ex: Adolescentes" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Descrição</label><input placeholder="Público-alvo deste tipo" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Criar Tipo</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalCidade }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Nova Cidade</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Estado *</label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>São Paulo (SP)</option><option>Rio de Janeiro (RJ)</option><option>Minas Gerais (MG)</option></select></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome da cidade *</label><input placeholder="Ex: Campinas" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Criar Cidade</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ modalBairro }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(11,21,48,.45);z-index:50;border-radius:20px"></div>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;background:var(--surface,#FFFFFF);border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:16px;z-index:51;box-shadow:0 24px 64px -12px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Novo Bairro</span>
+        <button onClick="{{ closeModal }}" style="width:32px;height:32px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:14px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Estado</label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>SP</option></select></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Cidade</label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>São Paulo</option><option>Guarulhos</option><option>Osasco</option></select></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome do bairro *</label><input placeholder="Ex: Vila Mariana" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+        <button onClick="{{ closeModal }}" style="height:46px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Cancelar</button>
+        <button onClick="{{ submitModal }}" style="height:46px;padding:0 22px;border:none;border-radius:10px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:13.5px;font-weight:600;cursor:pointer">Criar bairro</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toastVisible }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:60;background:#0E9F6E;color:#FFFFFF;border-radius:12px;padding:13px 22px;font-size:14px;font-weight:600;box-shadow:0 12px 32px -8px rgba(0,0,0,.35)">✓ {{ toastMsg }}</div>
+  </sc-if>
+
+</div>
+</sc-if>
+
+<!-- ═══════════════ CADASTRO PÚBLICO ═══════════════ -->
+<sc-if value="{{ isCadastro }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Cadastro de Visitante" style="width:1280px;max-width:96vw;min-height:820px;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px -16px rgba(11,21,48,.35);background:linear-gradient(160deg,#0B1530 0%,#122452 55%,#1E3A8A 100%);display:flex;flex-direction:column;align-items:center;padding:48px 24px 56px;gap:32px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:14px;color:#FFFFFF;text-align:center">
+    <img src="assets/logo.png" alt="Logo" style="width:56px;height:56px;border-radius:14px">
+    <div style="font-family:Sora,sans-serif;font-size:30px;font-weight:600;letter-spacing:-.3px">Que alegria receber você!</div>
+    <div style="font-size:15.5px;color:rgba(255,255,255,.7);max-width:440px;line-height:1.55">Deixe seus dados e encontraremos uma célula pertinho de você.</div>
+  </div>
+
+  <!-- Stepper -->
+  <div style="display:flex;align-items:center;gap:10px">
+    <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="{{ s.dotStyle }}">{{ s.n }}</div>
+          <span style="{{ s.labelStyle }}">{{ s.label }}</span>
+        </div>
+        <sc-if value="{{ s.hasLine }}" hint-placeholder-val="{{ true }}">
+          <div style="width:44px;height:2px;background:rgba(255,255,255,.22);border-radius:99px"></div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- Card -->
+  <div style="width:620px;max-width:94%;background:var(--surface,#FFFFFF);border-radius:18px;padding:36px 40px;display:flex;flex-direction:column;gap:24px;box-shadow:0 16px 48px -12px rgba(0,0,0,.4)">
+
+    <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Dados pessoais</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Nome completo <span style="color:#D92D20">*</span></label>
+          <input placeholder="Ex: João da Silva" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Telefone / WhatsApp <span style="color:#D92D20">*</span></label>
+          <input placeholder="(00) 00000-0000" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Data de nascimento <span style="color:#D92D20">*</span></label>
+            <input type="date" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Estado civil <span style="font-weight:400;color:var(--muted,#98A2B3)">(opcional)</span></label>
+            <select style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto">
+              <option>Selecione</option>
+              <option>Solteiro(a)</option>
+              <option>Casado(a)</option>
+              <option>Divorciado(a)</option>
+              <option>Viúvo(a)</option>
+              <option>União estável</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Onde você mora</div>
+        <div style="display:grid;grid-template-columns:180px 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">CEP <span style="font-weight:400;color:var(--muted,#98A2B3)">(busca automática)</span></label>
+            <input placeholder="00000-000" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Logradouro <span style="color:#D92D20">*</span></label>
+            <input placeholder="Rua, avenida, etc" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:180px 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Número <span style="color:#D92D20">*</span></label>
+            <input placeholder="Ex: 123" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Complemento</label>
+            <input placeholder="Apto, bloco, etc" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Estado</label>
+            <select style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option><option>SP</option><option>RJ</option><option>MG</option></select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Cidade</label>
+            <select style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option></select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Bairro</label>
+            <select style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 12px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option></select>
+          </div>
+        </div>
+        <div style="border:1px dashed var(--border,#C7CEDB);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;background:var(--surface2,#F9FAFB)">
+          <span style="font-size:18px">📍</span>
+          <span style="font-size:13.5px;color:var(--text3,#667085);line-height:1.5">Digite o CEP e preenchemos o endereço automaticamente. Ele também localiza as <strong style="color:var(--text2,#344054)">células mais próximas de você</strong>.</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Sobre você</div>
+          <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border,#E4E7EC);border-radius:12px;padding:14px 16px;background:var(--surface2,#F9FAFB)">
+            <span style="width:36px;height:36px;border-radius:10px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">⌂</span>
+            <span style="flex:1;font-size:14.5px;font-weight:500;color:var(--text2,#344054)">Deseja participar de alguma célula?</span>
+            <button onClick="{{ toggleCell }}" style="{{ toggleStyle }}">
+              <span style="{{ toggleKnobStyle }}"></span>
+            </button>
+          </div>
+          <sc-if value="{{ attendsCell }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <span style="font-size:13px;color:var(--text3,#667085)">Células perto do seu endereço:</span>
+              <sc-for list="{{ celulasProx }}" as="c" hint-placeholder-count="3">
+                <button onClick="{{ c.onClick }}" style="{{ c.style }}" style-hover="border-color:var(--link,#1E3A8A)">
+                  <div style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:16px">⌂</div>
+                  <div style="display:flex;flex-direction:column;gap:2px;flex:1;text-align:left">
+                    <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+                    <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ c.info }}</span>
+                  </div>
+                  <span style="font-size:12.5px;font-weight:600;color:var(--link,#1E3A8A)">{{ c.dist }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:20px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="font-family:Sora,sans-serif;font-size:19px;font-weight:600;color:var(--text,#101828)">Como posso ajudar você?</div>
+            <span style="font-size:13px;color:var(--text3,#667085)">Selecione todas as opções que se aplicam</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ interesses }}" as="o" hint-placeholder-count="5">
+              <button onClick="{{ o.onClick }}" style="{{ o.style }}" style-hover="border-color:var(--link,#1E3A8A)">{{ o.check }}{{ o.label }}</button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ showOutros }}" hint-placeholder-val="{{ false }}">
+            <input placeholder="Conte para nós como podemos ajudar" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:10px;padding:0 16px;font-size:15px;font-family:inherit;color:var(--text,#101828)">
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--borderS,#F0F2F5);padding-top:20px">
+      <button onClick="{{ stepBack }}" style="{{ backBtnStyle }}">← Voltar</button>
+      <button onClick="{{ stepNext }}" style="height:48px;padding:0 28px;border:none;border-radius:10px;background:#1E3A8A;color:#FFFFFF;font-family:Sora,sans-serif;font-size:14.5px;font-weight:600;cursor:pointer" style-hover="background:#16307A">{{ nextLabel }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ cadastroDone }}" hint-placeholder-val="{{ false }}">
+    <div style="width:620px;max-width:94%;background:rgba(16,185,129,.14);border:1px solid rgba(110,231,183,.4);color:#6EE7B7;border-radius:14px;padding:16px 22px;display:flex;align-items:center;gap:12px;font-size:14.5px;font-weight:500">
+      <span style="font-size:18px">✓</span> Cadastro enviado! O líder da célula entrará em contato pelo WhatsApp.
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: 1000}, &quot;screen&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;dashboard&quot;, &quot;login&quot;, &quot;cadastro&quot;], &quot;default&quot;: &quot;dashboard&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Protótipo&quot;}, &quot;darkMode&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Protótipo&quot;}}">
+class Component extends DCLogic {
+  state = { screen: null, navActive: 'Dashboard', step: 1, celulaSel: 0, done: false, attendsCell: true, interesses: ['Preciso de oração'], vq: '', vFilter: 'Todos', visSel: 0, vStatus: {}, converted: {}, lq: '', lSel: 0, lTab: 'Dados', locTab: 'Cidades', waTab: 'Em lote', waSeg: 'Todos os visitantes', modal: null, coordCor: '#1E3A8A', toast: '', ncTipo: 'Líder', ncSel: {}, edit: null,
+    waMsg: 'Olá {nome}! Foi uma alegria ter você conosco. Que tal participar da nossa célula esta semana?',
+    waTemplates: [
+      { nome: 'Boas-vindas', cat: 'Boas-vindas', msg: 'Olá {nome}! Foi uma alegria ter você conosco. Que tal conhecer a {celula}?' },
+      { nome: 'Convite para célula', cat: 'Convite', msg: 'Oi {nome}! A {celula} se reúne {data} às {horario} no bairro {bairro}. O líder {lider} espera você!' },
+      { nome: 'Lembrete de encontro', cat: 'Geral', msg: '{nome}, não esqueça: nosso encontro é {data} às {horario}. Até lá!' },
+    ],
+    waTplModal: false, waTpl: null };
+
+  renderVals() {
+    const screen = this.state.screen ?? this.props.screen ?? 'dashboard';
+    const set = (k, v) => this.setState({ [k]: v });
+    const openEdit = (kind, data) => this.setState({ modal: kind, edit: data, coordCor: (data && data.cor) || this.state.coordCor });
+    const edSet = (k) => (e) => this.setState(s => ({ edit: { ...s.edit, [k]: e.target.value } }));
+    const dark = this.state.dark ?? this.props.darkMode ?? false;
+    const darkVars = '--page:#0A101F;--surface:#131C31;--surface2:#0F1829;--chip:#1D2F55;--chip2:#1A2B4E;--link:#93B4FD;--accentB:#3E63DD;--text:#F2F5FA;--text2:#C9D3E0;--text3:#97A5B8;--muted:#697A92;--border:#283755;--borderS:#1E2B45;--okBg:#0E3A2C;--okFg:#57D9A3;--warnBg:#3F2D10;--warnFg:#F2C063;--inatBg:#26303F;--inatFg:#AEB9C9;--barT:#5B8DEF;--barI:#2FBE8F';
+
+    const tab = (on) => `border:none;border-radius:999px;padding:8px 18px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;${on ? 'background:#0B1530;color:#FFFFFF' : 'background:transparent;color:var(--text2,#475467)'}`;
+
+    // Sidebar nav
+    const navItem = (icon, label, count) => ({
+      icon, label, count: count || false,
+      onClick: () => set('navActive', label),
+      style: `display:flex;align-items:center;gap:11px;border:none;border-radius:10px;padding:10px 12px;font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;width:100%;${this.state.navActive === label ? 'background:rgba(232,163,61,.14);color:#FFFFFF;font-weight:600' : 'background:transparent;color:rgba(255,255,255,.62)'}`
+    });
+    const navGroups = [
+      { label: 'Início', items: [navItem('◫', 'Dashboard'), navItem('◔', 'Relatórios')] },
+      { label: 'Pessoas', items: [navItem('☺', 'Visitantes', '8'), navItem('★', 'Líderes'), navItem('◉', 'Supervisores'), navItem('⌘', 'Coordenações'), navItem('＋', 'Novo Cadastro')] },
+      { label: 'Células', items: [navItem('⌂', 'Células'), navItem('◈', 'Tipos de Célula'), navItem('▤', 'Materiais')] },
+      { label: 'Sistema', items: [navItem('✉', 'WhatsApp'), navItem('◎', 'Cidades e Bairros'), navItem('♡', 'Notificações')] },
+    ];
+
+    const kpi = (label, icon, value, sub) => ({ label, icon, value, sub });
+
+    const badge = (bg, fg) => `font-size:12px;font-weight:600;border-radius:99px;padding:4px 11px;background:${bg};color:${fg};white-space:nowrap`;
+    const badges = {
+      novo: badge('var(--chip,#EFF4FF)', 'var(--link,#1E3A8A)'),
+      acomp: badge('var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)'),
+      integ: badge('var(--okBg,#E7F6EF)', 'var(--okFg,#0E9F6E)'),
+      inativo: badge('var(--inatBg,#F2F4F7)', 'var(--inatFg,#667085)'),
+    };
+    const avatar = (bg, fg) => `width:40px;height:40px;border-radius:99px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:13.5px;flex:none`;
+    const visitantes = [
+      { initials: 'MS', nome: 'Mariana Souza', meta: 'Visitou há 2 dias · Instagram', celula: 'Célula Vida Nova', status: 'Novo', badgeStyle: badges.novo, avatarStyle: avatar('var(--chip,#EFF4FF)', 'var(--link,#1E3A8A)') },
+      { initials: 'JP', nome: 'João Pedro Lima', meta: 'Visitou há 5 dias · Amigo', celula: 'Célula Esperança', status: 'Em acompanhamento', badgeStyle: badges.acomp, avatarStyle: avatar('var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)') },
+      { initials: 'AC', nome: 'Ana Clara Ferreira', meta: 'Visitou há 1 semana · Evento', celula: 'Célula Vida Nova', status: 'Integrado', badgeStyle: badges.integ, avatarStyle: avatar('var(--okBg,#E7F6EF)', 'var(--okFg,#0E9F6E)') },
+      { initials: 'RA', nome: 'Rafael Almeida', meta: 'Visitou há 2 semanas · Site', celula: 'Célula Restauração', status: 'Em acompanhamento', badgeStyle: badges.acomp, avatarStyle: avatar('var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)') },
+      { initials: 'CB', nome: 'Camila Barros', meta: 'Visitou há 3 semanas · Amigo', celula: '—', status: 'Não retornou', badgeStyle: badges.inativo, avatarStyle: avatar('var(--inatBg,#F2F4F7)', 'var(--inatFg,#667085)') },
+    ];
+
+    const rawMonths = [
+      { m: 'Fev', total: 14, integ: 4 }, { m: 'Mar', total: 19, integ: 6 },
+      { m: 'Abr', total: 16, integ: 5 }, { m: 'Mai', total: 24, integ: 8 },
+      { m: 'Jun', total: 28, integ: 11 }, { m: 'Jul', total: 22, integ: 9 },
+    ];
+    const maxT = 28;
+    const meses = rawMonths.map(r => ({
+      m: r.m,
+      totalStyle: `width:12px;border-radius:4px 4px 0 0;background:var(--barT,#1E3A8A);height:${Math.round(r.total / maxT * 100)}%`,
+      integStyle: `width:12px;border-radius:4px 4px 0 0;background:var(--barI,#0E9F6E);height:${Math.round(r.integ / maxT * 100)}%`,
+    }));
+
+    const celulas = [
+      { nome: 'Célula Vida Nova', lider: 'Carla Mendes · Quinta-feira', membros: 'Ativa' },
+      { nome: 'Célula Esperança', lider: 'Marcos Dias · Terça-feira', membros: 'Ativa' },
+      { nome: 'Célula Restauração', lider: 'Paulo Nunes · Sexta-feira', membros: 'Ativa' },
+    ];
+
+    // Cadastro
+    const step = this.state.step;
+    const stepDef = (n, label) => ({
+      n: String(n), label, hasLine: n < 3,
+      dotStyle: `width:28px;height:28px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;font-family:Sora,sans-serif;${step >= n ? 'background:#E8A33D;color:#0B1530' : 'background:rgba(255,255,255,.14);color:rgba(255,255,255,.6)'}`,
+      labelStyle: `font-size:13.5px;font-weight:600;${step >= n ? 'color:#FFFFFF' : 'color:rgba(255,255,255,.5)'}`
+    });
+    const sel = this.state.interesses;
+    const interesses = ['Membro da igreja', 'Procurando batismo', 'Quero ter uma célula em casa', 'Preciso de oração', 'Outros'].map(label => {
+      const on = sel.includes(label);
+      return {
+        label,
+        check: on ? '✓ ' : '',
+        onClick: () => set('interesses', on ? sel.filter(x => x !== label) : [...sel, label]),
+        style: `border-radius:999px;padding:9px 16px;font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;${on ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);font-weight:600' : 'border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--text2,#475467)'}`
+      };
+    });
+    const attendsCell = this.state.attendsCell;
+    const celulasProx = [
+      { nome: 'Célula Vida Nova', info: 'Quinta, 20h · Casa da Carla · Jd. Primavera', dist: '850 m' },
+      { nome: 'Célula Esperança', info: 'Terça, 19h30 · Casa do Marcos · Centro', dist: '1,2 km' },
+      { nome: 'Célula Restauração', info: 'Sexta, 20h · Casa do Paulo · Vila Nova', dist: '2,4 km' },
+    ].map((c, i) => ({
+      ...c,
+      onClick: () => set('celulaSel', i),
+      style: `display:flex;align-items:center;gap:14px;width:100%;border-radius:12px;padding:14px 16px;font-family:inherit;cursor:pointer;${this.state.celulaSel === i ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip2,#F5F8FF)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF)'}`
+    }));
+
+    // ── Páginas internas ──
+    const page = this.state.navActive;
+    const builtPages = ['Dashboard', 'Visitantes', 'Células', 'Relatórios', 'Materiais', 'Líderes', 'Supervisores', 'Coordenações', 'Novo Cadastro', 'Tipos de Célula', 'Cidades e Bairros', 'WhatsApp', 'Notificações'];
+
+    const statusDefs = {
+      novo: { label: 'Novo', badge: badges.novo },
+      acomp: { label: 'Em acompanhamento', badge: badges.acomp },
+      integ: { label: 'Integrado', badge: badges.integ },
+      inativo: { label: 'Não retornou', badge: badges.inativo },
+    };
+    const visBase = [
+      { nome: 'Mariana Souza', tel: '(11) 98811-2233', celula: 'Célula Vida Nova', st: 'novo', visita: 'há 2 dias', end: 'Rua das Flores, 123 · Jd. Primavera' },
+      { nome: 'João Pedro Lima', tel: '(11) 97744-5566', celula: 'Célula Esperança', st: 'acomp', visita: 'há 5 dias', end: 'Av. Central, 456 · Centro' },
+      { nome: 'Ana Clara Ferreira', tel: '(11) 96633-7788', celula: 'Célula Vida Nova', st: 'integ', visita: 'há 1 semana', end: 'Rua Ipê Amarelo, 89 · Jd. Primavera' },
+      { nome: 'Rafael Almeida', tel: '(11) 95522-8899', celula: 'Célula Restauração', st: 'acomp', visita: 'há 2 semanas', end: 'Rua do Bosque, 210 · Vila Nova' },
+      { nome: 'Camila Barros', tel: '(11) 94411-9900', celula: '—', st: 'inativo', visita: 'há 3 semanas', end: 'Av. das Palmeiras, 77 · Centro' },
+      { nome: 'Bruno Carvalho', tel: '(11) 93300-1122', celula: 'Célula Esperança', st: 'novo', visita: 'há 3 dias', end: 'Rua Aurora, 15 · Centro' },
+      { nome: 'Fernanda Rocha', tel: '(11) 92299-3344', celula: 'Célula Restauração', st: 'integ', visita: 'há 1 mês', end: 'Rua Santa Clara, 302 · Vila Nova' },
+      { nome: 'Lucas Martins', tel: '(11) 91188-5566', celula: '—', st: 'novo', visita: 'ontem', end: 'Rua Horizonte, 44 · Jd. Primavera' },
+    ];
+    const effSt = (i) => this.state.vStatus[i] ?? visBase[i].st;
+    const avColors = { novo: ['var(--chip,#EFF4FF)', 'var(--link,#1E3A8A)'], acomp: ['var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)'], integ: ['var(--okBg,#E7F6EF)', 'var(--okFg,#0E9F6E)'], inativo: ['var(--inatBg,#F2F4F7)', 'var(--inatFg,#667085)'] };
+    const q = this.state.vq.toLowerCase();
+    const fLabel = this.state.vFilter;
+    const visRows = visBase.map((v, i) => ({ ...v, i })).filter(v =>
+      (!q || v.nome.toLowerCase().includes(q)) &&
+      (fLabel === 'Todos' || statusDefs[effSt(v.i)].label === fLabel)
+    ).map(v => {
+      const st = effSt(v.i);
+      return {
+        nome: v.nome, tel: v.tel, celula: v.celula, visita: v.visita,
+        initials: v.nome.split(' ').map(p => p[0]).slice(0, 2).join(''),
+        avatarStyle: avatar(avColors[st][0], avColors[st][1]),
+        status: statusDefs[st].label, badgeStyle: statusDefs[st].badge,
+        onClick: () => set('visSel', v.i),
+        rowStyle: `display:flex;align-items:center;gap:14px;padding:13px 20px;border-bottom:1px solid var(--borderS,#F5F6F8);cursor:pointer;${this.state.visSel === v.i ? 'background:var(--chip2,#F5F8FF);box-shadow:inset 3px 0 0 #1E3A8A' : 'background:transparent'}`,
+      };
+    });
+    const vFilters = ['Todos', 'Novo', 'Em acompanhamento', 'Integrado', 'Não retornou'].map(label => ({
+      label,
+      onClick: () => set('vFilter', label),
+      style: `border-radius:999px;padding:7px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;${fLabel === label ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text3,#667085)'}`
+    }));
+    const si = this.state.visSel;
+    const sv = visBase[si];
+    const svSt = effSt(si);
+    const statusOpts = Object.entries(statusDefs).map(([key, d]) => ({
+      label: d.label,
+      onClick: () => this.setState(s => ({ vStatus: { ...s.vStatus, [si]: key } })),
+      style: `border-radius:999px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;${svSt === key ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text3,#667085)'}`
+    }));
+
+    const celulasPage = [
+      { nome: 'Célula Vida Nova', tipo: 'Adultos', lider: 'Carla Mendes', dia: 'Quinta-feira · 20h', end: 'Rua das Acácias, 45 · Jd. Primavera', membros: '14 membros', cap: 'Capacidade: 18' },
+      { nome: 'Célula Esperança', tipo: 'Casais', lider: 'Marcos Dias', dia: 'Terça-feira · 19h30', end: 'Av. Central, 890 · Centro', membros: '11 membros', cap: 'Capacidade: 15' },
+      { nome: 'Célula Restauração', tipo: 'Jovens', lider: 'Paulo Nunes', dia: 'Sexta-feira · 20h', end: 'Rua do Bosque, 12 · Vila Nova', membros: '9 membros', cap: 'Capacidade: 12' },
+      { nome: 'Célula Ágape', tipo: 'Adultos', lider: 'Renata Campos', dia: 'Quarta-feira · 20h', end: 'Rua Santa Clara, 210 · Vila Nova', membros: '13 membros', cap: 'Capacidade: 16' },
+      { nome: 'Célula Videira', tipo: 'Jovens', lider: 'Tiago Fonseca', dia: 'Sábado · 18h', end: 'Rua Aurora, 301 · Centro', membros: '8 membros', cap: 'Capacidade: 14' },
+      { nome: 'Célula Shalom', tipo: 'Casais', lider: 'Débora Pires', dia: 'Quinta-feira · 19h30', end: 'Av. das Palmeiras, 55 · Centro', membros: '12 membros', cap: 'Capacidade: 15' },
+    ].map(c => ({ ...c,
+      onEdit: () => openEdit('editCelula', { nome: c.nome, lider: c.lider, dia: c.dia, end: c.end, tipo: c.tipo }),
+      onMembros: () => openEdit('membros', { nome: c.nome, membros: memberPoolAll.slice(0, 6) }),
+    }));
+
+    const materiais = [
+      { nome: 'Estudo de Célula — Semana 32.pdf', celula: 'Todas as células', data: 'Enviado em 28/06/2026', tam: '1,2 MB' },
+      { nome: 'Guia do Anfitrião.pdf', celula: 'Célula Vida Nova', data: 'Enviado em 21/06/2026', tam: '860 KB' },
+      { nome: 'Roteiro de Louvor — Julho.pdf', celula: 'Todas as células', data: 'Enviado em 15/06/2026', tam: '540 KB' },
+      { nome: 'Treinamento de Líderes — Módulo 2.pdf', celula: 'Líderes', data: 'Enviado em 08/06/2026', tam: '2,4 MB' },
+    ];
+
+    const relCards = [
+      { label: 'Taxa de Integração', icon: '✓', value: '22,5%', sub: 'Integrados ÷ total de visitantes' },
+      { label: 'Líderes Ativos', icon: '★', value: '9', sub: 'Usuários com perfil líder' },
+      { label: 'Visitantes (mês)', icon: '☺', value: '22', sub: 'Cadastrados no mês corrente' },
+      { label: 'Média Frequência', icon: '◔', value: '78,4%', sub: 'Presença média nos encontros' },
+    ];
+
+    // ── Líderes ──
+    const coordColors = { Norte: ['#EFF4FF', '#1E3A8A'], Sul: ['#E7F6EF', '#0E9F6E'], Leste: ['#FDF3E1', '#B54708'], Oeste: ['#F3EEFE', '#6D46C7'] };
+    const lideresBase = [
+      { nome: 'Carla Mendes', email: 'carla.mendes@igreja.com.br', tel: '(11) 98811-2233', coord: 'Norte', sup: 'André Prado', cels: ['Vida Nova'], vis: 14, desc: 'Lidera a região do Jardim Primavera há 3 anos, com foco em famílias.' },
+      { nome: 'Marcos Dias', email: 'marcos.dias@igreja.com.br', tel: '(11) 97744-5566', coord: 'Sul', sup: 'Beatriz Lopes', cels: ['Esperança'], vis: 11, desc: '' },
+      { nome: 'Paulo Nunes', email: 'paulo.nunes@igreja.com.br', tel: '(11) 96633-7788', coord: 'Leste', sup: 'André Prado', cels: ['Restauração'], vis: 9, desc: 'Trabalha com o público jovem da Vila Nova.' },
+      { nome: 'Renata Campos', email: 'renata.campos@igreja.com.br', tel: '(11) 95522-8899', coord: 'Norte', sup: 'Beatriz Lopes', cels: ['Ágape', 'Videira'], vis: 21, desc: '' },
+      { nome: 'Tiago Fonseca', email: 'tiago.fonseca@igreja.com.br', tel: '(11) 94411-9900', coord: 'Oeste', sup: 'Carlos Vieira', cels: ['Videira'], vis: 8, desc: '' },
+      { nome: 'Débora Pires', email: 'debora.pires@igreja.com.br', tel: '(11) 93300-1122', coord: 'Sul', sup: 'Carlos Vieira', cels: ['Shalom'], vis: 12, desc: 'Coordena células de casais no Centro.' },
+    ];
+    const lq = this.state.lq.toLowerCase();
+    const lideres = lideresBase.map((l, i) => ({ l, i })).filter(({ l }) => !lq || l.nome.toLowerCase().includes(lq) || l.email.toLowerCase().includes(lq)).map(({ l, i }) => {
+      const cc = coordColors[l.coord];
+      return {
+        nome: l.nome, email: l.email, cels: l.cels.length + ' célula' + (l.cels.length !== 1 ? 's' : ''), vis: l.vis + ' visitantes', coord: l.coord,
+        initials: l.nome.split(' ').map(p => p[0]).slice(0, 2).join(''),
+        avatarStyle: `width:46px;height:46px;border-radius:99px;background:${cc[0]};color:${cc[1]};display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:15px;flex:none`,
+        coordStyle: `font-size:11.5px;font-weight:600;border-radius:99px;padding:3px 10px;background:${cc[0]};color:${cc[1]}`,
+        onClick: () => set('lSel', i),
+        cardStyle: `background:var(--surface,#FFFFFF);border:1px solid ${this.state.lSel === i ? 'var(--accentB,#1E3A8A)' : 'var(--border,#E9ECF2)'};border-radius:14px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.04)`,
+      };
+    });
+    const li = this.state.lSel;
+    const sl = lideresBase[li];
+    const slcc = coordColors[sl.coord];
+    const lTab = this.state.lTab;
+    const lTabs = ['Dados', 'Células', 'Visitantes'].map(t => ({ label: t, onClick: () => set('lTab', t), style: `padding:10px 4px;border:none;background:transparent;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;border-bottom:2px solid ${lTab === t ? 'var(--accentB,#1E3A8A)' : 'transparent'};color:${lTab === t ? 'var(--link,#1E3A8A)' : 'var(--text3,#667085)'}` }));
+    const slInfo = [
+      ['Cargo', 'Líder'], ['E-mail', sl.email], ['Telefone', sl.tel],
+      ['Coordenação', sl.coord], ['Supervisor', sl.sup], ['Células', sl.cels.length + ' · ' + sl.cels.join(', ')],
+    ].map(([k, v]) => ({ k, v }));
+    const slCells = sl.cels.map(c => ({ nome: 'Célula ' + c }));
+
+    // ── Supervisores ──
+    const supEnds = { 'André Prado': 'Rua Ipê Amarelo, 120 · Jd. Primavera', 'Beatriz Lopes': 'Av. Central, 456 · Centro', 'Carlos Vieira': 'Rua Horizonte, 88 · Vila Nova' };
+    const supervisores = [
+      { nome: 'André Prado', coord: 'Norte', lideres: 'Carla Mendes, Paulo Nunes', qtd: '2 líderes', cels: '3 células', email: 'andre.prado@igreja.com.br' },
+      { nome: 'Beatriz Lopes', coord: 'Sul', lideres: 'Marcos Dias, Renata Campos', qtd: '2 líderes', cels: '3 células', email: 'beatriz.lopes@igreja.com.br' },
+      { nome: 'Carlos Vieira', coord: 'Oeste', lideres: 'Tiago Fonseca, Débora Pires', qtd: '2 líderes', cels: '2 células', email: 'carlos.vieira@igreja.com.br' },
+    ].map(s => { const cc = coordColors[s.coord]; return { ...s, initials: s.nome.split(' ').map(p => p[0]).slice(0, 2).join(''), avatarStyle: `width:46px;height:46px;border-radius:99px;background:${cc[0]};color:${cc[1]};display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:15px;flex:none`, coordStyle: `font-size:11.5px;font-weight:600;border-radius:99px;padding:3px 10px;background:${cc[0]};color:${cc[1]}`, onEdit: () => openEdit('editSupervisor', { nome: s.nome, email: s.email, coord: s.coord, end: supEnds[s.nome] }) }; });
+
+    // ── Coordenações ──
+    const coordenacoes = [
+      { nome: 'Coordenação Norte', cor: '#1E3A8A', sups: '1 supervisor', lids: '2 líderes' },
+      { nome: 'Coordenação Sul', cor: '#0E9F6E', sups: '1 supervisor', lids: '2 líderes' },
+      { nome: 'Coordenação Leste', cor: '#B54708', sups: '0 supervisor', lids: '1 líder' },
+      { nome: 'Coordenação Oeste', cor: '#6D46C7', sups: '1 supervisor', lids: '1 líder' },
+    ].map(c => ({ ...c, onEdit: () => openEdit('editCoordenacao', { nome: c.nome, cor: c.cor }) }));
+
+    // ── Tipos de célula ──
+    const tiposCelula = [
+      { nome: 'Adultos', desc: 'Células para o público adulto', qtd: '2 células' },
+      { nome: 'Jovens', desc: 'Células para adolescentes e jovens', qtd: '2 células' },
+      { nome: 'Casais', desc: 'Células voltadas a casais', qtd: '2 células' },
+      { nome: 'Infantil', desc: 'Células infantis supervisionadas', qtd: '0 células' },
+    ].map(t => ({ ...t, onEdit: () => openEdit('editTipo', { nome: t.nome, desc: t.desc }) }));
+
+    // ── Cidades e bairros ──
+    const locTab = this.state.locTab;
+    const locTabs = ['Cidades', 'Bairros'].map(t => ({ label: t, onClick: () => set('locTab', t), style: `padding:9px 18px;border-radius:9px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;${locTab === t ? 'background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'background:transparent;color:var(--text3,#667085)'}` }));
+    const cidades = [
+      { nome: 'São Paulo', uf: 'SP', bairros: '8 bairros' },
+      { nome: 'Guarulhos', uf: 'SP', bairros: '3 bairros' },
+      { nome: 'Osasco', uf: 'SP', bairros: '2 bairros' },
+    ].map(c => ({ ...c, onEdit: () => openEdit('editCidade', { nome: c.nome, uf: c.uf }) }));
+    const bairros = [
+      { nome: 'Jardim Primavera', cidade: 'São Paulo · SP' },
+      { nome: 'Centro', cidade: 'São Paulo · SP' },
+      { nome: 'Vila Nova', cidade: 'São Paulo · SP' },
+      { nome: 'Jardim Aeroporto', cidade: 'Guarulhos · SP' },
+    ].map(b => ({ ...b, onEdit: () => openEdit('editBairro', { nome: b.nome, cidade: b.cidade.split(' ·')[0] }) }));
+
+    // ── WhatsApp ──
+    const waTab = this.state.waTab;
+    const waTabs = ['Em lote', 'Individual', 'Templates'].map(t => ({ label: t, onClick: () => set('waTab', t), style: `padding:9px 18px;border-radius:9px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;${waTab === t ? 'background:#25D366;color:#FFFFFF' : 'background:transparent;color:var(--text3,#667085)'}` }));
+    const waSegmentos = ['Todos os visitantes', 'Novos visitantes', 'Em acompanhamento', 'Líderes'].map(label => ({ label, sel: this.state.waSeg === label, onClick: () => set('waSeg', label), style: `display:flex;align-items:center;gap:10px;border:1px solid ${this.state.waSeg === label ? 'var(--accentB,#1E3A8A)' : 'var(--border,#D0D5DD)'};border-radius:11px;padding:13px 15px;cursor:pointer;background:${this.state.waSeg === label ? 'var(--chip,#EFF4FF)' : 'var(--surface,#FFFFFF)'}` }));
+
+    // ── Templates de WhatsApp ──
+    const waTemplates = this.state.waTemplates;
+    const wtpl = this.state.waTpl || {};
+    const tplSet = (k) => (e) => this.setState(s => ({ waTpl: { ...s.waTpl, [k]: e.target.value } }));
+    const waSamples = { nome: 'Mariana', celula: 'Célula Vida Nova', data: 'quinta-feira', horario: '20h', bairro: 'Jd. Primavera', lider: 'Carla Mendes' };
+    const tplVars = ['nome', 'celula', 'data', 'horario', 'bairro', 'lider'].map(v => ({
+      label: '{' + v + '}',
+      onClick: () => this.setState(s => { const m = (s.waTpl && s.waTpl.msg) || ''; return { waTpl: { ...s.waTpl, msg: m + (m && !m.endsWith(' ') ? ' ' : '') + '{' + v + '}' } }; }),
+    }));
+    const tplPreview = (wtpl.msg || '').replace(/\{(\w+)\}/g, (m, k) => waSamples[k] || m);
+    const catBadge = (cat) => cat === 'Boas-vindas' ? badge('var(--okBg,#E7F6EF)', 'var(--okFg,#0E9F6E)') : cat === 'Convite' ? badge('var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)') : badge('var(--chip,#EFF4FF)', 'var(--link,#1E3A8A)');
+    const waTplRows = waTemplates.map((t, i) => ({
+      nome: t.nome, cat: t.cat,
+      msgShort: t.msg.length > 72 ? t.msg.slice(0, 72) + '…' : t.msg,
+      catStyle: catBadge(t.cat),
+      onEdit: () => this.setState({ waTplModal: true, waTpl: { ...t, idx: i } }),
+      onDelete: () => this.setState(s => ({ waTemplates: s.waTemplates.filter((_, j) => j !== i) })),
+      onUse: () => this.setState({ waMsg: t.msg, waTab: 'Em lote' }),
+    }));
+    const waTplPick = waTemplates.map(t => ({ nome: t.nome, onClick: () => set('waMsg', t.msg) }));
+
+    // ── Novo Cadastro (Líderes, Supervisores e Coordenadores) ──
+    const ncTipo = this.state.ncTipo;
+    const ncSel = this.state.ncSel;
+    const tglNc = (k) => this.setState(s => ({ ncSel: { ...s.ncSel, [k]: !s.ncSel[k] } }));
+    const ncItem = (key, nome, sub) => {
+      const on = !!ncSel[key];
+      return {
+        nome, sub,
+        onClick: () => tglNc(key),
+        check: on ? '✓' : '',
+        boxStyle: `width:20px;height:20px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;${on ? 'background:var(--accentB,#1E3A8A);color:#FFFFFF;border:1.5px solid var(--accentB,#1E3A8A)' : 'border:1.5px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:transparent'}`,
+      };
+    };
+    const ncCels = celulasPage.map((c, i) => ncItem('c' + i, c.nome, c.end));
+    const ncLids = lideresBase.map((l, i) => ncItem('l' + i, l.nome, l.email));
+    const ncSups = supervisores.map((s, i) => ncItem('s' + i, s.nome, s.email));
+    const cnt = (p) => Object.keys(ncSel).filter(k => k[0] === p && ncSel[k]).length;
+    const ncTipos = [
+      { t: 'Líder', icon: '★', desc: 'Conduz uma ou mais células' },
+      { t: 'Supervisor', icon: '◉', desc: 'Acompanha líderes' },
+      { t: 'Coordenador', icon: '⌘', desc: 'Gere uma coordenação' },
+    ].map(({ t, icon, desc }) => ({
+      t, icon, desc,
+      onClick: () => set('ncTipo', t),
+      style: `flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 12px;border-radius:14px;font-family:inherit;cursor:pointer;${ncTipo === t ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF)'}`,
+      iconStyle: `width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;${ncTipo === t ? 'background:var(--accentB,#1E3A8A);color:#FFFFFF' : 'background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)'}`,
+      labelStyle: `font-size:14px;font-weight:600;${ncTipo === t ? 'color:var(--link,#1E3A8A)' : 'color:var(--text,#101828)'}`,
+    }));
+
+    // ── Notificações ──
+    const notificacoes = [
+      { icon: '☺', tipo: 'novo', titulo: 'Novo visitante cadastrado', texto: 'Lucas Martins se cadastrou pela tela pública.', tempo: 'há 12 min', unread: true },
+      { icon: '✓', tipo: 'integ', titulo: 'Visitante integrado', texto: 'Ana Clara Ferreira foi integrada à Célula Vida Nova.', tempo: 'há 2 h', unread: true },
+      { icon: '⌂', tipo: 'novo', titulo: 'Nova célula criada', texto: 'Célula Videira foi cadastrada por Tiago Fonseca.', tempo: 'ontem', unread: false },
+      { icon: '✉', tipo: 'acomp', titulo: 'Campanha enviada', texto: 'Mensagem em lote enviada para 42 visitantes.', tempo: 'há 2 dias', unread: false },
+    ].map(n => {
+      const c = n.tipo === 'integ' ? ['var(--okBg,#E7F6EF)', 'var(--okFg,#0E9F6E)'] : n.tipo === 'acomp' ? ['var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)'] : ['var(--chip,#EFF4FF)', 'var(--link,#1E3A8A)'];
+      return { ...n, iconStyle: `width:42px;height:42px;border-radius:12px;background:${c[0]};color:${c[1]};display:flex;align-items:center;justify-content:center;font-size:17px;flex:none`, rowStyle: `display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-bottom:1px solid var(--borderS,#F5F6F8);background:${n.unread ? 'var(--chip2,#F5F8FF)' : 'transparent'}` };
+    });
+
+    // ── Estado de edição ──
+    const ed = this.state.edit || {};
+    const memberPoolAll = ['Ana Beatriz Costa', 'Roberto Silva', 'Juliana Prado', 'Felipe Andrade', 'Patrícia Gomes', 'Henrique Sales', 'Sofia Ramires', 'Otávio Brito'];
+    const membrosArr = ed.membros || [];
+    const membrosList = membrosArr.map(nome => ({
+      nome,
+      initials: nome.split(' ').map(p => p[0]).slice(0, 2).join(''),
+      onRemove: () => this.setState(s => ({ edit: { ...s.edit, membros: s.edit.membros.filter(m => m !== nome) } })),
+    }));
+    const onAddMembro = () => { const nx = memberPoolAll.find(m => !membrosArr.includes(m)); if (nx) this.setState(s => ({ edit: { ...s.edit, membros: [...s.edit.membros, nx] } })); };
+    const lvRows = visBase.map((v, i) => ({ v, i })).filter(({ v }) => sl.cels.some(c => v.celula.includes(c))).map(({ v, i }) => {
+      const st = effSt(i);
+      return { nome: v.nome, visita: 'Visitou ' + v.visita, initials: v.nome.split(' ').map(p => p[0]).slice(0, 2).join(''), avatarStyle: avatar(avColors[st][0], avColors[st][1]), status: statusDefs[st].label, badgeStyle: statusDefs[st].badge };
+    });
+
+    return {
+      isLogin: screen === 'login', isDashboard: screen === 'dashboard', isCadastro: screen === 'cadastro',
+      pageDashboard: page === 'Dashboard',
+      pageVisitantes: page === 'Visitantes',
+      pageCelulas: page === 'Células',
+      pageRelatorios: page === 'Relatórios',
+      pageMateriais: page === 'Materiais',
+      pageLideres: page === 'Líderes',
+      pageSupervisores: page === 'Supervisores',
+      pageCoordenacoes: page === 'Coordenações',
+      pageNovoCadastro: page === 'Novo Cadastro',
+      pageTipos: page === 'Tipos de Célula',
+      pageLocal: page === 'Cidades e Bairros',
+      pageWhatsapp: page === 'WhatsApp',
+      pageNotif: page === 'Notificações',
+      pageOther: !builtPages.includes(page),
+      lideres, onLSearch: (e) => set('lq', e.target.value),
+      lTabs, lTab,
+      selLNome: sl.nome, selLInitials: sl.nome.split(' ').map(p => p[0]).slice(0, 2).join(''),
+      selLAvatarStyle: `width:64px;height:64px;border-radius:99px;background:${slcc[0]};color:${slcc[1]};display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:22px;flex:none`,
+      selLCoord: sl.coord, selLCoordStyle: `font-size:12px;font-weight:600;border-radius:99px;padding:4px 12px;background:${slcc[0]};color:${slcc[1]}`,
+      slInfo, slCells, slDesc: sl.desc || 'Nenhuma descrição adicionada.', slHasDesc: !!sl.desc, slVis: sl.vis,
+      isLTabDados: lTab === 'Dados', isLTabCelulas: lTab === 'Células', isLTabVisitantes: lTab === 'Visitantes',
+      supervisores, coordenacoes, tiposCelula,
+      locTabs, isLocCidades: locTab === 'Cidades', isLocBairros: locTab === 'Bairros', cidades, bairros,
+      waTabs, isWaLote: waTab === 'Em lote', isWaIndividual: waTab === 'Individual', waSegmentos,
+      isWaCompose: waTab === 'Em lote' || waTab === 'Individual',
+      isWaTemplates: waTab === 'Templates',
+      waMsg: this.state.waMsg, onWaMsg: (e) => set('waMsg', e.target.value),
+      waTplRows, waTplPick,
+      waTplModalOpen: this.state.waTplModal,
+      waTplNew: () => this.setState({ waTplModal: true, waTpl: { nome: '', cat: 'Geral', msg: '' } }),
+      waTplClose: () => set('waTplModal', false),
+      waTplSave: () => { this.setState(s => { const t = { nome: s.waTpl.nome || 'Sem nome', cat: s.waTpl.cat || 'Geral', msg: s.waTpl.msg || '' }; const arr = [...s.waTemplates]; if (s.waTpl.idx != null) { arr[s.waTpl.idx] = t; } else { arr.push(t); } return { waTemplates: arr, waTplModal: false, toast: 'Template salvo com sucesso!' }; }); setTimeout(() => this.setState({ toast: '' }), 2600); },
+      waTplTitle: wtpl.idx != null ? 'Editar Template' : 'Novo Template',
+      tplNome: wtpl.nome ?? '', tplCat: wtpl.cat ?? 'Geral', tplMsg: wtpl.msg ?? '',
+      onTplNome: tplSet('nome'), onTplCat: tplSet('cat'), onTplMsg: tplSet('msg'),
+      tplVars, tplPreview, tplHasPreview: !!wtpl.msg,
+      notificacoes,
+      modalVisitante: this.state.modal === 'visitante',
+      modalCelula: this.state.modal === 'celula',
+      modalLider: this.state.modal === 'lider',
+      modalSupervisor: this.state.modal === 'supervisor',
+      modalCoordenacao: this.state.modal === 'coordenacao',
+      modalTipo: this.state.modal === 'tipo',
+      modalCidade: this.state.modal === 'cidade',
+      modalBairro: this.state.modal === 'bairro',
+      openVisitante: () => set('modal', 'visitante'),
+      openCelula: () => set('modal', 'celula'),
+      openLider: () => this.setState({ navActive: 'Novo Cadastro', ncTipo: 'Líder', modal: null }),
+      openSupervisor: () => this.setState({ navActive: 'Novo Cadastro', ncTipo: 'Supervisor', modal: null }),
+      openCoordenacao: () => set('modal', 'coordenacao'),
+      openTipo: () => set('modal', 'tipo'),
+      openCidade: () => set('modal', 'cidade'),
+      openBairro: () => set('modal', 'bairro'),
+      closeModal: () => set('modal', null),
+      modalEditCidade: this.state.modal === 'editCidade',
+      modalEditBairro: this.state.modal === 'editBairro',
+      modalEditTipo: this.state.modal === 'editTipo',
+      modalEditCelula: this.state.modal === 'editCelula',
+      modalMembros: this.state.modal === 'membros',
+      modalEditCoordenacao: this.state.modal === 'editCoordenacao',
+      modalEditSupervisor: this.state.modal === 'editSupervisor',
+      modalEditLider: this.state.modal === 'editLider',
+      modalListaVis: this.state.modal === 'listaVis',
+      modalMapa: this.state.modal === 'mapa',
+      openEditLider: (e) => { if (e && e.preventDefault) e.preventDefault(); openEdit('editLider', { nome: sl.nome, email: sl.email, tel: sl.tel, desc: sl.desc, sup: sl.sup, end: ['Rua das Acácias, 45 · Jd. Primavera', 'Av. Central, 890 · Centro', 'Rua do Bosque, 12 · Vila Nova', 'Rua Santa Clara, 210 · Vila Nova', 'Rua Aurora, 301 · Centro', 'Av. das Palmeiras, 55 · Centro'][li] }); },
+      openListaVis: (e) => { e.preventDefault(); openEdit('listaVis', { nome: sl.nome }); },
+      openMapa: (e) => { e.preventDefault(); openEdit('mapa', { nome: sv.nome, end: sv.end }); },
+      edNome: ed.nome ?? '', edEmail: ed.email ?? '', edTel: ed.tel ?? '', edDesc: ed.desc ?? '',
+      edUf: ed.uf ?? 'SP', edCidade: ed.cidade ?? 'São Paulo', edLider: ed.lider ?? '', edDia: ed.dia ?? '', edEnd: ed.end ?? '', edTipo: ed.tipo ?? 'Adultos', edCoord: ed.coord ?? 'Norte', edSup: ed.sup ?? 'André Prado',
+      onEdNome: edSet('nome'), onEdEmail: edSet('email'), onEdTel: edSet('tel'), onEdDesc: edSet('desc'),
+      onEdUf: edSet('uf'), onEdCidade: edSet('cidade'), onEdLider: edSet('lider'), onEdDia: edSet('dia'), onEdEnd: edSet('end'), onEdTipo: edSet('tipo'), onEdCoord: edSet('coord'), onEdSup: edSet('sup'),
+      membrosList, membrosTitle: 'Membros · ' + (ed.nome ?? ''), membrosCount: membrosArr.length + ' membros', onAddMembro,
+      lvRows, lvTitle: 'Visitantes de ' + sl.nome,
+      submitModal: () => { this.setState({ modal: null, toast: 'Cadastro salvo com sucesso!' }); setTimeout(() => this.setState({ toast: '' }), 2600); },
+      toastMsg: this.state.toast, toastVisible: !!this.state.toast,
+      ncTipos, ncCels, ncLids, ncSups,
+      ncIsLider: ncTipo === 'Líder',
+      ncIsSupervisor: ncTipo === 'Supervisor',
+      ncIsCoordenador: ncTipo === 'Coordenador',
+      ncCelLabel: 'Associar Células (' + cnt('c') + ' selecionadas)',
+      ncLidLabel: 'Associar Líderes (' + cnt('l') + ' selecionados)',
+      ncSupLabel: 'Associar Supervisores (' + cnt('s') + ' selecionados)',
+      ncLimpar: () => set('ncSel', {}),
+      corOpts: ['#1E3A8A', '#0E9F6E', '#B54708', '#6D46C7', '#0E7490', '#BE185D'].map(c => ({
+        onClick: () => set('coordCor', c),
+        style: `width:36px;height:36px;border-radius:99px;background:${c};cursor:pointer;border:${this.state.coordCor === c ? '3px solid var(--text,#101828)' : '3px solid transparent'};padding:0`
+      })),
+      onSearch: (e) => set('vq', e.target.value),
+      visRows, vFilters, statusOpts,
+      selNome: sv.nome, selTel: sv.tel, selCelula: sv.celula, selEnd: sv.end, selVisita: 'Visitou ' + sv.visita,
+      selInitials: sv.nome.split(' ').map(p => p[0]).slice(0, 2).join(''),
+      selAvatarStyle: avatar(avColors[svSt][0], avColors[svSt][1]) + ';width:56px;height:56px;font-size:18px',
+      selConverted: !!this.state.converted[si],
+      convert: () => this.setState(s => ({ converted: { ...s.converted, [si]: true }, vStatus: { ...s.vStatus, [si]: 'integ' } })),
+      celulasPage, materiais, relCards,
+      goLogin: () => set('screen', 'login'),
+      goDashboard: () => set('screen', 'dashboard'),
+      goCadastro: () => set('screen', 'cadastro'),
+      goCadastroLink: (e) => { e.preventDefault(); set('screen', 'cadastro'); },
+      themeVars: dark ? darkVars : '',
+      themeIcon: dark ? '☀' : '☾',
+      toggleDark: () => set('dark', !dark),
+      tabLoginStyle: tab(screen === 'login'), tabDashStyle: tab(screen === 'dashboard'), tabCadStyle: tab(screen === 'cadastro'),
+      navGroups,
+      pageTitle: this.state.navActive,
+      kpis: [
+        kpi('Visitantes Cadastrados', '☺', '138', 'Total no sistema'),
+        kpi('Encaminhamentos', '➤', '54', 'Acompanhamento + integrados'),
+        kpi('Visitantes Integrados', '✓', '31', 'Status: integrado'),
+        kpi('Frequência nas Células', '◔', '78,4%', 'Média de presença'),
+      ],
+      visitantes, meses, celulas,
+      steps: [stepDef(1, 'Dados pessoais'), stepDef(2, 'Endereço'), stepDef(3, 'Sobre você')],
+      isStep1: step === 1, isStep2: step === 2, isStep3: step === 3,
+      interesses, celulasProx,
+      attendsCell,
+      toggleCell: () => set('attendsCell', !attendsCell),
+      toggleStyle: `width:46px;height:26px;border-radius:99px;border:none;cursor:pointer;padding:3px;display:flex;transition:background .2s;${attendsCell ? 'background:#1E3A8A;justify-content:flex-end' : 'background:#D0D5DD;justify-content:flex-start'}`,
+      toggleKnobStyle: 'width:20px;height:20px;border-radius:99px;background:#FFFFFF;box-shadow:0 1px 2px rgba(16,24,40,.2)',
+      showOutros: sel.includes('Outros'),
+      nextLabel: step === 3 ? 'Concluir cadastro' : 'Continuar →',
+      backBtnStyle: `height:48px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;visibility:${step > 1 ? 'visible' : 'hidden'}`,
+      stepBack: () => set('step', Math.max(1, step - 1)),
+      stepNext: () => { if (step < 3) { this.setState({ step: step + 1 }); } else { this.setState({ done: true }); } },
+      cadastroDone: this.state.done,
+    };
+  }
+}
+</script>
+</body>
+</html>

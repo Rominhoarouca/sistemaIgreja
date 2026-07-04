@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+body{margin:0;background:#EEF0F4;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+input::placeholder{color:#98A2B3}
+.scr::-webkit-scrollbar{width:0}
+input:focus,select:focus{outline:none;border-color:#1E3A8A !important}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:28px 12px 60px;gap:20px;background:var(--page,#EEF0F4);{{ themeVars }}">
+
+<!-- Prototype chrome -->
+<div style="display:flex;align-items:center;gap:6px;background:var(--surface,#FFFFFF);border:1px solid var(--border,#E4E7EC);border-radius:999px;padding:5px;box-shadow:0 1px 3px rgba(16,24,40,.06);flex-wrap:wrap;justify-content:center;max-width:96vw">
+  <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+    <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+  </sc-for>
+  <button onClick="{{ toggleDark }}" title="Claro/escuro" style="border:none;border-radius:999px;width:34px;height:34px;font-size:15px;cursor:pointer;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)">{{ themeIcon }}</button>
+</div>
+
+<!-- Phone frame -->
+<div style="width:390px;max-width:94vw;height:844px;border-radius:52px;background:#0A0E17;padding:13px;box-shadow:0 30px 70px -20px rgba(11,21,48,.55);flex:none;position:relative">
+  <div style="position:absolute;top:26px;left:50%;transform:translateX(-50%);width:120px;height:30px;background:#0A0E17;border-radius:99px;z-index:20"></div>
+  <div class="scr" style="width:100%;height:100%;border-radius:40px;overflow:hidden;background:var(--surface2,#F7F8FA);position:relative;display:flex;flex-direction:column">
+
+    <!-- Status bar -->
+    <div style="height:52px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 26px 8px;font-size:14px;font-weight:600;color:{{ statusColor }};z-index:10;background:{{ statusBg }}">
+      <span>9:41</span>
+      <span style="display:flex;gap:6px;align-items:center;font-size:13px">▮▮▮ 5G ▰</span>
+    </div>
+
+    <!-- ══ LOGIN ══ -->
+    <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Login" style="flex:1;background:linear-gradient(170deg,#0B1530 0%,#122452 55%,#1E3A8A 100%);display:flex;flex-direction:column;padding:0 28px;color:#FFFFFF;overflow-y:auto">
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:26px">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <img src="assets/logo.png" alt="Logo" style="width:60px;height:60px;border-radius:16px">
+          <div style="font-family:Sora,sans-serif;font-size:28px;font-weight:600;line-height:1.2;letter-spacing:-.4px">Bem-vindo de<br>volta</div>
+          <div style="font-size:15px;color:rgba(255,255,255,.72);line-height:1.55">Entre para acompanhar seus visitantes e células.</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85)">E-mail</label>
+            <input type="email" placeholder="voce@igreja.com.br" style="height:52px;border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:0 16px;font-size:15px;font-family:inherit;color:#FFFFFF;background:rgba(255,255,255,.08)">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85)">Senha</label>
+            <input type="password" placeholder="••••••••" style="height:52px;border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:0 16px;font-size:15px;font-family:inherit;color:#FFFFFF;background:rgba(255,255,255,.08)">
+          </div>
+          <a href="#" style="align-self:flex-end;font-size:13.5px;font-weight:600;color:#93B4FD;text-decoration:none">Esqueci a senha</a>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <button onClick="{{ goHome }}" style="height:54px;border:none;border-radius:13px;background:#FFFFFF;color:#0B1530;font-family:Sora,sans-serif;font-size:16px;font-weight:600;cursor:pointer">Entrar</button>
+          <div style="text-align:center;font-size:14px;color:rgba(255,255,255,.7)">É visitante? <a href="#" onClick="{{ goCadLink }}" style="font-weight:600;color:#93B4FD;text-decoration:none">Faça seu cadastro</a></div>
+        </div>
+      </div>
+      <div style="height:34px;flex:none;display:flex;align-items:center;justify-content:center"><div style="width:130px;height:5px;border-radius:99px;background:rgba(255,255,255,.35)"></div></div>
+    </div>
+    </sc-if>
+
+    <!-- ══ HOME / DASHBOARD ══ -->
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Mobile Dashboard" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:20px">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <img src="assets/logo.png" alt="Logo" style="width:40px;height:40px;border-radius:11px">
+        <div style="display:flex;flex-direction:column;flex:1">
+          <span style="font-size:12.5px;color:var(--muted,#98A2B3)">Bom dia,</span>
+          <span style="font-family:Sora,sans-serif;font-size:16px;font-weight:600;color:var(--text,#101828)">Pr. Ricardo</span>
+        </div>
+        <button onClick="{{ goNotif }}" title="Notificações" style="width:42px;height:42px;border-radius:12px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:17px;cursor:pointer;position:relative">🔔<span style="position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:99px;background:#E8A33D"></span></button>
+      </div>
+
+      <!-- KPI grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="width:34px;height:34px;border-radius:10px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">{{ k.icon }}</span>
+            </div>
+            <div style="font-family:Sora,sans-serif;font-size:26px;font-weight:600;color:var(--text,#101828);letter-spacing:-.5px">{{ k.value }}</div>
+            <div style="font-size:12px;color:var(--muted,#98A2B3);line-height:1.3">{{ k.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Chart card -->
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-family:Sora,sans-serif;font-size:14.5px;font-weight:600;color:var(--text,#101828)">Crescimento de Integração</span>
+        </div>
+        <div style="display:flex;gap:14px;font-size:11.5px;color:var(--text2,#475467)">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:var(--barT,#1E3A8A);display:inline-block"></span>Total</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:var(--barI,#0E9F6E);display:inline-block"></span>Integrados</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;height:110px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+          <sc-for list="{{ meses }}" as="mo" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end">
+              <div style="display:flex;align-items:flex-end;gap:3px;flex:1">
+                <div style="{{ mo.totalStyle }}"></div>
+                <div style="{{ mo.integStyle }}"></div>
+              </div>
+              <span style="font-size:10.5px;color:var(--muted,#98A2B3)">{{ mo.m }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- Ações rápidas -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <span style="font-family:Sora,sans-serif;font-size:14.5px;font-weight:600;color:var(--text,#101828)">Ações rápidas</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <button onClick="{{ novaCelula }}" style="height:52px;border:1px solid var(--border,#D0D5DD);border-radius:13px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">＋ Nova Célula</button>
+          <button onClick="{{ goNovoCadastro }}" style="height:52px;border:1px solid var(--border,#D0D5DD);border-radius:13px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">＋ Novo Líder</button>
+        </div>
+      </div>
+
+      <!-- Visitantes recentes -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-family:Sora,sans-serif;font-size:14.5px;font-weight:600;color:var(--text,#101828)">Visitantes recentes</span>
+          <a href="#" onClick="{{ goVisitantes }}" style="font-size:13px;font-weight:600;color:var(--link,#1E3A8A);text-decoration:none">Ver todos</a>
+        </div>
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;overflow:hidden">
+          <sc-for list="{{ visShort }}" as="v" hint-placeholder-count="3">
+            <div onClick="{{ goVisitantes }}" style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--borderS,#F5F6F8);cursor:pointer">
+              <div style="{{ v.avatarStyle }}">{{ v.initials }}</div>
+              <div style="display:flex;flex-direction:column;gap:1px;flex:1;min-width:0">
+                <span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ v.nome }}</span>
+                <span style="font-size:11.5px;color:var(--muted,#98A2B3)">Visitou {{ v.visita }}</span>
+              </div>
+              <span style="{{ v.badgeStyle }}">{{ v.status }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ VISITANTES ══ -->
+    <sc-if value="{{ isVisitantes }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Visitantes" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-family:Sora,sans-serif;font-size:22px;font-weight:600;color:var(--text,#101828);padding-top:6px">Visitantes</div>
+      <div style="display:flex;align-items:center;gap:8px;height:46px;border:1px solid var(--border,#D0D5DD);border-radius:12px;padding:0 14px;background:var(--surface,#FFFFFF)">
+        <span style="color:var(--muted,#98A2B3)">⌕</span>
+        <input placeholder="Buscar por nome…" onChange="{{ onSearch }}" style="flex:1;border:none;background:transparent;font-size:14px;font-family:inherit;color:var(--text,#101828)">
+      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px" class="scr">
+        <sc-for list="{{ vFilters }}" as="f" hint-placeholder-count="5">
+          <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ visRows }}" as="v" hint-placeholder-count="6">
+          <div onClick="{{ v.onClick }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:15px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+            <div style="{{ v.avatarStyle }}">{{ v.initials }}</div>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+              <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ v.nome }}</span>
+              <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ v.celula }} · {{ v.tel }}</span>
+            </div>
+            <span style="{{ v.badgeStyle }}">{{ v.status }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <!-- Detail sheet -->
+    <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(11,21,48,.42);z-index:40;display:flex;align-items:flex-end"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;z-index:41;background:var(--surface,#FFFFFF);border-radius:26px 26px 0 0;padding:10px 22px 30px;display:flex;flex-direction:column;gap:16px;max-height:74%;overflow-y:auto" class="scr">
+      <div style="align-self:center;width:44px;height:5px;border-radius:99px;background:var(--border,#E4E7EC);margin-bottom:4px"></div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="{{ selAvatarStyle }}">{{ selInitials }}</div>
+        <div style="display:flex;flex-direction:column;gap:2px;flex:1">
+          <span style="font-family:Sora,sans-serif;font-size:17px;font-weight:600;color:var(--text,#101828)">{{ selNome }}</span>
+          <span style="font-size:12.5px;color:var(--muted,#98A2B3)">{{ selVisita }}</span>
+        </div>
+        <button onClick="{{ closeSheet }}" style="width:34px;height:34px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:14px">
+        <div style="display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--muted,#98A2B3)">Telefone</span><span style="color:var(--text2,#344054);font-weight:500">{{ selTel }}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13.5px"><span style="color:var(--muted,#98A2B3)">Célula</span><span style="color:var(--text2,#344054);font-weight:500">{{ selCelula }}</span></div>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:13.5px"><span style="color:var(--muted,#98A2B3)">Endereço</span><span style="color:var(--text2,#344054);font-weight:500">{{ selEnd }}</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:14px">
+        <span style="font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted,#98A2B3)">Atualizar status</span>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ statusOpts }}" as="s" hint-placeholder-count="4">
+            <button onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button style="flex:1;height:48px;border:none;border-radius:12px;background:#25D366;color:#FFFFFF;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">WhatsApp</button>
+        <button style="flex:1;height:48px;border:1px solid var(--accentB,#1E3A8A);border-radius:12px;background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer">Converter</button>
+      </div>
+    </div>
+    </sc-if>
+    </sc-if>
+
+    <!-- ══ MAIS (resolve excesso de caminhos) ══ -->
+    <sc-if value="{{ isMais }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Mais" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:20px">
+      <div style="font-family:Sora,sans-serif;font-size:22px;font-weight:600;color:var(--text,#101828);padding-top:6px">Menu</div>
+      <sc-for list="{{ maisGroups }}" as="g" hint-placeholder-count="3">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="font-size:11.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted,#98A2B3)">{{ g.label }}</span>
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;overflow:hidden">
+            <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="4">
+              <div onClick="{{ it.onClick }}" style="display:flex;align-items:center;gap:14px;padding:15px 16px;border-bottom:1px solid var(--borderS,#F5F6F8);cursor:pointer">
+                <span style="width:38px;height:38px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:16px">{{ it.icon }}</span>
+                <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+                  <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ it.title }}</span>
+                  <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ it.sub }}</span>
+                </div>
+                <span style="color:var(--muted,#98A2B3);font-size:18px">›</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+      <button style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:13px;background:var(--surface,#FFFFFF);color:#D92D20;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Sair da conta</button>
+    </div>
+    </sc-if>
+
+    <!-- ══ CÉLULAS ══ -->
+    <sc-if value="{{ isCelulas }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Células" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px">
+        <span style="font-family:Sora,sans-serif;font-size:22px;font-weight:600;color:var(--text,#101828)">Células</span>
+        <button onClick="{{ novaCelula }}" style="height:40px;padding:0 14px;border:none;border-radius:11px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:12.5px;font-weight:600;cursor:pointer">+ Nova Célula</button>
+      </div>
+      <sc-for list="{{ celulasM }}" as="c" hint-placeholder-count="4">
+        <div onClick="{{ c.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+          <span style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none">⌂</span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+            <span style="font-size:12px;color:var(--muted,#98A2B3)">{{ c.sub }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none">
+            <span style="font-size:12px;font-weight:600;color:var(--text2,#475467)">{{ c.membros }}</span>
+            <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ RELATÓRIOS ══ -->
+    <sc-if value="{{ isRelatorios }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Relatórios" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-family:Sora,sans-serif;font-size:22px;font-weight:600;color:var(--text,#101828);padding-top:6px">Relatórios</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <sc-for list="{{ relCards }}" as="k" hint-placeholder-count="4">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px">
+            <span style="width:34px;height:34px;border-radius:10px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">{{ k.icon }}</span>
+            <div style="font-family:Sora,sans-serif;font-size:24px;font-weight:600;color:var(--text,#101828);letter-spacing:-.5px">{{ k.value }}</div>
+            <div style="font-size:12px;color:var(--muted,#98A2B3);line-height:1.3">{{ k.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-family:Sora,sans-serif;font-size:14.5px;font-weight:600;color:var(--text,#101828)">Captação × Integração</span>
+        <div style="display:flex;gap:14px;font-size:11.5px;color:var(--text2,#475467)">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:var(--barT,#1E3A8A);display:inline-block"></span>Total</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:var(--barI,#0E9F6E);display:inline-block"></span>Integrados</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;height:120px;border-bottom:1px solid var(--borderS,#F0F2F5)">
+          <sc-for list="{{ meses }}" as="mo" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end">
+              <div style="display:flex;align-items:flex-end;gap:3px;flex:1">
+                <div style="{{ mo.totalStyle }}"></div>
+                <div style="{{ mo.integStyle }}"></div>
+              </div>
+              <span style="font-size:10.5px;color:var(--muted,#98A2B3)">{{ mo.m }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <button style="height:44px;border:1px solid var(--border,#D0D5DD);border-radius:11px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">↓ Exportar relatório</button>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ LÍDERES ══ -->
+    <sc-if value="{{ isLideres }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Líderes" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Líderes</span>
+      </div>
+      <sc-for list="{{ lideresM }}" as="l" hint-placeholder-count="4">
+        <div onClick="{{ l.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+          <span style="width:42px;height:42px;border-radius:99px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:14px;flex:none">{{ l.initials }}</span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ l.nome }}</span>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ l.sub }}</span>
+          </div>
+          <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ SUPERVISORES ══ -->
+    <sc-if value="{{ isSupervisores }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Supervisores" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Supervisores</span>
+      </div>
+      <sc-for list="{{ supervisoresM }}" as="s" hint-placeholder-count="3">
+        <div onClick="{{ s.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+          <span style="width:42px;height:42px;border-radius:99px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:14px;flex:none">{{ s.initials }}</span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ s.nome }}</span>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ s.sub }}</span>
+          </div>
+          <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ COORDENAÇÕES ══ -->
+    <sc-if value="{{ isCoordenacoes }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Coordenações" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="flex:1;font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Coordenações</span>
+        <button onClick="{{ novaCoordenacao }}" style="height:40px;padding:0 14px;border:none;border-radius:11px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:12.5px;font-weight:600;cursor:pointer">+ Nova</button>
+      </div>
+      <sc-for list="{{ coordenacoesM }}" as="c" hint-placeholder-count="4">
+        <div onClick="{{ c.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+          <span style="width:12px;height:40px;border-radius:99px;background:{{ c.cor }};flex:none"></span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ c.sub }}</span>
+          </div>
+          <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ NOVO CADASTRO ══ -->
+    <sc-if value="{{ isNovoCadastro }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Novo Cadastro" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Novo Cadastro</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted,#98A2B3)">Tipo de Cadastro</label>
+        <div style="display:flex;gap:8px">
+          <sc-for list="{{ ncTipos }}" as="t" hint-placeholder-count="3">
+            <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.t }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">Informações Pessoais</span>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Nome Completo</label><input placeholder="Nome do usuário" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">E-mail</label><input placeholder="usuario@igreja.com.br" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Telefone</label><input placeholder="(00) 00000-0000" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Senha Temporária <span style="color:#D92D20">*</span></label><input type="password" placeholder="Mínimo 6 caracteres" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-family:Sora,sans-serif;font-size:15px;font-weight:600;color:var(--text,#101828)">Dados de Endereço</span>
+        <div style="display:grid;grid-template-columns:130px 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">CEP</label><input placeholder="00000-000" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Logradouro</label><input placeholder="Rua, avenida" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Cidade <span style="color:#D92D20">*</span></label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option><option>São Paulo</option><option>Guarulhos</option><option>Osasco</option></select></div>
+          <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Bairro <span style="color:#D92D20">*</span></label><select style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Selecione</option><option>Jardim Primavera</option><option>Centro</option><option>Vila Nova</option></select></div>
+        </div>
+      </div>
+      <button onClick="{{ ncSalvar }}" style="height:52px;border:none;border-radius:13px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer">✓ Salvar Cadastro</button>
+    </div>
+    </sc-if>
+
+    <!-- ══ TIPOS DE CÉLULA ══ -->
+    <sc-if value="{{ isTipos }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Tipos de Célula" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="flex:1;font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Tipos de Célula</span>
+        <button onClick="{{ novoTipo }}" style="height:40px;padding:0 14px;border:none;border-radius:11px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:12.5px;font-weight:600;cursor:pointer">+ Novo</button>
+      </div>
+      <sc-for list="{{ tiposM }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+          <span style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">◈</span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ t.nome }}</span>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ t.sub }}</span>
+          </div>
+          <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ MATERIAIS ══ -->
+    <sc-if value="{{ isMateriais }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Materiais" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Materiais</span>
+      </div>
+      <div style="border:1.5px dashed var(--border,#C7CEDB);border-radius:14px;padding:22px;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--surface2,#F9FAFB);cursor:pointer">
+        <span style="font-size:20px">↑</span>
+        <span style="font-size:13.5px;font-weight:600;color:var(--text2,#344054)">Enviar novo material</span>
+        <span style="font-size:11.5px;color:var(--muted,#98A2B3)">PDF, DOCX, PPTX</span>
+      </div>
+      <sc-for list="{{ materiaisM }}" as="m" hint-placeholder-count="3">
+        <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px">
+          <span style="width:40px;height:40px;border-radius:11px;background:var(--warnBg,#FDF3E1);color:var(--warnFg,#B54708);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">PDF</span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:13.5px;font-weight:600;color:var(--text,#101828)">{{ m.nome }}</span>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ m.sub }}</span>
+          </div>
+          <button style="width:38px;height:38px;border-radius:10px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:14px;cursor:pointer;flex:none">↓</button>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ CIDADES E BAIRROS ══ -->
+    <sc-if value="{{ isLocais }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Cidades e Bairros" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Cidades e Bairros</span>
+      </div>
+      <div style="display:flex;gap:4px;background:var(--surface,#FFFFFF);border:1px solid var(--border,#E4E7EC);border-radius:12px;padding:4px">
+        <sc-for list="{{ locTabs }}" as="t" hint-placeholder-count="2">
+          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+      <sc-if value="{{ isLocCidades }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ novaCidade }}" style="height:46px;border:1.5px dashed var(--border,#C7CEDB);border-radius:12px;background:var(--surface2,#F9FAFB);color:var(--link,#1E3A8A);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">+ Nova Cidade</button>
+        <sc-for list="{{ cidadesM }}" as="c" hint-placeholder-count="3">
+          <div onClick="{{ c.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+            <span style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">◎</span>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+              <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span>
+              <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ c.sub }}</span>
+            </div>
+            <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{ isLocBairros }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ novoBairro }}" style="height:46px;border:1.5px dashed var(--border,#C7CEDB);border-radius:12px;background:var(--surface2,#F9FAFB);color:var(--link,#1E3A8A);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">+ Novo Bairro</button>
+        <sc-for list="{{ bairrosM }}" as="b" hint-placeholder-count="4">
+          <div onClick="{{ b.onTap }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;cursor:pointer">
+            <span style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">◉</span>
+            <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+              <span style="font-size:14.5px;font-weight:600;color:var(--text,#101828)">{{ b.nome }}</span>
+              <span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ b.sub }}</span>
+            </div>
+            <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+          </div>
+        </sc-for>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ══ NOTIFICAÇÕES ══ -->
+    <sc-if value="{{ isNotif }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Notificações" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goHome }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Notificações</span>
+      </div>
+      <sc-for list="{{ notifsM }}" as="n" hint-placeholder-count="4">
+        <div style="{{ n.rowStyle }}">
+          <span style="width:38px;height:38px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none">{{ n.icon }}</span>
+          <div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">
+            <span style="font-size:13.5px;font-weight:600;color:var(--text,#101828)">{{ n.titulo }}</span>
+            <span style="font-size:11.5px;color:var(--muted,#98A2B3);line-height:1.45">{{ n.sub }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <!-- ══ CONFIGURAÇÕES ══ -->
+    <sc-if value="{{ isConfig }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Configurações" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">Configurações</span>
+      </div>
+      <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px">
+        <span style="width:46px;height:46px;border-radius:99px;background:#E8A33D;color:#0B1530;display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:16px;flex:none">PR</span>
+        <div style="display:flex;flex-direction:column;gap:1px;flex:1">
+          <span style="font-size:15px;font-weight:600;color:var(--text,#101828)">Pr. Ricardo</span>
+          <span style="font-size:12px;color:var(--muted,#98A2B3)">Administrador · admin@sistemaigreja.com.br</span>
+        </div>
+      </div>
+      <div onClick="{{ toggleDark }}" style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer">
+        <span style="width:40px;height:40px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:16px;flex:none">{{ themeIcon }}</span>
+        <span style="flex:1;font-size:14.5px;font-weight:600;color:var(--text,#101828)">Alternar tema claro/escuro</span>
+        <span style="color:var(--muted,#98A2B3);font-size:16px">›</span>
+      </div>
+      <button style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:13px;background:var(--surface,#FFFFFF);color:#D92D20;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Sair da conta</button>
+    </div>
+    </sc-if>
+
+    <!-- ══ FOLHA DE EDIÇÃO GENÉRICA ══ -->
+    <sc-if value="{{ gsOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ gsClose }}" style="position:absolute;inset:0;background:rgba(11,21,48,.42);z-index:44"></div>
+    <div class="scr" style="position:absolute;left:0;right:0;bottom:0;z-index:45;background:var(--surface,#FFFFFF);border-radius:26px 26px 0 0;padding:10px 22px 30px;display:flex;flex-direction:column;gap:14px;max-height:82%;overflow-y:auto">
+      <div style="align-self:center;width:44px;height:5px;border-radius:99px;background:var(--border,#E4E7EC);margin-bottom:4px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;color:var(--text,#101828)">{{ gsTitle }}</span>
+        <button onClick="{{ gsClose }}" style="width:34px;height:34px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:15px;cursor:pointer">✕</button>
+      </div>
+      <sc-for list="{{ gsFields }}" as="f" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">{{ f.label }}</label>
+          <sc-if value="{{ f.isInput }}" hint-placeholder-val="{{ true }}">
+            <input value="{{ f.value }}" onChange="{{ f.onChange }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+          </sc-if>
+          <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">
+            <select value="{{ f.value }}" onChange="{{ f.onChange }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto">
+              <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="3">
+                <option>{{ o.o }}</option>
+              </sc-for>
+            </select>
+          </sc-if>
+        </div>
+      </sc-for>
+      <button onClick="{{ gsSave }}" style="height:52px;border:none;border-radius:13px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px">✓ Salvar</button>
+    </div>
+    </sc-if>
+
+    <!-- ══ WHATSAPP ══ -->
+    <sc-if value="{{ isWhatsapp }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile WhatsApp" class="scr" style="flex:1;overflow-y:auto;padding:6px 20px 96px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:12px;padding-top:6px">
+        <button onClick="{{ goMais }}" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:16px;cursor:pointer;flex:none">←</button>
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <span style="font-family:Sora,sans-serif;font-size:20px;font-weight:600;color:var(--text,#101828)">WhatsApp</span>
+          <span style="font-size:12px;color:var(--muted,#98A2B3)">Mensagens e templates</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;background:var(--surface,#FFFFFF);border:1px solid var(--border,#E4E7EC);border-radius:12px;padding:4px">
+        <sc-for list="{{ waTabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ isWaCompose }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <sc-if value="{{ isWaLote }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Segmento de destinatários</label>
+            <div class="scr" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px">
+              <sc-for list="{{ waSegs }}" as="s" hint-placeholder-count="4">
+                <button onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isWaIndividual }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Destinatário</label>
+            <input placeholder="Buscar visitante ou número…" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)">
+          </div>
+        </sc-if>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Usar template</label>
+          <div class="scr" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px">
+            <sc-for list="{{ waTplPick }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.onClick }}" style="border-radius:999px;padding:9px 14px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none">▤ {{ t.nome }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Mensagem</label>
+          <textarea value="{{ waMsg }}" onChange="{{ onWaMsg }}" placeholder="Escreva a mensagem…" style="min-height:120px;border:1px solid var(--border,#D0D5DD);border-radius:12px;padding:13px 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);resize:vertical;line-height:1.5"></textarea>
+        </div>
+        <button style="height:52px;border:none;border-radius:13px;background:#25D366;color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer">✈ Enviar mensagem</button>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ isWaTemplates }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button onClick="{{ waTplNew }}" style="height:48px;border:none;border-radius:12px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:14px;font-weight:600;cursor:pointer">+ Novo Template</button>
+        <sc-for list="{{ waTplRows }}" as="t" hint-placeholder-count="3">
+          <div style="background:var(--surface,#FFFFFF);border:1px solid var(--border,#E9ECF2);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="width:34px;height:34px;border-radius:10px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:14px;flex:none">▤</span>
+              <span style="flex:1;font-size:14px;font-weight:600;color:var(--text,#101828)">{{ t.nome }}</span>
+              <span style="{{ t.catStyle }}">{{ t.cat }}</span>
+            </div>
+            <span style="font-size:12.5px;color:var(--muted,#98A2B3);line-height:1.45">{{ t.msgShort }}</span>
+            <div style="display:flex;gap:8px">
+              <button onClick="{{ t.onUse }}" style="flex:1;height:38px;border:1px solid var(--accentB,#1E3A8A);border-radius:10px;background:var(--surface,#FFFFFF);color:var(--link,#1E3A8A);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer">Usar</button>
+              <button onClick="{{ t.onEdit }}" style="width:38px;height:38px;border-radius:10px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--text2,#475467);font-size:13px;cursor:pointer;flex:none">✎</button>
+              <button onClick="{{ t.onDelete }}" style="width:38px;height:38px;border-radius:10px;border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:#D92D20;font-size:13px;cursor:pointer;flex:none">✕</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+    </div>
+
+    <!-- Template sheet -->
+    <sc-if value="{{ waTplModalOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ waTplClose }}" style="position:absolute;inset:0;background:rgba(11,21,48,.42);z-index:40"></div>
+    <div class="scr" style="position:absolute;left:0;right:0;bottom:0;z-index:41;background:var(--surface,#FFFFFF);border-radius:26px 26px 0 0;padding:10px 22px 30px;display:flex;flex-direction:column;gap:14px;max-height:86%;overflow-y:auto">
+      <div style="align-self:center;width:44px;height:5px;border-radius:99px;background:var(--border,#E4E7EC);margin-bottom:4px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;color:var(--text,#101828)">{{ waTplTitle }}</span>
+        <button onClick="{{ waTplClose }}" style="width:34px;height:34px;border-radius:99px;border:none;background:var(--surface2,#F2F4F7);color:var(--text2,#475467);font-size:15px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Nome do template</label><input value="{{ tplNome }}" onChange="{{ onTplNome }}" placeholder="Ex: Boas-vindas" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+      <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Categoria</label><select value="{{ tplCat }}" onChange="{{ onTplCat }}" style="height:48px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 12px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);appearance:auto"><option>Geral</option><option>Boas-vindas</option><option>Convite</option></select></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Inserir variável</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <sc-for list="{{ tplVars }}" as="v" hint-placeholder-count="6">
+            <button onClick="{{ v.onClick }}" style="border-radius:999px;padding:8px 13px;border:none;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);font-family:ui-monospace,monospace;font-size:12px;font-weight:600;cursor:pointer">+ {{ v.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">Mensagem</label>
+        <textarea value="{{ tplMsg }}" onChange="{{ onTplMsg }}" placeholder="Escreva a mensagem do template…" style="min-height:110px;border:1px solid var(--border,#D0D5DD);border-radius:12px;padding:13px 15px;font-size:14.5px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF);resize:vertical;line-height:1.5"></textarea>
+      </div>
+      <sc-if value="{{ tplHasPreview }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <label style="font-size:12.5px;font-weight:600;color:var(--text2,#344054)">👁 Preview</label>
+          <div style="border-radius:12px;background:var(--okBg,#E7F6EF);padding:13px 15px;font-size:13.5px;color:var(--text,#101828);line-height:1.55">{{ tplPreview }}</div>
+        </div>
+      </sc-if>
+      <button onClick="{{ waTplSave }}" style="height:52px;border:none;border-radius:13px;background:var(--accentB,#1E3A8A);color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer">✓ Salvar Template</button>
+    </div>
+    </sc-if>
+    </sc-if>
+
+    <!-- ══ CADASTRO (wizard) ══ -->
+    <sc-if value="{{ isCadastro }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Mobile Cadastro" class="scr" style="flex:1;overflow-y:auto;background:linear-gradient(175deg,#0B1530 0%,#122452 100%);display:flex;flex-direction:column">
+      <div style="padding:8px 24px 20px;display:flex;flex-direction:column;gap:16px;color:#FFFFFF">
+        <img src="assets/logo.png" alt="Logo" style="width:48px;height:48px;border-radius:13px">
+        <div style="font-family:Sora,sans-serif;font-size:22px;font-weight:600;letter-spacing:-.3px">Que alegria<br>receber você!</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+            <div style="{{ s.barStyle }}"></div>
+          </sc-for>
+        </div>
+        <span style="font-size:12.5px;color:rgba(255,255,255,.65)">Passo {{ step }} de 3 · {{ stepName }}</span>
+      </div>
+      <div style="flex:1;background:var(--surface,#FFFFFF);border-radius:26px 26px 0 0;padding:26px 22px 30px;display:flex;flex-direction:column;gap:18px">
+        <sc-if value="{{ isStep1 }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;color:var(--text,#101828)">Dados pessoais</div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Nome completo *</label><input placeholder="Ex: João da Silva" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Telefone / WhatsApp *</label><input placeholder="(00) 00000-0000" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Data de nascimento *</label><input type="date" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isStep2 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;color:var(--text,#101828)">Onde você mora</div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">CEP (busca automática)</label><input placeholder="00000-000" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Logradouro *</label><input placeholder="Rua, avenida" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Número *</label><input placeholder="123" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+              <div style="display:flex;flex-direction:column;gap:7px"><label style="font-size:13px;font-weight:600;color:var(--text2,#344054)">Complemento</label><input placeholder="Apto, bloco" style="height:50px;border:1px solid var(--border,#D0D5DD);border-radius:11px;padding:0 15px;font-size:15px;font-family:inherit;color:var(--text,#101828);background:var(--surface,#FFFFFF)"></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isStep3 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="font-family:Sora,sans-serif;font-size:18px;font-weight:600;color:var(--text,#101828)">Sobre você</div>
+              <div style="display:flex;align-items:center;gap:12px;border:1px solid var(--border,#E4E7EC);border-radius:12px;padding:12px 14px;background:var(--surface2,#F9FAFB)">
+                <span style="flex:1;font-size:14px;font-weight:500;color:var(--text2,#344054)">Deseja participar de alguma célula?</span>
+                <button onClick="{{ toggleCell }}" style="{{ toggleStyle }}"><span style="width:20px;height:20px;border-radius:99px;background:#FFFFFF;box-shadow:0 1px 2px rgba(16,24,40,.2)"></span></button>
+              </div>
+              <sc-if value="{{ attendsCell }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <sc-for list="{{ celulasProx }}" as="c" hint-placeholder-count="3">
+                    <button onClick="{{ c.onClick }}" style="{{ c.style }}">
+                      <div style="width:38px;height:38px;border-radius:11px;background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);display:flex;align-items:center;justify-content:center;font-size:15px">⌂</div>
+                      <div style="display:flex;flex-direction:column;gap:1px;flex:1;text-align:left;min-width:0"><span style="font-size:14px;font-weight:600;color:var(--text,#101828)">{{ c.nome }}</span><span style="font-size:11.5px;color:var(--muted,#98A2B3)">{{ c.info }}</span></div>
+                      <span style="font-size:12px;font-weight:600;color:var(--link,#1E3A8A)">{{ c.dist }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--borderS,#F0F2F5);padding-top:16px">
+              <div style="font-family:Sora,sans-serif;font-size:16px;font-weight:600;color:var(--text,#101828)">Como posso ajudar você?</div>
+              <span style="font-size:12.5px;color:var(--muted,#98A2B3)">Selecione todas as opções que se aplicam</span>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ interesses }}" as="o" hint-placeholder-count="5">
+                  <button onClick="{{ o.onClick }}" style="{{ o.style }}">{{ o.check }}{{ o.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ cadDone }}" hint-placeholder-val="{{ false }}">
+          <div style="border-radius:12px;background:var(--okBg,#E7F6EF);color:var(--okFg,#0E9F6E);font-size:13.5px;font-weight:600;padding:14px;display:flex;align-items:center;gap:10px">✓ Cadastro enviado! O líder entrará em contato.</div>
+        </sc-if>
+        <div style="display:flex;gap:12px;margin-top:auto">
+          <button onClick="{{ stepBack }}" style="{{ backBtnStyle }}">Voltar</button>
+          <button onClick="{{ stepNext }}" style="flex:1;height:52px;border:none;border-radius:12px;background:#1E3A8A;color:#FFFFFF;font-family:Sora,sans-serif;font-size:15px;font-weight:600;cursor:pointer">{{ nextLabel }}</button>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ══ BOTTOM NAV (só nas telas internas) ══ -->
+    <sc-if value="{{ showNav }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;left:0;right:0;bottom:0;height:82px;background:var(--surface,#FFFFFF);border-top:1px solid var(--border,#E9ECF2);display:flex;align-items:flex-start;padding:10px 8px 0;z-index:30">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+        <button onClick="{{ n.onClick }}" style="flex:1;background:transparent;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0">
+          <span style="font-size:20px;color:{{ n.color }}">{{ n.icon }}</span>
+          <span style="font-size:10.5px;font-weight:600;color:{{ n.color }}">{{ n.label }}</span>
+        </button>
+      </sc-for>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 440, &quot;height&quot;: 980}, &quot;darkMode&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Protótipo&quot;}}">
+class Component extends DCLogic {
+  state = { screen: 'home', vq: '', vFilter: 'Todos', visSel: null, vStatus: {}, step: 1, attendsCell: true, celulaSel: 0, interesses: ['Preciso de oração'], cadDone: false, dark: false,
+    waTab: 'Em lote', waSeg: 'Todos os visitantes',
+    waMsg: 'Olá {nome}! Foi uma alegria ter você conosco. Que tal participar da nossa célula esta semana?',
+    waTemplates: [
+      { nome: 'Boas-vindas', cat: 'Boas-vindas', msg: 'Olá {nome}! Foi uma alegria ter você conosco. Que tal conhecer a {celula}?' },
+      { nome: 'Convite para célula', cat: 'Convite', msg: 'Oi {nome}! A {celula} se reúne {data} às {horario} no bairro {bairro}. O líder {lider} espera você!' },
+      { nome: 'Lembrete de encontro', cat: 'Geral', msg: '{nome}, não esqueça: nosso encontro é {data} às {horario}. Até lá!' },
+    ],
+    waTplModal: false, waTpl: null, gsheet: null, locTab: 'Cidades', ncTipo: 'Líder' };
+
+  renderVals() {
+    const set = (k, v) => this.setState({ [k]: v });
+    const screen = this.state.screen;
+    const dark = this.state.dark;
+    const darkVars = '--page:#0A101F;--surface:#131C31;--surface2:#0F1829;--chip:#1D2F55;--chip2:#1A2B4E;--link:#93B4FD;--accentB:#3E63DD;--text:#F2F5FA;--text2:#C9D3E0;--text3:#97A5B8;--muted:#697A92;--border:#283755;--borderS:#1E2B45;--okBg:#0E3A2C;--okFg:#57D9A3;--warnBg:#3F2D10;--warnFg:#F2C063;--inatBg:#26303F;--inatFg:#AEB9C9;--barT:#5B8DEF;--barI:#2FBE8F';
+
+    const badge = (bg, fg) => `font-size:11px;font-weight:600;border-radius:99px;padding:4px 10px;background:${bg};color:${fg};white-space:nowrap;flex:none`;
+    const statusDefs = {
+      novo: { label: 'Novo', bg: 'var(--chip,#EFF4FF)', fg: 'var(--link,#1E3A8A)' },
+      acomp: { label: 'Acompanham.', bg: 'var(--warnBg,#FDF3E1)', fg: 'var(--warnFg,#B54708)' },
+      integ: { label: 'Integrado', bg: 'var(--okBg,#E7F6EF)', fg: 'var(--okFg,#0E9F6E)' },
+      inativo: { label: 'Inativo', bg: 'var(--inatBg,#F2F4F7)', fg: 'var(--inatFg,#667085)' },
+    };
+    const avatar = (st, big) => { const d = statusDefs[st]; const s = big ? 54 : 42; return `width:${s}px;height:${s}px;border-radius:99px;background:${d.bg};color:${d.fg};display:flex;align-items:center;justify-content:center;font-family:Sora,sans-serif;font-weight:600;font-size:${big ? 18 : 14}px;flex:none`; };
+    const ini = (n) => n.split(' ').map(p => p[0]).slice(0, 2).join('');
+
+    const visBase = [
+      { nome: 'Mariana Souza', tel: '(11) 98811-2233', celula: 'Vida Nova', st: 'novo', visita: 'há 2 dias', end: 'Rua das Flores, 123 · Jd. Primavera' },
+      { nome: 'João Pedro Lima', tel: '(11) 97744-5566', celula: 'Esperança', st: 'acomp', visita: 'há 5 dias', end: 'Av. Central, 456 · Centro' },
+      { nome: 'Ana Clara Ferreira', tel: '(11) 96633-7788', celula: 'Vida Nova', st: 'integ', visita: 'há 1 semana', end: 'Rua Ipê Amarelo, 89 · Jd. Primavera' },
+      { nome: 'Rafael Almeida', tel: '(11) 95522-8899', celula: 'Restauração', st: 'acomp', visita: 'há 2 semanas', end: 'Rua do Bosque, 210 · Vila Nova' },
+      { nome: 'Camila Barros', tel: '(11) 94411-9900', celula: '—', st: 'inativo', visita: 'há 3 semanas', end: 'Av. das Palmeiras, 77 · Centro' },
+      { nome: 'Bruno Carvalho', tel: '(11) 93300-1122', celula: 'Esperança', st: 'novo', visita: 'há 3 dias', end: 'Rua Aurora, 15 · Centro' },
+      { nome: 'Lucas Martins', tel: '(11) 91188-5566', celula: '—', st: 'novo', visita: 'ontem', end: 'Rua Horizonte, 44 · Jd. Primavera' },
+    ];
+    const effSt = (i) => this.state.vStatus[i] ?? visBase[i].st;
+    const mkRow = (v, i) => { const st = effSt(i); return { nome: v.nome, tel: v.tel, celula: v.celula, visita: v.visita, initials: ini(v.nome), avatarStyle: avatar(st), status: statusDefs[st].label, badgeStyle: badge(statusDefs[st].bg, statusDefs[st].fg), onClick: () => set('visSel', i) }; };
+
+    const q = this.state.vq.toLowerCase();
+    const fLabel = this.state.vFilter;
+    const visRows = visBase.map((v, i) => ({ v, i })).filter(({ v, i }) => (!q || v.nome.toLowerCase().includes(q)) && (fLabel === 'Todos' || statusDefs[effSt(i)].label === fLabel)).map(({ v, i }) => mkRow(v, i));
+    const visShort = [0, 1, 2].map(i => mkRow(visBase[i], i));
+
+    const vFilters = ['Todos', 'Novo', 'Acompanham.', 'Integrado', 'Inativo'].map(label => ({ label, onClick: () => set('vFilter', label), style: `border-radius:999px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none;${fLabel === label ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text3,#667085)'}` }));
+
+    const si = this.state.visSel;
+    const sheetOpen = si !== null;
+    const sv = sheetOpen ? visBase[si] : visBase[0];
+    const svSt = effSt(sheetOpen ? si : 0);
+    const statusOpts = Object.entries(statusDefs).map(([key, d]) => ({ label: d.label, onClick: () => this.setState(s => ({ vStatus: { ...s.vStatus, [si]: key } })), style: `border-radius:999px;padding:8px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;${svSt === key ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text3,#667085)'}` }));
+
+    // KPIs & chart
+    const kpis = [
+      { icon: '☺', value: '138', label: 'Visitantes cadastrados' },
+      { icon: '➤', value: '54', label: 'Encaminhamentos' },
+      { icon: '✓', value: '31', label: 'Integrados' },
+      { icon: '◔', value: '78%', label: 'Frequência nas células' },
+    ];
+    const rawMonths = [{ m: 'Fev', total: 14, integ: 4 }, { m: 'Mar', total: 19, integ: 6 }, { m: 'Abr', total: 16, integ: 5 }, { m: 'Mai', total: 24, integ: 8 }, { m: 'Jun', total: 28, integ: 11 }, { m: 'Jul', total: 22, integ: 9 }];
+    const maxT = 28;
+    const meses = rawMonths.map(r => ({ m: r.m, totalStyle: `width:9px;border-radius:3px 3px 0 0;background:var(--barT,#1E3A8A);height:${Math.round(r.total / maxT * 100)}%`, integStyle: `width:9px;border-radius:3px 3px 0 0;background:var(--barI,#0E9F6E);height:${Math.round(r.integ / maxT * 100)}%` }));
+
+    // Mais menu
+    const maisGroups = [
+      { label: 'Pessoas', items: [
+        { icon: '★', title: 'Líderes', sub: 'Líderes, células e frequências', onClick: () => set('screen', 'lideres') },
+        { icon: '◉', title: 'Supervisores', sub: 'Supervisores e seus líderes', onClick: () => set('screen', 'supervisores') },
+        { icon: '⌘', title: 'Coordenações', sub: 'Criar e gerenciar coordenações', onClick: () => set('screen', 'coordenacoes') },
+        { icon: '＋', title: 'Novo Cadastro', sub: 'Líderes, supervisores, coordenadores', onClick: () => set('screen', 'novocadastro') },
+      ]},
+      { label: 'Células', items: [
+        { icon: '⌂', title: 'Células', sub: 'Gerir células ativas', onClick: () => set('screen', 'celulas') },
+        { icon: '◈', title: 'Tipos de Célula', sub: 'Criar e gerenciar tipos', onClick: () => set('screen', 'tipos') },
+        { icon: '▤', title: 'Materiais', sub: 'Enviar e organizar materiais', onClick: () => set('screen', 'materiais') },
+      ]},
+      { label: 'Sistema', items: [
+        { icon: '✉', title: 'WhatsApp', sub: 'Mensagens, templates e envio em lote', onClick: () => set('screen', 'whatsapp') },
+        { icon: '◎', title: 'Cidades e Bairros', sub: 'Gerenciar localidades', onClick: () => set('screen', 'locais') },
+        { icon: '⚙', title: 'Configurações', sub: 'Perfil e preferências', onClick: () => set('screen', 'config') },
+      ]},
+    ];
+
+    // Telas internas + folha de edição genérica
+    const liderNames = ['Carla Mendes', 'Marcos Dias', 'Paulo Nunes', 'Renata Campos', 'Tiago Fonseca', 'Débora Pires'];
+    const supNames = ['André Prado', 'Beatriz Lopes', 'Carlos Vieira'];
+    const tipoOpts = ['Adultos', 'Jovens', 'Casais', 'Infantil'];
+    const gOpen = (title, fields) => set('gsheet', { title, fields });
+    const gs = this.state.gsheet;
+    const gsFields = gs ? gs.fields.map((f, i) => ({
+      label: f.label,
+      value: f.value ?? '',
+      isSelect: !!f.options,
+      isInput: !f.options,
+      options: (f.options || []).map(o => ({ o })),
+      onChange: (e) => this.setState(s => ({ gsheet: { ...s.gsheet, fields: s.gsheet.fields.map((x, j) => j === i ? { ...x, value: e.target.value } : x) } })),
+    })) : [];
+
+    const celulasM = [
+      { nome: 'Célula Vida Nova', lider: 'Carla Mendes', dia: 'Quinta-feira · 20h', tipo: 'Adultos', membros: '14 membros' },
+      { nome: 'Célula Esperança', lider: 'Marcos Dias', dia: 'Terça-feira · 19h30', tipo: 'Casais', membros: '11 membros' },
+      { nome: 'Célula Restauração', lider: 'Paulo Nunes', dia: 'Sexta-feira · 20h', tipo: 'Jovens', membros: '9 membros' },
+      { nome: 'Célula Ágape', lider: 'Renata Campos', dia: 'Quarta-feira · 20h', tipo: 'Adultos', membros: '13 membros' },
+    ].map(c => ({ ...c, sub: c.lider + ' · ' + c.dia, onTap: () => gOpen('Editar Célula', [{ label: 'Nome', value: c.nome }, { label: 'Líder', value: c.lider, options: liderNames }, { label: 'Dia e horário', value: c.dia }, { label: 'Tipo', value: c.tipo, options: tipoOpts }]) }));
+    const novaCelula = () => gOpen('Nova Célula', [{ label: 'Nome', value: '' }, { label: 'Líder', value: 'Carla Mendes', options: liderNames }, { label: 'Dia e horário', value: '' }, { label: 'Tipo', value: 'Adultos', options: tipoOpts }]);
+
+    const lideresM = [
+      { nome: 'Carla Mendes', email: 'carla.mendes@igreja.com.br', sub: 'Coord. Norte · 1 célula · 14 visitantes', sup: 'André Prado' },
+      { nome: 'Marcos Dias', email: 'marcos.dias@igreja.com.br', sub: 'Coord. Sul · 1 célula · 11 visitantes', sup: 'Beatriz Lopes' },
+      { nome: 'Paulo Nunes', email: 'paulo.nunes@igreja.com.br', sub: 'Coord. Leste · 1 célula · 9 visitantes', sup: 'André Prado' },
+      { nome: 'Renata Campos', email: 'renata.campos@igreja.com.br', sub: 'Coord. Norte · 2 células · 21 visitantes', sup: 'Beatriz Lopes' },
+    ].map(l => ({ ...l, initials: l.nome.split(' ').map(p => p[0]).slice(0, 2).join(''), onTap: () => gOpen('Editar Líder', [{ label: 'Nome', value: l.nome }, { label: 'E-mail', value: l.email }, { label: 'Telefone', value: '(11) 98800-0000' }, { label: 'Endereço', value: 'Rua das Acácias, 45 · Jd. Primavera' }, { label: 'Supervisor', value: l.sup, options: supNames }]) }));
+
+    const supervisoresM = [
+      { nome: 'André Prado', email: 'andre.prado@igreja.com.br', sub: 'Coord. Norte · 2 líderes', coord: 'Norte' },
+      { nome: 'Beatriz Lopes', email: 'beatriz.lopes@igreja.com.br', sub: 'Coord. Sul · 2 líderes', coord: 'Sul' },
+      { nome: 'Carlos Vieira', email: 'carlos.vieira@igreja.com.br', sub: 'Coord. Oeste · 2 líderes', coord: 'Oeste' },
+    ].map(s => ({ ...s, initials: s.nome.split(' ').map(p => p[0]).slice(0, 2).join(''), onTap: () => gOpen('Editar Supervisor', [{ label: 'Nome', value: s.nome }, { label: 'E-mail', value: s.email }, { label: 'Endereço', value: 'Av. Central, 456 · Centro' }, { label: 'Coordenação', value: s.coord, options: ['Norte', 'Sul', 'Leste', 'Oeste'] }]) }));
+
+    const corOpts = ['Azul', 'Verde', 'Âmbar', 'Roxo'];
+    const coordenacoesM = [
+      { nome: 'Coordenação Norte', cor: '#1E3A8A', corNome: 'Azul', sub: '1 supervisor · 2 líderes' },
+      { nome: 'Coordenação Sul', cor: '#0E9F6E', corNome: 'Verde', sub: '1 supervisor · 2 líderes' },
+      { nome: 'Coordenação Leste', cor: '#B54708', corNome: 'Âmbar', sub: '0 supervisor · 1 líder' },
+      { nome: 'Coordenação Oeste', cor: '#6D46C7', corNome: 'Roxo', sub: '1 supervisor · 1 líder' },
+    ].map(c => ({ ...c, onTap: () => gOpen('Editar Coordenação', [{ label: 'Nome', value: c.nome }, { label: 'Cor de identificação', value: c.corNome, options: corOpts }]) }));
+    const novaCoordenacao = () => gOpen('Nova Coordenação', [{ label: 'Nome', value: '' }, { label: 'Cor de identificação', value: 'Azul', options: corOpts }]);
+
+    const tiposM = [
+      { nome: 'Adultos', sub: 'Células para o público adulto · 2 células' },
+      { nome: 'Jovens', sub: 'Células para adolescentes e jovens · 2 células' },
+      { nome: 'Casais', sub: 'Células voltadas a casais · 2 células' },
+      { nome: 'Infantil', sub: 'Células infantis supervisionadas · 0 células' },
+    ].map(t => ({ ...t, onTap: () => gOpen('Editar Tipo de Célula', [{ label: 'Nome', value: t.nome }, { label: 'Descrição', value: t.sub.split(' ·')[0] }]) }));
+    const novoTipo = () => gOpen('Novo Tipo de Célula', [{ label: 'Nome', value: '' }, { label: 'Descrição', value: '' }]);
+
+    const locTab = this.state.locTab;
+    const locTabs = ['Cidades', 'Bairros'].map(t => ({ label: t, onClick: () => set('locTab', t), style: `flex:1;padding:9px 4px;border-radius:9px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;${locTab === t ? 'background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'background:transparent;color:var(--text3,#667085)'}` }));
+    const cidadesM = [
+      { nome: 'São Paulo', sub: 'SP · 8 bairros' }, { nome: 'Guarulhos', sub: 'SP · 3 bairros' }, { nome: 'Osasco', sub: 'SP · 2 bairros' },
+    ].map(c => ({ ...c, onTap: () => gOpen('Editar Cidade', [{ label: 'Estado', value: 'SP', options: ['SP', 'RJ', 'MG'] }, { label: 'Nome da cidade', value: c.nome }]) }));
+    const bairrosM = [
+      { nome: 'Jardim Primavera', sub: 'São Paulo · SP' }, { nome: 'Centro', sub: 'São Paulo · SP' }, { nome: 'Vila Nova', sub: 'São Paulo · SP' }, { nome: 'Jardim Aeroporto', sub: 'Guarulhos · SP' },
+    ].map(b => ({ ...b, onTap: () => gOpen('Editar Bairro', [{ label: 'Cidade', value: b.sub.split(' ·')[0], options: ['São Paulo', 'Guarulhos', 'Osasco'] }, { label: 'Nome do bairro', value: b.nome }]) }));
+    const novaCidade = () => gOpen('Nova Cidade', [{ label: 'Estado', value: 'SP', options: ['SP', 'RJ', 'MG'] }, { label: 'Nome da cidade', value: '' }]);
+    const novoBairro = () => gOpen('Novo Bairro', [{ label: 'Cidade', value: 'São Paulo', options: ['São Paulo', 'Guarulhos', 'Osasco'] }, { label: 'Nome do bairro', value: '' }]);
+
+    const materiaisM = [
+      { nome: 'Estudo de Célula — Semana 32.pdf', sub: 'Todas as células · 28/06/2026 · 1,2 MB' },
+      { nome: 'Guia do Anfitrião.pdf', sub: 'Célula Vida Nova · 21/06/2026 · 860 KB' },
+      { nome: 'Roteiro de Louvor — Julho.pdf', sub: 'Todas as células · 15/06/2026 · 540 KB' },
+    ];
+
+    const relCards = [
+      { icon: '✓', value: '22,5%', label: 'Taxa de Integração' },
+      { icon: '★', value: '9', label: 'Líderes Ativos' },
+      { icon: '☺', value: '22', label: 'Visitantes (mês)' },
+      { icon: '◔', value: '78,4%', label: 'Média Frequência' },
+    ];
+
+    const notifsM = [
+      { icon: '☺', titulo: 'Novo visitante cadastrado', sub: 'Lucas Martins se cadastrou pela tela pública. · há 12 min', unread: true },
+      { icon: '✓', titulo: 'Visitante integrado', sub: 'Ana Clara foi integrada à Célula Vida Nova. · há 2 h', unread: true },
+      { icon: '⌂', titulo: 'Nova célula criada', sub: 'Célula Videira cadastrada por Tiago Fonseca. · ontem', unread: false },
+      { icon: '✉', titulo: 'Campanha enviada', sub: 'Mensagem em lote para 42 visitantes. · há 2 dias', unread: false },
+    ].map(n => ({ ...n, rowStyle: `display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--border,#E9ECF2);background:${n.unread ? 'var(--chip2,#F5F8FF)' : 'var(--surface,#FFFFFF)'}` }));
+
+    const ncTipo = this.state.ncTipo;
+    const ncTipos = ['Líder', 'Supervisor', 'Coordenador'].map(t => ({
+      t, onClick: () => set('ncTipo', t),
+      style: `flex:1;padding:12px 6px;border-radius:12px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;${ncTipo === t ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text3,#667085)'}`,
+    }));
+
+    // Cadastro wizard
+    const step = this.state.step;
+    const steps = [1, 2, 3].map(n => ({ barStyle: `flex:1;height:4px;border-radius:99px;background:${step >= n ? '#E8A33D' : 'rgba(255,255,255,.22)'}` }));
+    const stepNames = { 1: 'Dados pessoais', 2: 'Endereço', 3: 'Sobre você' };
+    const sel = this.state.interesses;
+    const interesses = ['Membro da igreja', 'Procurando batismo', 'Quero ter uma célula em casa', 'Preciso de oração', 'Outros'].map(label => { const on = sel.includes(label); return { label, check: on ? '✓ ' : '', onClick: () => set('interesses', on ? sel.filter(x => x !== label) : [...sel, label]), style: `border-radius:999px;padding:9px 15px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;${on ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A);font-weight:600' : 'border:1px solid var(--border,#D0D5DD);background:var(--surface,#FFFFFF);color:var(--text2,#475467)'}` }; });
+    const attendsCell = this.state.attendsCell;
+    const celulasProx = [
+      { nome: 'Célula Vida Nova', info: 'Quinta, 20h · Jd. Primavera', dist: '850 m' },
+      { nome: 'Célula Esperança', info: 'Terça, 19h30 · Centro', dist: '1,2 km' },
+      { nome: 'Célula Restauração', info: 'Sexta, 20h · Vila Nova', dist: '2,4 km' },
+    ].map((c, i) => ({ ...c, onClick: () => set('celulaSel', i), style: `display:flex;align-items:center;gap:12px;width:100%;border-radius:12px;padding:12px 14px;font-family:inherit;cursor:pointer;${this.state.celulaSel === i ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip2,#F5F8FF)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF)'}` }));
+
+    // WhatsApp + Templates
+    const waTab = this.state.waTab;
+    const waTabs = ['Em lote', 'Individual', 'Templates'].map(t => ({ label: t, onClick: () => set('waTab', t), style: `flex:1;padding:9px 4px;border-radius:9px;border:none;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;${waTab === t ? 'background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'background:transparent;color:var(--text3,#667085)'}` }));
+    const waSegs = ['Todos os visitantes', 'Novos visitantes', 'Em acompanhamento', 'Líderes'].map(label => ({ label, onClick: () => set('waSeg', label), style: `border-radius:999px;padding:9px 14px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none;${this.state.waSeg === label ? 'border:1.5px solid var(--accentB,#1E3A8A);background:var(--chip,#EFF4FF);color:var(--link,#1E3A8A)' : 'border:1px solid var(--border,#E4E7EC);background:var(--surface,#FFFFFF);color:var(--text3,#667085)'}` }));
+    const wtpl = this.state.waTpl || {};
+    const tplSet = (k) => (e) => this.setState(s => ({ waTpl: { ...s.waTpl, [k]: e.target.value } }));
+    const waSamples = { nome: 'Mariana', celula: 'Célula Vida Nova', data: 'quinta-feira', horario: '20h', bairro: 'Jd. Primavera', lider: 'Carla Mendes' };
+    const tplVars = ['nome', 'celula', 'data', 'horario', 'bairro', 'lider'].map(v => ({
+      label: '{' + v + '}',
+      onClick: () => this.setState(s => { const m = (s.waTpl && s.waTpl.msg) || ''; return { waTpl: { ...s.waTpl, msg: m + (m && !m.endsWith(' ') ? ' ' : '') + '{' + v + '}' } }; }),
+    }));
+    const tplPreview = (wtpl.msg || '').replace(/\{(\w+)\}/g, (m, k) => waSamples[k] || m);
+    const catColor = (cat) => cat === 'Boas-vindas' ? ['var(--okBg,#E7F6EF)', 'var(--okFg,#0E9F6E)'] : cat === 'Convite' ? ['var(--warnBg,#FDF3E1)', 'var(--warnFg,#B54708)'] : ['var(--chip,#EFF4FF)', 'var(--link,#1E3A8A)'];
+    const waTplRows = this.state.waTemplates.map((t, i) => {
+      const c = catColor(t.cat);
+      return {
+        nome: t.nome, cat: t.cat,
+        msgShort: t.msg.length > 60 ? t.msg.slice(0, 60) + '…' : t.msg,
+        catStyle: `font-size:10.5px;font-weight:600;border-radius:99px;padding:3px 9px;background:${c[0]};color:${c[1]};white-space:nowrap`,
+        onEdit: () => this.setState({ waTplModal: true, waTpl: { ...t, idx: i } }),
+        onDelete: () => this.setState(s => ({ waTemplates: s.waTemplates.filter((_, j) => j !== i) })),
+        onUse: () => this.setState({ waMsg: t.msg, waTab: 'Em lote' }),
+      };
+    });
+    const waTplPick = this.state.waTemplates.map(t => ({ nome: t.nome, onClick: () => set('waMsg', t.msg) }));
+
+    // Nav
+    const navDef = [
+      { key: 'home', icon: '◫', label: 'Início' },
+      { key: 'visitantes', icon: '☺', label: 'Visitantes' },
+      { key: 'celulas', icon: '⌂', label: 'Células' },
+      { key: 'relatorios', icon: '◔', label: 'Relatórios' },
+      { key: 'mais', icon: '☰', label: 'Mais' },
+    ];
+    const maisScreens = ['mais', 'lideres', 'supervisores', 'coordenacoes', 'novocadastro', 'tipos', 'materiais', 'whatsapp', 'locais', 'config', 'notif'];
+    const navItems = navDef.map(n => ({ icon: n.icon, label: n.label, onClick: () => set('screen', n.key), color: (screen === n.key || (n.key === 'mais' && maisScreens.includes(screen))) ? 'var(--link,#1E3A8A)' : 'var(--muted,#98A2B3)' }));
+
+    const internal = ['home', 'visitantes', 'celulas', 'relatorios', ...maisScreens].includes(screen);
+    const tabDef = [['home', 'Dashboard'], ['visitantes', 'Visitantes'], ['cadastro', 'Cadastro'], ['login', 'Login']];
+    const tabs = tabDef.map(([k, label]) => ({ label, onClick: () => set('screen', k), style: `border:none;border-radius:999px;padding:8px 16px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;${screen === k ? 'background:var(--accentB,#0B1530);color:#FFFFFF' : 'background:transparent;color:var(--text2,#475467)'}` }));
+
+    const onDark = (screen === 'login' || screen === 'cadastro');
+
+    return {
+      themeVars: dark ? darkVars : '', themeIcon: dark ? '☀' : '☾', toggleDark: () => set('dark', !dark),
+      tabs,
+      statusColor: onDark ? '#FFFFFF' : 'var(--text,#101828)',
+      statusBg: 'transparent',
+      isLogin: screen === 'login', isHome: screen === 'home', isVisitantes: screen === 'visitantes', isMais: screen === 'mais', isCadastro: screen === 'cadastro',
+      isCelulas: screen === 'celulas', isRelatorios: screen === 'relatorios', isLideres: screen === 'lideres', isSupervisores: screen === 'supervisores', isCoordenacoes: screen === 'coordenacoes', isNovoCadastro: screen === 'novocadastro', isTipos: screen === 'tipos', isMateriais: screen === 'materiais', isLocais: screen === 'locais', isConfig: screen === 'config', isNotif: screen === 'notif',
+      goNotif: () => set('screen', 'notif'),
+      goNovoCadastro: () => this.setState({ screen: 'novocadastro', ncTipo: 'Líder' }),
+      celulasM, novaCelula, lideresM, supervisoresM, coordenacoesM, novaCoordenacao, tiposM, novoTipo,
+      locTabs, isLocCidades: locTab === 'Cidades', isLocBairros: locTab === 'Bairros', cidadesM, bairrosM, novaCidade, novoBairro,
+      materiaisM, relCards, notifsM, ncTipos,
+      gsOpen: !!gs, gsTitle: gs ? gs.title : '', gsFields, gsClose: () => set('gsheet', null), gsSave: () => set('gsheet', null),
+      ncSalvar: () => set('screen', 'mais'),
+      showNav: internal,
+      goHome: () => set('screen', 'home'), goVisitantes: () => set('screen', 'visitantes'),
+      isWhatsapp: screen === 'whatsapp', goMais: () => set('screen', 'mais'),
+      waTabs, waSegs,
+      isWaLote: waTab === 'Em lote', isWaIndividual: waTab === 'Individual', isWaTemplates: waTab === 'Templates',
+      isWaCompose: waTab === 'Em lote' || waTab === 'Individual',
+      waMsg: this.state.waMsg, onWaMsg: (e) => set('waMsg', e.target.value),
+      waTplRows, waTplPick,
+      waTplModalOpen: this.state.waTplModal,
+      waTplNew: () => this.setState({ waTplModal: true, waTpl: { nome: '', cat: 'Geral', msg: '' } }),
+      waTplClose: () => set('waTplModal', false),
+      waTplSave: () => this.setState(s => { const t = { nome: s.waTpl.nome || 'Sem nome', cat: s.waTpl.cat || 'Geral', msg: s.waTpl.msg || '' }; const arr = [...s.waTemplates]; if (s.waTpl.idx != null) { arr[s.waTpl.idx] = t; } else { arr.push(t); } return { waTemplates: arr, waTplModal: false }; }),
+      waTplTitle: wtpl.idx != null ? 'Editar Template' : 'Novo Template',
+      tplNome: wtpl.nome ?? '', tplCat: wtpl.cat ?? 'Geral', tplMsg: wtpl.msg ?? '',
+      onTplNome: tplSet('nome'), onTplCat: tplSet('cat'), onTplMsg: tplSet('msg'),
+      tplVars, tplPreview, tplHasPreview: !!wtpl.msg,
+      goCadLink: (e) => { e.preventDefault(); set('screen', 'cadastro'); },
+      kpis, meses, visShort, visRows, vFilters, navItems, maisGroups,
+      onSearch: (e) => set('vq', e.target.value),
+      sheetOpen, closeSheet: () => set('visSel', null),
+      selNome: sv.nome, selTel: sv.tel, selCelula: sv.celula === '—' ? 'Sem célula' : 'Célula ' + sv.celula, selEnd: sv.end, selVisita: 'Visitou ' + sv.visita,
+      selInitials: ini(sv.nome), selAvatarStyle: avatar(svSt, true), statusOpts,
+      step, stepName: stepNames[step], steps, isStep1: step === 1, isStep2: step === 2, isStep3: step === 3,
+      interesses, attendsCell, toggleCell: () => set('attendsCell', !attendsCell),
+      toggleStyle: `width:46px;height:26px;border-radius:99px;border:none;cursor:pointer;padding:3px;display:flex;${attendsCell ? 'background:#1E3A8A;justify-content:flex-end' : 'background:#D0D5DD;justify-content:flex-start'}`,
+      celulasProx, cadDone: this.state.cadDone,
+      nextLabel: step === 3 ? 'Concluir' : 'Continuar',
+      backBtnStyle: `height:52px;padding:0 20px;border:1px solid var(--border,#D0D5DD);border-radius:12px;background:var(--surface,#FFFFFF);color:var(--text2,#344054);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;${step > 1 ? '' : 'display:none'}`,
+      stepBack: () => set('step', Math.max(1, step - 1)),
+      stepNext: () => { if (step < 3) set('step', step + 1); else set('cadDone', true); },
+    };
+  }
+}
+</script>
+</body>
+</html>

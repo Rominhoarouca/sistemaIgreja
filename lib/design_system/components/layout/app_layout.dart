@@ -84,7 +84,9 @@ class AppSectionHeader extends StatelessWidget {
             child: Text(
               actionLabel!,
               style: AppTypography.labelMedium.copyWith(
-                color: AppColors.primary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppColors.linkDark
+                    : AppColors.primary,
               ),
             ),
           ),
@@ -105,18 +107,7 @@ class AppGradientHeader extends StatelessWidget {
     return Container(
       height: height,
       width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primaryDark,
-            AppColors.primary,
-            AppColors.secondary,
-          ],
-          stops: [0.0, 0.6, 1.0],
-        ),
-      ),
+      decoration: const BoxDecoration(gradient: AppColors.brandGradient),
       child: child,
     );
   }

@@ -77,7 +77,7 @@ class _NearbyCellsPageState extends State<NearbyCellsPage> {
     final filtered = _filteredCells;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Células Próximas'),
         backgroundColor: AppColors.primary,

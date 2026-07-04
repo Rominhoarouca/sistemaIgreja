@@ -480,7 +480,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
             ],
           ),
-          backgroundColor: AppColors.background,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: LayoutBuilder(
             builder: (ctx, constraints) {
               return Center(

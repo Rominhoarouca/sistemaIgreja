@@ -40,7 +40,7 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
     final appBar = AppBar(
       title: const Text('Painel do Supervisor'),
       elevation: 0,
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_outlined),
@@ -62,7 +62,7 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
     if (isWide) {
       return Scaffold(
         appBar: appBar,
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Row(
           children: [
             NavigationRail(
@@ -91,7 +91,7 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
 
     return Scaffold(
       appBar: appBar,
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: tabContent,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
