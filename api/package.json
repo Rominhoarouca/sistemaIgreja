@@ -11,6 +11,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "generate": "prisma generate",
     "seed": "tsx prisma/seed.ts",
+    "seed:massa": "tsx prisma/seed-massa.ts",
     "test": "jest",
     "test:unit": "jest --testPathPattern='tests/unit'",
     "test:integration": "jest --testPathPattern='tests/integration'",

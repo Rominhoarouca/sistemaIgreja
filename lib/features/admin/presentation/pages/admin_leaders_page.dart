@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/reset_password_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data Models
@@ -230,8 +231,6 @@ class _AdminLeadersPageState extends State<AdminLeadersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
         title: const Text('Líderes'),
         actions: [
           IconButton(
@@ -482,14 +481,20 @@ class _LeaderDetailPageState extends State<_LeaderDetailPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
         title: Text(_leader.name),
+        actions: [
+          IconButton(
+            tooltip: 'Redefinir senha',
+            icon: const Icon(Icons.lock_reset),
+            onPressed: () => showResetPasswordSheet(
+              context,
+              userId: _leader.id,
+              userName: _leader.name,
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
-          indicatorColor: AppColors.white,
-          labelColor: AppColors.white,
-          unselectedLabelColor: AppColors.white.withValues(alpha: 0.65),
           tabs: const [
             Tab(icon: Icon(Icons.person_outline), text: 'Dados'),
             Tab(icon: Icon(Icons.home_outlined), text: 'Células'),
@@ -1210,8 +1215,7 @@ class _CellMeetingsSheet extends StatelessWidget {
                 horizontal: AppSpacing.pagePaddingH,
               ),
               itemCount: meetings.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(height: AppSpacing.xs),
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.xs),
               itemBuilder: (_, i) {
                 final m = meetings[i];
                 final color = _rateColor(m.rate);

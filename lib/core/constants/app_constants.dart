@@ -75,6 +75,9 @@ abstract final class AppRoutes {
   // Supervisor
   static const String supervisorHome = '/supervisor';
 
+  // Coordenador
+  static const String coordinatorHome = '/coordinator';
+
   // Admin
   static const String adminDashboard = '/admin';
   static const String adminVisitors = '/admin/visitors';

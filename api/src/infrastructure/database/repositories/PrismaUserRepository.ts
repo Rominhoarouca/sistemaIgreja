@@ -118,6 +118,46 @@ export class PrismaUserRepository implements IUserRepository {
     return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
   }
 
+  async findSupervisorsByCoordinatorId(coordinatorId: string): Promise<User[]> {
+    const coordenacao = await this.prisma.coordenacao.findUnique({
+      where: { coordinadorId: coordinatorId },
+      select: { id: true },
+    });
+    if (!coordenacao) return [];
+    const supervisors = await this.prisma.user.findMany({
+      where: { role: 'SUPERVISOR', coordenacaoId: coordenacao.id },
+      orderBy: { name: 'asc' },
+    });
+    return supervisors.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
+  async findLeadersByCoordinatorId(coordinatorId: string): Promise<User[]> {
+    const coordenacao = await this.prisma.coordenacao.findUnique({
+      where: { coordinadorId: coordinatorId },
+      select: { id: true },
+    });
+    if (!coordenacao) return [];
+    const leaders = await this.prisma.user.findMany({
+      where: {
+        role: 'LIDER',
+        supervisor: { coordenacaoId: coordenacao.id },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
+  async resetPassword(userId: string, passwordHash: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { password: passwordHash },
+      }),
+      // Invalida sessões existentes do usuário-alvo
+      this.prisma.refreshToken.deleteMany({ where: { userId } }),
+    ]);
+  }
+
   async assignSupervisor(leaderId: string, supervisorId: string | null): Promise<void> {
     await this.prisma.user.update({
       where: { id: leaderId },

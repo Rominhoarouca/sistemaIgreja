@@ -73,195 +73,191 @@ class VisitorDetailsSheet extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-              Row(
+        Row(
+          children: [
+            AppAvatar(
+              initials: name.split(' ').map((e) => e[0]).take(2).join(),
+              size: 56,
+            ),
+            const SizedBox(width: AppSpacing.base),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppAvatar(
-                    initials: name.split(' ').map((e) => e[0]).take(2).join(),
-                    size: 56,
-                  ),
-                  const SizedBox(width: AppSpacing.base),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: AppTypography.headlineSmall),
-                        const SizedBox(height: AppSpacing.xs),
-                        VisitorStatusBadge(status: status),
-                      ],
-                    ),
-                  ),
+                  Text(name, style: AppTypography.headlineSmall),
+                  const SizedBox(height: AppSpacing.xs),
+                  VisitorStatusBadge(status: status),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xl),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xl),
 
-              // ── Informações Básicas ─────────────────────────
-              Text('Informações Básicas', style: AppTypography.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    DetailRow(
-                      icon: Icons.phone_outlined,
-                      label: 'Telefone',
-                      value: _textOrDash(visitor['phone']),
-                    ),
-                    const Divider(height: 1),
-                    DetailRow(
-                      icon: Icons.email_outlined,
-                      label: 'Email',
-                      value: _textOrDash(visitor['email']),
-                    ),
-                    const Divider(height: 1),
-                    DetailRow(
-                      icon: Icons.location_on_outlined,
-                      label: 'Endereço',
-                      value: _textOrDash(visitor['address']),
-                    ),
-                    const Divider(height: 1),
-                    DetailRow(
-                      icon: Icons.access_time_outlined,
-                      label: 'Cadastrado',
-                      value: relativeTime(),
-                    ),
-                  ],
-                ),
+        // ── Informações Básicas ─────────────────────────
+        Text('Informações Básicas', style: AppTypography.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              DetailRow(
+                icon: Icons.phone_outlined,
+                label: 'Telefone',
+                value: _textOrDash(visitor['phone']),
               ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // ── Informações Pessoais ────────────────────────
-              Text('Informações Pessoais', style: AppTypography.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    DetailRow(
-                      icon: Icons.cake_outlined,
-                      label: 'Data de Nascimento',
-                      value: _formatDate(visitor['birthDate'] as String?),
-                    ),
-                    if (age != null) ...[
-                      const Divider(height: 1),
-                      DetailRow(
-                        icon: Icons.person_outline,
-                        label: 'Idade',
-                        value: '$age anos',
-                      ),
-                    ],
-                    const Divider(height: 1),
-                    DetailRow(
-                      icon: Icons.favorite_outline,
-                      label: 'Estado Civil',
-                      value: _textOrDash(visitor['maritalStatus']),
-                    ),
-                  ],
-                ),
+              const Divider(height: 1),
+              DetailRow(
+                icon: Icons.email_outlined,
+                label: 'Email',
+                value: _textOrDash(visitor['email']),
               ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // ── Informações Espirituais ─────────────────────
-              Text('Informações Espirituais', style: AppTypography.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              AppCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    DetailRow(
-                      icon: Icons.check_outlined,
-                      label: 'Batizado',
-                      value: (visitor['isBaptized'] as bool?) == true
-                          ? 'Sim'
-                          : 'Não',
-                    ),
-                    const Divider(height: 1),
-                    DetailRow(
-                      icon: Icons.group_outlined,
-                      label: 'Frequenta Célula',
-                      value: visitor['cellId'] != null ? 'Sim' : 'Não',
-                    ),
-                  ],
-                ),
+              const Divider(height: 1),
+              DetailRow(
+                icon: Icons.location_on_outlined,
+                label: 'Endereço',
+                value: _textOrDash(visitor['address']),
               ),
-              const SizedBox(height: AppSpacing.xl),
-
-              // ── Informações Adicionais ──────────────────────
-              if (_textOrDash(visitor['knownPersonName']).isNotEmpty ||
-                  _textOrDash(visitor['originChurch']).isNotEmpty ||
-                  (visitor['interests'] as List?)?.isNotEmpty == true) ...[
-                Text('Informações Adicionais', style: AppTypography.titleSmall),
-                const SizedBox(height: AppSpacing.sm),
-                AppCard(
-                  padding: EdgeInsets.zero,
-                  child: Column(
-                    children: [
-                      if (_textOrDash(visitor['originChurch']).isNotEmpty) ...[
-                        DetailRow(
-                          icon: Icons.church_outlined,
-                          label: 'Igreja de Origem',
-                          value: _textOrDash(visitor['originChurch']),
-                        ),
-                        const Divider(height: 1),
-                      ],
-                      if (_textOrDash(
-                        visitor['knownPersonName'],
-                      ).isNotEmpty) ...[
-                        DetailRow(
-                          icon: Icons.person_add_outlined,
-                          label: 'Conhecido Por',
-                          value: _textOrDash(visitor['knownPersonName']),
-                        ),
-                        const Divider(height: 1),
-                      ],
-                      if ((visitor['interests'] as List?)?.isNotEmpty == true)
-                        DetailRow(
-                          icon: Icons.star_outline,
-                          label: 'Interesses',
-                          value: (visitor['interests'] as List)
-                              .cast<String>()
-                              .join(', '),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-              ],
-
-              // ── Alterar Status ──────────────────────────────
-              Text('Alterar status', style: AppTypography.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              const Wrap(
-                spacing: AppSpacing.sm,
-                children: [
-                  VisitorStatusChip(label: 'Novo'),
-                  VisitorStatusChip(label: 'Em acompanhamento'),
-                  VisitorStatusChip(label: 'Integrado'),
-                  VisitorStatusChip(label: 'Inativo'),
-                ],
+              const Divider(height: 1),
+              DetailRow(
+                icon: Icons.access_time_outlined,
+                label: 'Cadastrado',
+                value: relativeTime(),
               ),
-              const SizedBox(height: AppSpacing.lg),
-
-              // ── Ações ───────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: AppSpacing.buttonHeightMd,
-                child: FilledButton.icon(
-                  onPressed: () => _openWhatsApp(visitor['phone'] as String?),
-                  icon: const Icon(Icons.chat_outlined, size: 18),
-                  label: const Text('Enviar WhatsApp'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.whatsapp,
-                    foregroundColor: AppColors.white,
-                    textStyle: AppTypography.buttonLabel,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.base),
             ],
-          );
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+
+        // ── Informações Pessoais ────────────────────────
+        Text('Informações Pessoais', style: AppTypography.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              DetailRow(
+                icon: Icons.cake_outlined,
+                label: 'Data de Nascimento',
+                value: _formatDate(visitor['birthDate'] as String?),
+              ),
+              if (age != null) ...[
+                const Divider(height: 1),
+                DetailRow(
+                  icon: Icons.person_outline,
+                  label: 'Idade',
+                  value: '$age anos',
+                ),
+              ],
+              const Divider(height: 1),
+              DetailRow(
+                icon: Icons.favorite_outline,
+                label: 'Estado Civil',
+                value: _textOrDash(visitor['maritalStatus']),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+
+        // ── Informações Espirituais ─────────────────────
+        Text('Informações Espirituais', style: AppTypography.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              DetailRow(
+                icon: Icons.check_outlined,
+                label: 'Batizado',
+                value: (visitor['isBaptized'] as bool?) == true ? 'Sim' : 'Não',
+              ),
+              const Divider(height: 1),
+              DetailRow(
+                icon: Icons.group_outlined,
+                label: 'Frequenta Célula',
+                value: visitor['cellId'] != null ? 'Sim' : 'Não',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+
+        // ── Informações Adicionais ──────────────────────
+        if (_textOrDash(visitor['knownPersonName']).isNotEmpty ||
+            _textOrDash(visitor['originChurch']).isNotEmpty ||
+            (visitor['interests'] as List?)?.isNotEmpty == true) ...[
+          Text('Informações Adicionais', style: AppTypography.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                if (_textOrDash(visitor['originChurch']).isNotEmpty) ...[
+                  DetailRow(
+                    icon: Icons.church_outlined,
+                    label: 'Igreja de Origem',
+                    value: _textOrDash(visitor['originChurch']),
+                  ),
+                  const Divider(height: 1),
+                ],
+                if (_textOrDash(visitor['knownPersonName']).isNotEmpty) ...[
+                  DetailRow(
+                    icon: Icons.person_add_outlined,
+                    label: 'Conhecido Por',
+                    value: _textOrDash(visitor['knownPersonName']),
+                  ),
+                  const Divider(height: 1),
+                ],
+                if ((visitor['interests'] as List?)?.isNotEmpty == true)
+                  DetailRow(
+                    icon: Icons.star_outline,
+                    label: 'Interesses',
+                    value: (visitor['interests'] as List).cast<String>().join(
+                      ', ',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+
+        // ── Alterar Status ──────────────────────────────
+        Text('Alterar status', style: AppTypography.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        const Wrap(
+          spacing: AppSpacing.sm,
+          children: [
+            VisitorStatusChip(label: 'Novo'),
+            VisitorStatusChip(label: 'Em acompanhamento'),
+            VisitorStatusChip(label: 'Integrado'),
+            VisitorStatusChip(label: 'Inativo'),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+
+        // ── Ações ───────────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: AppSpacing.buttonHeightMd,
+          child: FilledButton.icon(
+            onPressed: () => _openWhatsApp(visitor['phone'] as String?),
+            icon: const Icon(Icons.chat_outlined, size: 18),
+            label: const Text('Enviar WhatsApp'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.whatsapp,
+              foregroundColor: AppColors.white,
+              textStyle: AppTypography.buttonLabel,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.base),
+      ],
+    );
 
     if (panel) {
       return SingleChildScrollView(

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { UserController } from '../controllers/UserController';
-import { authMiddleware, requireAdmin, requireSupervisorOrAdmin } from '../middlewares/auth.middleware';
+import { authMiddleware, requireAdmin, requireSupervisorOrAdmin, requireStaff } from '../middlewares/auth.middleware';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -17,12 +17,14 @@ export function userRoutes(controller: UserController): Router {
   router.get('/leaders', requireSupervisorOrAdmin, controller.findLeaders);
   router.get('/supervisors', requireAdmin, controller.findSupervisors);
   router.get('/coordinadores', requireAdmin, controller.findCoordinadores);
-  router.get('/my-leaders', requireSupervisorOrAdmin, controller.getMyLeaders);
+  router.get('/my-leaders', requireStaff, controller.getMyLeaders);
+  router.get('/my-supervisors', requireStaff, controller.getMySupervisors);
   router.post('/create', requireAdmin, controller.createUser);
   router.patch('/leaders/:leaderId/supervisor', requireAdmin, controller.assignLeaderSupervisor);
   router.patch('/leaders/:leaderId/promote', requireAdmin, controller.promoteLeader);
   router.patch('/leaders/:leaderId', requireAdmin, controller.updateLeaderDescription);
   router.patch('/supervisors/:supervisorId/coordenacao', requireAdmin, controller.assignSupervisorCoordenacao);
+  router.patch('/:userId/password', requireStaff, controller.resetUserPassword);
 
   return router;
 }

@@ -492,10 +492,11 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           Text(
             'Que alegria receber você!',
             textAlign: TextAlign.center,
-            style: (isWide
-                    ? AppTypography.headlineSmall
-                    : AppTypography.titleLarge)
-                .copyWith(color: AppColors.white),
+            style:
+                (isWide
+                        ? AppTypography.headlineSmall
+                        : AppTypography.titleLarge)
+                    .copyWith(color: AppColors.white),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
@@ -567,7 +568,11 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
                   ),
                 ),
                 child: i < _currentStep
-                    ? const Icon(Icons.check, size: 14, color: AppColors.navy900)
+                    ? const Icon(
+                        Icons.check,
+                        size: 14,
+                        color: AppColors.navy900,
+                      )
                     : Text(
                         '${i + 1}',
                         style: AppTypography.labelSmall.copyWith(
@@ -598,7 +603,11 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   }
 
   Widget _buildCard(BuildContext context) {
-    final steps = [_buildStepPersonal(), _buildStepAddress(), _buildStepAbout()];
+    final steps = [
+      _buildStepPersonal(),
+      _buildStepAddress(),
+      _buildStepAbout(),
+    ];
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl2),

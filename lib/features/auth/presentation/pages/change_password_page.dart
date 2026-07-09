@@ -51,12 +51,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        elevation: 0,
-        title: const Text('Alterar Senha'),
-      ),
+      appBar: AppBar(elevation: 0, title: const Text('Alterar Senha')),
       body: Align(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),

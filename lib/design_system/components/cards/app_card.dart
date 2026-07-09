@@ -77,6 +77,7 @@ class StatCard extends StatelessWidget {
     this.color = AppColors.primary,
     this.subtitle,
     this.deltaPositive = true,
+    this.onTap,
   });
 
   final String label;
@@ -88,6 +89,9 @@ class StatCard extends StatelessWidget {
   final String? subtitle;
   final bool deltaPositive;
 
+  /// Torna o card clicável (ex.: abrir detalhe da métrica).
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -95,6 +99,7 @@ class StatCard extends StatelessWidget {
     final compact = MediaQuery.sizeOf(context).width < 1024;
 
     return AppCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

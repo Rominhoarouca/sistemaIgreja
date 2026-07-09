@@ -459,8 +459,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
         return Scaffold(
           appBar: AppBar(
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.white,
             elevation: 0,
             title: const Text('Meu Perfil'),
             actions: [

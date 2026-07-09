@@ -21,6 +21,7 @@ import '../features/admin/presentation/pages/admin_coordenacoes_page.dart';
 import '../features/admin/presentation/pages/admin_location_page.dart';
 import '../features/visitor/presentation/pages/visitor_self_register_page.dart';
 import '../features/supervisor/presentation/pages/supervisor_home_page.dart';
+import '../features/coordinator/presentation/pages/coordinator_home_page.dart';
 import '../features/admin/presentation/pages/admin_cell_types_page.dart';
 import '../features/whatsapp/presentation/pages/admin_whatsapp_page.dart';
 import '../features/admin/presentation/pages/admin_users_register_page.dart';
@@ -69,6 +70,7 @@ GoRouter createRouter(AuthBloc authBloc) {
         }
         if (authState.user.isAdmin) return AppRoutes.adminDashboard;
         if (authState.user.isSupervisor) return AppRoutes.supervisorHome;
+        if (authState.user.isCoordinator) return AppRoutes.coordinatorHome;
         return AppRoutes.leaderHome;
       }
 
@@ -102,6 +104,14 @@ GoRouter createRouter(AuthBloc authBloc) {
         name: 'supervisor-home',
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: SupervisorHomePage()),
+      ),
+
+      // ── Coordenador ───────────────────────────────────────────────────
+      GoRoute(
+        path: AppRoutes.coordinatorHome,
+        name: 'coordinator-home',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: CoordinatorHomePage()),
       ),
 
       // ── Leader ────────────────────────────────────────────────────────

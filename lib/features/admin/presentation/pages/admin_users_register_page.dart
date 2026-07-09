@@ -484,26 +484,178 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
         .toList();
   }
 
+  Widget _personalInfoCard() {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: 'Informações Pessoais'),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Nome Completo',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+            textCapitalization: TextCapitalization.words,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Nome é obrigatório' : null,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _emailCtrl,
+            decoration: const InputDecoration(
+              labelText: 'E-mail',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
+            keyboardType: TextInputType.emailAddress,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) {
+                return 'E-mail é obrigatório';
+              }
+              if (!RegExp(
+                r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+              ).hasMatch(v)) {
+                return 'E-mail inválido';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _phoneCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Telefone',
+              prefixIcon: Icon(Icons.phone_outlined),
+              hintText: '(11) 99999-9999',
+            ),
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              MaskTextInputFormatter(
+                mask: '(##) #####-####',
+                filter: {'#': RegExp(r'[0-9]')},
+              ),
+            ],
+            validator: (v) => (v == null || v.trim().isEmpty)
+                ? 'Telefone é obrigatório'
+                : null,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _passwordCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Senha Temporária *',
+              prefixIcon: Icon(Icons.lock_outlined),
+              hintText: 'Mínimo 6 caracteres',
+            ),
+            obscureText: true,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) {
+                return 'Senha é obrigatória';
+              }
+              if (v.length < 6) {
+                return 'Mínimo 6 caracteres';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+      ),
+    );
+  }
+
+  Widget _addressCard() {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(title: 'Dados de Endereço'),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _cepCtrl,
+            decoration: const InputDecoration(
+              labelText: 'CEP',
+              prefixIcon: Icon(Icons.mail_outlined),
+              hintText: '00000-000',
+            ),
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              MaskTextInputFormatter(
+                mask: '#####-###',
+                filter: {'#': RegExp(r'[0-9]')},
+              ),
+            ],
+            onChanged: _lookupCep,
+          ),
+          if (_cepLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.sm),
+              child: CircularProgressIndicator(),
+            ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _addressCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Logradouro',
+              prefixIcon: Icon(Icons.location_on_outlined),
+            ),
+            readOnly: true,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: _numeroCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Número',
+                    prefixIcon: Icon(Icons.home_outlined),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                flex: 3,
+                child: TextFormField(
+                  controller: _complementoCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Complemento',
+                    prefixIcon: Icon(Icons.info_outlined),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AddressSelector(
+            onChanged: (bairroId) => setState(() => _bairroId = bairroId),
+            initialEstadoId: _cepEstadoId,
+            initialCidadeId: _cepCidadeId,
+            initialBairroId: _cepBairroId,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textOnPrimary,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Novo Cadastro',
-              style: AppTypography.titleLarge.copyWith(
-                color: AppColors.textOnPrimary,
-              ),
-            ),
+            const Text('Novo Cadastro'),
             Text(
               'Líderes, Supervisores e Coordenadores',
               style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textOnPrimary.withValues(alpha: 0.75),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -513,391 +665,293 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.base),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Type selector
-                  _SectionHeader(title: 'Tipo de Cadastro'),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1100),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _UserTypeCard(
-                          label: 'Líder',
-                          icon: Icons.person_outlined,
-                          selected: _selectedType == _UserType.leader,
-                          onTap: () => setState(() {
-                            _selectedCells.clear();
-                            _cellSearch = '';
-                            _selectedType = _UserType.leader;
-                            _refreshData();
-                          }),
-                        ),
+                      // Type selector
+                      _SectionHeader(title: 'Tipo de Cadastro'),
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _UserTypeCard(
+                              label: 'Líder',
+                              icon: Icons.person_outlined,
+                              selected: _selectedType == _UserType.leader,
+                              onTap: () => setState(() {
+                                _selectedCells.clear();
+                                _cellSearch = '';
+                                _selectedType = _UserType.leader;
+                                _refreshData();
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _UserTypeCard(
+                              label: 'Supervisor',
+                              icon: Icons.manage_accounts_outlined,
+                              selected: _selectedType == _UserType.supervisor,
+                              onTap: () => setState(() {
+                                _selectedLeaders.clear();
+                                _leaderSearch = '';
+                                _selectedType = _UserType.supervisor;
+                                _refreshData();
+                              }),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: _UserTypeCard(
+                              label: 'Coordenador',
+                              icon: Icons.account_tree_outlined,
+                              selected: _selectedType == _UserType.coordinator,
+                              onTap: () => setState(() {
+                                _selectedSupervisors.clear();
+                                _supervisorSearch = '';
+                                _selectedType = _UserType.coordinator;
+                                _refreshData();
+                              }),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _UserTypeCard(
-                          label: 'Supervisor',
-                          icon: Icons.manage_accounts_outlined,
-                          selected: _selectedType == _UserType.supervisor,
-                          onTap: () => setState(() {
-                            _selectedLeaders.clear();
-                            _leaderSearch = '';
-                            _selectedType = _UserType.supervisor;
-                            _refreshData();
-                          }),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _UserTypeCard(
-                          label: 'Coordenador',
-                          icon: Icons.account_tree_outlined,
-                          selected: _selectedType == _UserType.coordinator,
-                          onTap: () => setState(() {
-                            _selectedSupervisors.clear();
-                            _supervisorSearch = '';
-                            _selectedType = _UserType.coordinator;
-                            _refreshData();
-                          }),
+                      const SizedBox(height: AppSpacing.xl),
+                      // Form
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final wide = constraints.maxWidth >= 900;
+                                final personal = _personalInfoCard();
+                                final address = _addressCard();
+                                if (!wide) {
+                                  return Column(
+                                    children: [
+                                      personal,
+                                      const SizedBox(height: AppSpacing.base),
+                                      address,
+                                    ],
+                                  );
+                                }
+                                // Dois cards lado a lado no desktop.
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: personal),
+                                    const SizedBox(width: AppSpacing.base),
+                                    Expanded(child: address),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                            // Associations
+                            if (_selectedType == _UserType.leader)
+                              _CellAssociation(
+                                cells: _filteredCells,
+                                selectedIds: _selectedCells,
+                                onToggle: (id) => setState(() {
+                                  if (_selectedCells.contains(id)) {
+                                    _selectedCells.remove(id);
+                                  } else {
+                                    _selectedCells.add(id);
+                                  }
+                                }),
+                                searchQuery: _cellSearch,
+                                onSearchChanged: (v) =>
+                                    setState(() => _cellSearch = v),
+                              )
+                            else if (_selectedType == _UserType.supervisor)
+                              _LeaderAssociation(
+                                leaders: _filteredLeaders,
+                                selectedIds: _selectedLeaders,
+                                onToggle: (id) => setState(() {
+                                  if (_selectedLeaders.contains(id)) {
+                                    _selectedLeaders.remove(id);
+                                  } else {
+                                    _selectedLeaders.add(id);
+                                  }
+                                }),
+                                searchQuery: _leaderSearch,
+                                onSearchChanged: (v) =>
+                                    setState(() => _leaderSearch = v),
+                              )
+                            else if (_selectedType ==
+                                _UserType.coordinator) ...[
+                              _LeaderAssociation(
+                                leaders: _filteredLeaders,
+                                selectedIds: _selectedLeaders,
+                                onToggle: (id) => setState(() {
+                                  if (_selectedLeaders.contains(id)) {
+                                    _selectedLeaders.remove(id);
+                                  } else {
+                                    _selectedLeaders.add(id);
+                                  }
+                                }),
+                                searchQuery: _leaderSearch,
+                                onSearchChanged: (v) =>
+                                    setState(() => _leaderSearch = v),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _SupervisorAssociation(
+                                supervisors: _filteredSupervisors,
+                                selectedIds: _selectedSupervisors,
+                                onToggle: (id) => setState(() {
+                                  if (_selectedSupervisors.contains(id)) {
+                                    _selectedSupervisors.remove(id);
+                                  } else {
+                                    _selectedSupervisors.add(id);
+                                  }
+                                }),
+                                searchQuery: _supervisorSearch,
+                                onSearchChanged: (v) =>
+                                    setState(() => _supervisorSearch = v),
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              if (_coordenacoes.isEmpty)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Coordenação',
+                                      style: AppTypography.titleSmall.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    Container(
+                                      padding: const EdgeInsets.all(
+                                        AppSpacing.base,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: AppColors.grey200,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            'Nenhuma coordenação cadastrada',
+                                            style: AppTypography.bodyMedium
+                                                .copyWith(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                          ),
+                                          const SizedBox(height: AppSpacing.md),
+                                          SizedBox(
+                                            width: double.infinity,
+                                            child: FilledButton.icon(
+                                              onPressed:
+                                                  _showCreateCoordenacaoSheet,
+                                              icon: const Icon(Icons.add),
+                                              label: const Text(
+                                                'Criar Nova Coordenação',
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Coordenação',
+                                      style: AppTypography.titleSmall.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    ..._coordenacoes.map((c) {
+                                      final selected =
+                                          _selectedCoordenacaoId == c.id;
+                                      return CheckboxListTile(
+                                        dense: true,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          c.name,
+                                          style: AppTypography.bodyMedium
+                                              .copyWith(
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                        value: selected,
+                                        onChanged: (_) => setState(
+                                          () => _selectedCoordenacaoId = c.id,
+                                        ),
+                                        activeColor: AppColors.primary,
+                                      );
+                                    }),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: _showCreateCoordenacaoSheet,
+                                        icon: const Icon(Icons.add),
+                                        label: const Text(
+                                          'Criar Nova Coordenação',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                            const SizedBox(height: AppSpacing.xl2),
+                            // Buttons
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: _submitting ? null : _submit,
+                                icon: const Icon(Icons.check),
+                                label: _submitting
+                                    ? const Text('Cadastrando...')
+                                    : const Text('Salvar Cadastro'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  disabledBackgroundColor: AppColors.grey200,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: AppSpacing.md,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _resetForm,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Limpar Formulário'),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  // Form
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionHeader(title: 'Informações Pessoais'),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _nameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Nome Completo',
-                            prefixIcon: Icon(Icons.person_outline),
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Nome é obrigatório'
-                              : null,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _emailCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'E-mail',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'E-mail é obrigatório';
-                            }
-                            if (!RegExp(
-                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                            ).hasMatch(v)) {
-                              return 'E-mail inválido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _phoneCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Telefone',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                            hintText: '(11) 99999-9999',
-                          ),
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            MaskTextInputFormatter(
-                              mask: '(##) #####-####',
-                              filter: {'#': RegExp(r'[0-9]')},
-                            ),
-                          ],
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Telefone é obrigatório'
-                              : null,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _passwordCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Senha Temporária *',
-                            prefixIcon: Icon(Icons.lock_outlined),
-                            hintText: 'Mínimo 6 caracteres',
-                          ),
-                          obscureText: true,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Senha é obrigatória';
-                            }
-                            if (v.length < 6) {
-                              return 'Mínimo 6 caracteres';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        const _SectionHeader(title: 'Dados de Endereço'),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _cepCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'CEP',
-                            prefixIcon: Icon(Icons.mail_outlined),
-                            hintText: '00000-000',
-                          ),
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            MaskTextInputFormatter(
-                              mask: '#####-###',
-                              filter: {'#': RegExp(r'[0-9]')},
-                            ),
-                          ],
-                          onChanged: _lookupCep,
-                        ),
-                        if (_cepLoading)
-                          const Padding(
-                            padding: EdgeInsets.only(top: AppSpacing.sm),
-                            child: CircularProgressIndicator(),
-                          ),
-                        const SizedBox(height: AppSpacing.sm),
-                        TextFormField(
-                          controller: _addressCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Logradouro',
-                            prefixIcon: Icon(Icons.location_on_outlined),
-                          ),
-                          readOnly: true,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: TextFormField(
-                                controller: _numeroCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Número',
-                                  prefixIcon: Icon(Icons.home_outlined),
-                                ),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              flex: 3,
-                              child: TextFormField(
-                                controller: _complementoCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Complemento',
-                                  prefixIcon: Icon(Icons.info_outlined),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        AddressSelector(
-                          onChanged: (bairroId) =>
-                              setState(() => _bairroId = bairroId),
-                          initialEstadoId: _cepEstadoId,
-                          initialCidadeId: _cepCidadeId,
-                          initialBairroId: _cepBairroId,
-                        ),
-                        const SizedBox(height: AppSpacing.xl),
-                        // Associations
-                        if (_selectedType == _UserType.leader)
-                          _CellAssociation(
-                            cells: _filteredCells,
-                            selectedIds: _selectedCells,
-                            onToggle: (id) => setState(() {
-                              if (_selectedCells.contains(id)) {
-                                _selectedCells.remove(id);
-                              } else {
-                                _selectedCells.add(id);
-                              }
-                            }),
-                            searchQuery: _cellSearch,
-                            onSearchChanged: (v) =>
-                                setState(() => _cellSearch = v),
-                          )
-                        else if (_selectedType == _UserType.supervisor)
-                          _LeaderAssociation(
-                            leaders: _filteredLeaders,
-                            selectedIds: _selectedLeaders,
-                            onToggle: (id) => setState(() {
-                              if (_selectedLeaders.contains(id)) {
-                                _selectedLeaders.remove(id);
-                              } else {
-                                _selectedLeaders.add(id);
-                              }
-                            }),
-                            searchQuery: _leaderSearch,
-                            onSearchChanged: (v) =>
-                                setState(() => _leaderSearch = v),
-                          )
-                        else if (_selectedType == _UserType.coordinator) ...[
-                          _LeaderAssociation(
-                            leaders: _filteredLeaders,
-                            selectedIds: _selectedLeaders,
-                            onToggle: (id) => setState(() {
-                              if (_selectedLeaders.contains(id)) {
-                                _selectedLeaders.remove(id);
-                              } else {
-                                _selectedLeaders.add(id);
-                              }
-                            }),
-                            searchQuery: _leaderSearch,
-                            onSearchChanged: (v) =>
-                                setState(() => _leaderSearch = v),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          _SupervisorAssociation(
-                            supervisors: _filteredSupervisors,
-                            selectedIds: _selectedSupervisors,
-                            onToggle: (id) => setState(() {
-                              if (_selectedSupervisors.contains(id)) {
-                                _selectedSupervisors.remove(id);
-                              } else {
-                                _selectedSupervisors.add(id);
-                              }
-                            }),
-                            searchQuery: _supervisorSearch,
-                            onSearchChanged: (v) =>
-                                setState(() => _supervisorSearch = v),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          if (_coordenacoes.isEmpty)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Coordenação',
-                                  style: AppTypography.titleSmall.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                Container(
-                                  padding: const EdgeInsets.all(
-                                    AppSpacing.base,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: AppColors.grey200,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Text(
-                                        'Nenhuma coordenação cadastrada',
-                                        style: AppTypography.bodyMedium
-                                            .copyWith(
-                                              color: AppColors.textSecondary,
-                                            ),
-                                      ),
-                                      const SizedBox(height: AppSpacing.md),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: FilledButton.icon(
-                                          onPressed:
-                                              _showCreateCoordenacaoSheet,
-                                          icon: const Icon(Icons.add),
-                                          label: const Text(
-                                            'Criar Nova Coordenação',
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Coordenação',
-                                  style: AppTypography.titleSmall.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurface,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                ..._coordenacoes.map((c) {
-                                  final selected =
-                                      _selectedCoordenacaoId == c.id;
-                                  return CheckboxListTile(
-                                    dense: true,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    title: Text(
-                                      c.name,
-                                      style: AppTypography.bodyMedium.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    value: selected,
-                                    onChanged: (_) => setState(
-                                      () => _selectedCoordenacaoId = c.id,
-                                    ),
-                                    activeColor: AppColors.primary,
-                                  );
-                                }),
-                                const SizedBox(height: AppSpacing.sm),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _showCreateCoordenacaoSheet,
-                                    icon: const Icon(Icons.add),
-                                    label: const Text('Criar Nova Coordenação'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                        const SizedBox(height: AppSpacing.xl2),
-                        // Buttons
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _submitting ? null : _submit,
-                            icon: const Icon(Icons.check),
-                            label: _submitting
-                                ? const Text('Cadastrando...')
-                                : const Text('Salvar Cadastro'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              disabledBackgroundColor: AppColors.grey200,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.md,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _resetForm,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Limpar Formulário'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
     );

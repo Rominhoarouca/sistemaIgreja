@@ -11,12 +11,7 @@ class AboutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        elevation: 0,
-        title: const Text('Sobre o App'),
-      ),
+      appBar: AppBar(elevation: 0, title: const Text('Sobre o App')),
       body: ListView(
         children: [
           // ── Hero ──────────────────────────────────────────────────────

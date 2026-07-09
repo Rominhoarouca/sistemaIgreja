@@ -130,7 +130,7 @@ export function createContainer(): Container {
   const cellController = new CellController(getNearbyCellsUseCase, cellRepo, cellMemberRepo);
   const attendanceController = new AttendanceController(registerAttendanceUseCase, attendanceRepo, minioService);
   const spiritualHistoryController = new SpiritualHistoryController(addSpiritualEventUseCase, spiritualHistoryRepo);
-  const dashboardController = new DashboardController(getDashboardStatsUseCase, visitorRepo);
+  const dashboardController = new DashboardController(getDashboardStatsUseCase, visitorRepo, attendanceRepo);
   const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo, prisma);
   const userController = new UserController(getProfileUseCase, updateProfileUseCase, userRepo);
   const coordenacaoController = new CoordenacaoController(coordenacaoRepo, userRepo);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/widgets/reset_password_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -195,8 +196,6 @@ class _AdminSupervisorsPageState extends State<AdminSupervisorsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
         title: const Text('Supervisores'),
         actions: [
           IconButton(
@@ -374,12 +373,22 @@ class _SupervisorCard extends StatelessWidget {
                     value: 'coordenacao',
                     child: Text('Vincular coordenação'),
                   ),
+                  const PopupMenuItem(
+                    value: 'password',
+                    child: Text('Redefinir senha'),
+                  ),
                 ],
                 onSelected: (action) {
                   if (action == 'leaders') {
                     _showLeaderSheet(context);
                   } else if (action == 'coordenacao') {
                     _showCoordenacaoSheet(context);
+                  } else if (action == 'password') {
+                    showResetPasswordSheet(
+                      context,
+                      userId: supervisor.id,
+                      userName: supervisor.name,
+                    );
                   }
                 },
               ),

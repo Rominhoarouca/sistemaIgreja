@@ -51,8 +51,16 @@ export class UserController {
   };
 
   getMyLeaders = async (req: Request, res: Response): Promise<void> => {
-    const leaders = await this.userRepo.findLeadersBySupervisorId(req.userId);
+    const leaders =
+      req.userRole === 'COORDENADOR'
+        ? await this.userRepo.findLeadersByCoordinatorId(req.userId)
+        : await this.userRepo.findLeadersBySupervisorId(req.userId);
     res.json({ leaders });
+  };
+
+  getMySupervisors = async (req: Request, res: Response): Promise<void> => {
+    const supervisors = await this.userRepo.findSupervisorsByCoordinatorId(req.userId);
+    res.json({ supervisors });
   };
 
   assignLeaderSupervisor = async (req: Request, res: Response): Promise<void> => {
@@ -80,6 +88,43 @@ export class UserController {
       .object({ coordenacaoId: z.string().uuid().nullable() })
       .parse(req.body);
     await this.userRepo.assignSupervisorToCoordenacao(supervisorId, coordenacaoId);
+    res.status(204).send();
+  };
+
+  /**
+   * Redefine a senha de outro usuário, conforme o escopo do solicitante:
+   * ADMIN → qualquer perfil; SUPERVISOR → apenas seus líderes;
+   * COORDENADOR → líderes e supervisores da sua coordenação.
+   */
+  resetUserPassword = async (req: Request, res: Response): Promise<void> => {
+    const { userId } = req.params as { userId: string };
+    const { newPassword } = z
+      .object({ newPassword: z.string().min(6).max(72) })
+      .parse(req.body);
+
+    const target = await this.userRepo.findById(userId);
+    if (!target) throw AppError.notFound('Usuário não encontrado');
+
+    let allowed = false;
+    if (req.userRole === 'ADMIN') {
+      allowed = true;
+    } else if (req.userRole === 'SUPERVISOR') {
+      allowed = target.role === 'LIDER' && target.supervisorId === req.userId;
+    } else if (req.userRole === 'COORDENADOR') {
+      if (target.role === 'SUPERVISOR') {
+        const sups = await this.userRepo.findSupervisorsByCoordinatorId(req.userId);
+        allowed = sups.some((s) => s.id === userId);
+      } else if (target.role === 'LIDER') {
+        const leaders = await this.userRepo.findLeadersByCoordinatorId(req.userId);
+        allowed = leaders.some((l) => l.id === userId);
+      }
+    }
+    if (!allowed) {
+      throw AppError.forbidden('Sem permissão para redefinir a senha deste usuário');
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.userRepo.resetPassword(userId, hash);
     res.status(204).send();
   };
 

@@ -326,8 +326,6 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
         elevation: 0,
         title: const Text('Materiais'),
         actions: [
@@ -529,11 +527,7 @@ class _MaterialTargetsPage extends StatelessWidget {
     final selectedSet = selectedCellIds.toSet();
     final allSelected = selectedSet.length >= cells.length;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Disponibilidade do material'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-      ),
+      appBar: AppBar(title: const Text('Disponibilidade do material')),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),

@@ -11,6 +11,7 @@ import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/address_selector.dart';
+import 'leader_dashboard_view.dart';
 
 /// Show a snackbar above any modal sheet by using the root navigator's context.
 void _showTopSnackBar(
@@ -84,34 +85,6 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
   _CellMenuItem? _selectedCell;
   bool _loadingCells = true;
 
-  static const _tabs = [
-    NavigationDestination(
-      icon: Icon(Icons.people_outline),
-      selectedIcon: Icon(Icons.people),
-      label: 'Visitantes',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.group_outlined),
-      selectedIcon: Icon(Icons.group),
-      label: 'Membros',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.check_circle_outline),
-      selectedIcon: Icon(Icons.check_circle),
-      label: 'Presença',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.auto_stories_outlined),
-      selectedIcon: Icon(Icons.auto_stories),
-      label: 'Materiais',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.trending_up_outlined),
-      selectedIcon: Icon(Icons.trending_up),
-      label: 'Histórico',
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -131,8 +104,6 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
             .map((c) => _CellMenuItem.fromJson(c as Map<String, dynamic>))
             .toList();
         _loadingCells = false;
-        // Auto-select if only one cell
-        if (_cells.length == 1) _selectedCell = _cells.first;
       });
     } catch (_) {
       if (!mounted) return;
@@ -174,16 +145,34 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
       );
     }
 
-    // ── Cell selector (when multiple cells or no cell selected) ─────────────
+    // ── Home: dashboard agregado das células do líder ────────────────────
     if (_selectedCell == null) {
-      return _CellSelectorView(
-        cells: _cells,
+      return LeaderDashboardView(
+        cells: _cells
+            .map(
+              (c) => LeaderCellInfo(
+                id: c.id,
+                name: c.name,
+                dayLabel: c.dayLabel,
+                time: c.time,
+                typeName: c.typeName,
+              ),
+            )
+            .toList(),
         coordenacaoName: _coordenacaoName,
         coordenacaoColor: _coordenacaoColor,
-        onSelect: (cell) {
+        onNavigateTab: (tab) {
+          if (_cells.isEmpty) return;
+          setState(() {
+            _selectedCell = _cells.first;
+            _selectedTab = tab;
+          });
+        },
+        onOpenCell: (info, {int tab = 0}) {
+          final cell = _cells.firstWhere((c) => c.id == info.id);
           setState(() {
             _selectedCell = cell;
-            _selectedTab = 0;
+            _selectedTab = tab;
           });
         },
       );
@@ -206,13 +195,23 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
             ),
         ],
       ),
-      leading: _cells.length > 1
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => setState(() => _selectedCell = null),
-            )
-          : null,
+      leading: IconButton(
+        tooltip: 'Voltar ao painel',
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => setState(() => _selectedCell = null),
+      ),
       actions: [
+        IconButton(
+          tooltip: Theme.of(context).brightness == Brightness.dark
+              ? 'Modo claro'
+              : 'Modo escuro',
+          icon: Icon(
+            Theme.of(context).brightness == Brightness.dark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
+          ),
+          onPressed: () => ThemeController.instance.toggle(context),
+        ),
         IconButton(
           icon: const Icon(Icons.notifications_outlined),
           onPressed: () => context.push('/notifications'),
@@ -283,36 +282,16 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
         body: Row(
           children: [
             NavigationRail(
-              selectedIndex: _selectedTab,
-              onDestinationSelected: (i) => setState(() => _selectedTab = i),
+              selectedIndex: _selectedTab + 1,
+              onDestinationSelected: (i) => setState(() {
+                if (i == 0) {
+                  _selectedCell = null; // volta ao dashboard
+                } else {
+                  _selectedTab = i - 1;
+                }
+              }),
               labelType: NavigationRailLabelType.all,
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.people_outline),
-                  selectedIcon: Icon(Icons.people),
-                  label: Text('Visitantes'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.group_outlined),
-                  selectedIcon: Icon(Icons.group),
-                  label: Text('Membros'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.check_circle_outline),
-                  selectedIcon: Icon(Icons.check_circle),
-                  label: Text('Presença'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.auto_stories_outlined),
-                  selectedIcon: Icon(Icons.auto_stories),
-                  label: Text('Materiais'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.trending_up_outlined),
-                  selectedIcon: Icon(Icons.trending_up),
-                  label: Text('Histórico'),
-                ),
-              ],
+              destinations: leaderRailDestinations(),
             ),
             const VerticalDivider(thickness: 1, width: 1),
             Expanded(child: bodyWithBanner),
@@ -325,170 +304,15 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
       appBar: appBar,
       body: bodyWithBanner,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedTab,
-        onDestinationSelected: (i) => setState(() => _selectedTab = i),
-        destinations: _tabs,
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// CELL SELECTOR VIEW
-// ═══════════════════════════════════════════════════════════════════════════
-
-class _CellSelectorView extends StatelessWidget {
-  const _CellSelectorView({
-    required this.cells,
-    required this.onSelect,
-    this.coordenacaoName,
-    this.coordenacaoColor,
-  });
-
-  final List<_CellMenuItem> cells;
-  final void Function(_CellMenuItem) onSelect;
-  final String? coordenacaoName;
-  final Color? coordenacaoColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minhas Células'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () => context.push('/notifications'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => context.push('/profile'),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (coordenacaoColor != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pagePaddingH,
-                vertical: AppSpacing.xs,
-              ),
-              color: coordenacaoColor!.withValues(alpha: 0.15),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: coordenacaoColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    coordenacaoName ?? '',
-                    style: AppTypography.labelSmall.copyWith(
-                      color: coordenacaoColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: cells.isEmpty
-                ? Center(
-                    child: AppEmptyState(
-                      title: 'Nenhuma célula vinculada',
-                      subtitle:
-                          'Aguarde o supervisor vincular uma célula à sua conta.',
-                      icon: Icons.group_work_outlined,
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-                    itemCount: cells.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (ctx, i) {
-                      final cell = cells[i];
-                      return AppCard(
-                        onTap: () => onSelect(cell),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusSm,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.group_work_outlined,
-                                color: AppColors.primary,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    cell.name,
-                                    style: AppTypography.titleSmall,
-                                  ),
-                                  const SizedBox(height: AppSpacing.xs2),
-                                  if (cell.typeName != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(
-                                        bottom: AppSpacing.xs2,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.sm,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(
-                                          AppSpacing.xs,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        cell.typeName!,
-                                        style: AppTypography.labelSmall
-                                            .copyWith(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                      ),
-                                    ),
-                                  Text(
-                                    '${cell.dayLabel} • ${cell.time}',
-                                    style: AppTypography.bodySmall.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(
-                              Icons.chevron_right,
-                              color: AppColors.grey400,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+        selectedIndex: _selectedTab + 1,
+        onDestinationSelected: (i) => setState(() {
+          if (i == 0) {
+            _selectedCell = null; // volta ao dashboard
+          } else {
+            _selectedTab = i - 1;
+          }
+        }),
+        destinations: kLeaderNavDestinations,
       ),
     );
   }
@@ -1581,10 +1405,6 @@ class _CellMembersTabState extends State<_CellMembersTab> {
     final added = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (_) => _AddMemberSheet(dio: _dio, cellId: widget.cellId),
     );
     if (added == true) _loadData();

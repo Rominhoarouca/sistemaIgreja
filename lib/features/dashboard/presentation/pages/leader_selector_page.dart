@@ -36,11 +36,7 @@ class _LeaderSelectorPageState extends State<LeaderSelectorPage> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Selecionar líder'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-      ),
+      appBar: AppBar(title: const Text('Selecionar líder')),
       body: Padding(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
         child: Column(

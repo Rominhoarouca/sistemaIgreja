@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/network/auth_storage.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
@@ -32,11 +34,37 @@ class _SidebarGroup {
 /// Sidebar 252px com gradiente navy — shell web/desktop do admin.
 /// Grupos: Início / Pessoas / Células / Sistema. Item ativo com fundo
 /// dourado translúcido. Card do usuário no rodapé.
-class AdminSidebar extends StatelessWidget {
-  const AdminSidebar({super.key, this.visitorBadge});
+class AdminSidebar extends StatefulWidget {
+  const AdminSidebar({super.key});
 
-  /// Contador exibido no item "Visitantes" (novos visitantes).
-  final int? visitorBadge;
+  @override
+  State<AdminSidebar> createState() => _AdminSidebarState();
+}
+
+class _AdminSidebarState extends State<AdminSidebar> {
+  /// Contador exibido no item "Visitantes" (visitantes com status "novo").
+  int? visitorBadge;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVisitorBadge();
+  }
+
+  Future<void> _loadVisitorBadge() async {
+    try {
+      final dio = DioClient(AuthStorage()).dio;
+      final resp = await dio.get('/visitors');
+      final data = ((resp.data as Map<String, dynamic>)['data'] as List)
+          .cast<Map<String, dynamic>>();
+      final novos = data
+          .where((v) => (v['status'] as String? ?? 'novo') == 'novo')
+          .length;
+      if (mounted) setState(() => visitorBadge = novos);
+    } catch (_) {
+      // Badge é opcional — silencia falha de rede.
+    }
+  }
 
   List<_SidebarGroup> _groups() => [
     _SidebarGroup('Início', [
@@ -102,7 +130,11 @@ class AdminSidebar extends StatelessWidget {
       ),
     ]),
     _SidebarGroup('Sistema', [
-      const _SidebarItem(Icons.chat_outlined, 'WhatsApp', AppRoutes.adminWhatsapp),
+      const _SidebarItem(
+        Icons.chat_outlined,
+        'WhatsApp',
+        AppRoutes.adminWhatsapp,
+      ),
       const _SidebarItem(
         Icons.location_city_outlined,
         'Cidades e Bairros',

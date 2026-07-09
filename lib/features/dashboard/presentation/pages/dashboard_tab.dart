@@ -10,6 +10,7 @@ import '../../domain/services/i_dashboard_service.dart';
 import '../widgets/integration_line_chart.dart';
 import 'chart_detail_page.dart';
 import 'admin_dashboard_sheets.dart';
+import 'report_metric_detail_page.dart';
 import '../widgets/visitor_widgets.dart';
 
 /// SRP: responsável apenas por exibir a aba de overview do dashboard.
@@ -93,6 +94,15 @@ class _DashboardTabState extends State<DashboardTab> {
     _ => 'Dia não informado',
   };
 
+  void _openMetricDetail(ReportMetric metric, String headerValue) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ReportMetricDetailPage(metric: metric, headerValue: headerValue),
+      ),
+    );
+  }
+
   void _showSheet(BuildContext context, Widget sheet) {
     showModalBottomSheet<void>(
       context: context,
@@ -158,24 +168,40 @@ class _DashboardTabState extends State<DashboardTab> {
                 value: '$totalVisitors',
                 icon: Icons.people_outline,
                 color: AppColors.primary,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.totalVisitors,
+                  '$totalVisitors',
+                ),
               ),
               StatCard(
                 label: 'Encaminhamentos',
                 value: '$forwarded',
                 icon: Icons.send_outlined,
                 color: AppColors.secondary,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.forwardedVisitors,
+                  '$forwarded',
+                ),
               ),
               StatCard(
                 label: 'Visitantes Integrados',
                 value: '$integrated',
                 icon: Icons.check_circle_outline,
                 color: AppColors.success,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.integratedVisitors,
+                  '$integrated',
+                ),
               ),
               StatCard(
                 label: 'Frequência nas Células',
                 value: '${avgAttendance.toStringAsFixed(1)}%',
                 icon: Icons.bar_chart_outlined,
                 color: AppColors.accent,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.avgAttendance,
+                  '${avgAttendance.toStringAsFixed(1)}%',
+                ),
               ),
             ]),
           ),
@@ -206,10 +232,38 @@ class _DashboardTabState extends State<DashboardTab> {
             ),
           const SizedBox(height: AppSpacing.base),
           AppSectionHeader(
-            title: 'Crescimento de Integração',
+            title: 'Funil de integração',
             actionLabel: 'Ver relatório',
             onAction: () => widget.onSwitchTab(3),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              children: [
+                _FunnelBar(
+                  label: 'Cadastrados',
+                  value: totalVisitors,
+                  max: totalVisitors,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FunnelBar(
+                  label: 'Encaminhados',
+                  value: forwarded,
+                  max: totalVisitors,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                _FunnelBar(
+                  label: 'Integrados',
+                  value: integrated,
+                  max: totalVisitors,
+                  color: AppColors.success,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          AppSectionHeader(title: 'Crescimento de Integração'),
           const SizedBox(height: AppSpacing.sm),
           AppCard(
             child: _months.isEmpty
@@ -334,10 +388,74 @@ class _DashboardTabState extends State<DashboardTab> {
       ),
     );
   }
-
 }
 
 // ── Private widgets ──────────────────────────────────────────────────────────
+
+/// Barra horizontal do funil de integração.
+class _FunnelBar extends StatelessWidget {
+  const _FunnelBar({
+    required this.label,
+    required this.value,
+    required this.max,
+    this.color,
+  });
+
+  final String label;
+  final int value;
+  final int max;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final barColor =
+        color ?? (isDark ? AppColors.chartBlue : AppColors.primary);
+    final fraction = max <= 0 ? 0.0 : (value / max).clamp(0.0, 1.0);
+    return Row(
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: AppTypography.bodySmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+            child: Stack(
+              children: [
+                Container(
+                  height: 10,
+                  color: isDark ? AppColors.chip2Dark : AppColors.borderSoft,
+                ),
+                FractionallySizedBox(
+                  widthFactor: fraction,
+                  child: Container(height: 10, color: barColor),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        SizedBox(
+          width: 36,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.end,
+            style: AppTypography.labelLarge.copyWith(
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _DashboardCellRow extends StatelessWidget {
   const _DashboardCellRow({

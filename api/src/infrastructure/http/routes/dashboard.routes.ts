@@ -7,5 +7,6 @@ export function dashboardRoutes(controller: DashboardController): Router {
   router.use(authMiddleware, requireAdmin);
   router.get('/stats', controller.getStats);
   router.get('/monthly-stats', controller.getMonthlyStats);
+  router.get('/attendance-by-cell', controller.getAttendanceByCell);
   return router;
 }

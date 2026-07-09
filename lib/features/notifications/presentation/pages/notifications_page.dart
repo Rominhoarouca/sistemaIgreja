@@ -59,8 +59,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
         elevation: 0,
         title: const Text('Notificações'),
         actions: [
@@ -73,9 +71,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               }),
               child: Text(
                 'Marcar todas como lidas',
-                style: AppTypography.labelMedium.copyWith(
-                  color: AppColors.white,
-                ),
+                style: AppTypography.labelMedium,
               ),
             ),
         ],

@@ -8,6 +8,8 @@ import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/address_selector.dart';
+import '../../../../shared/widgets/reset_password_sheet.dart';
+import 'supervisor_dashboard_tab.dart';
 
 /// Supervisor Panel — coordinates multiple leaders and their cells.
 class SupervisorHomePage extends StatefulWidget {
@@ -22,14 +24,19 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
 
   static const _tabs = [
     NavigationDestination(
+      icon: Icon(Icons.grid_view_outlined),
+      selectedIcon: Icon(Icons.grid_view_rounded),
+      label: 'Início',
+    ),
+    NavigationDestination(
       icon: Icon(Icons.people_outline),
       selectedIcon: Icon(Icons.people),
       label: 'Líderes',
     ),
     NavigationDestination(
-      icon: Icon(Icons.dashboard_outlined),
-      selectedIcon: Icon(Icons.dashboard),
-      label: 'Visão Geral',
+      icon: Icon(Icons.groups_2_outlined),
+      selectedIcon: Icon(Icons.groups_2),
+      label: 'Células',
     ),
   ];
 
@@ -40,8 +47,18 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
     final appBar = AppBar(
       title: const Text('Painel do Supervisor'),
       elevation: 0,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       actions: [
+        IconButton(
+          tooltip: Theme.of(context).brightness == Brightness.dark
+              ? 'Modo claro'
+              : 'Modo escuro',
+          icon: Icon(
+            Theme.of(context).brightness == Brightness.dark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
+          ),
+          onPressed: () => ThemeController.instance.toggle(context),
+        ),
         IconButton(
           icon: const Icon(Icons.notifications_outlined),
           onPressed: () => context.push('/notifications'),
@@ -56,7 +73,11 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
 
     final tabContent = IndexedStack(
       index: _selectedTab,
-      children: const [_LeadersTab(), _OverviewTab()],
+      children: const [
+        SupervisorDashboardTab(),
+        SupervisedLeadersTab(),
+        SupervisedCellsTab(),
+      ],
     );
 
     if (isWide) {
@@ -71,14 +92,19 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
               labelType: NavigationRailLabelType.all,
               destinations: const [
                 NavigationRailDestination(
+                  icon: Icon(Icons.grid_view_outlined),
+                  selectedIcon: Icon(Icons.grid_view_rounded),
+                  label: Text('Início'),
+                ),
+                NavigationRailDestination(
                   icon: Icon(Icons.people_outline),
                   selectedIcon: Icon(Icons.people),
                   label: Text('Líderes'),
                 ),
                 NavigationRailDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
-                  label: Text('Visão Geral'),
+                  icon: Icon(Icons.groups_2_outlined),
+                  selectedIcon: Icon(Icons.groups_2),
+                  label: Text('Células'),
                 ),
               ],
             ),
@@ -106,20 +132,20 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
 // TAB 1 — LEADERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _LeadersTab extends StatefulWidget {
-  const _LeadersTab();
+class SupervisedLeadersTab extends StatefulWidget {
+  const SupervisedLeadersTab({super.key});
 
   @override
-  State<_LeadersTab> createState() => _LeadersTabState();
+  State<SupervisedLeadersTab> createState() => SupervisedLeadersTabState();
 }
 
-class _LeadersTabState extends State<_LeadersTab> {
+class SupervisedLeadersTabState extends State<SupervisedLeadersTab> {
   late final Dio _dio;
   bool _loading = true;
   String? _error;
   final _searchCtrl = TextEditingController();
   String _query = '';
-  List<_LeaderData> _leaders = [];
+  List<SupervisedLeaderData> _leaders = [];
 
   @override
   void initState() {
@@ -147,10 +173,10 @@ class _LeadersTabState extends State<_LeadersTab> {
       if (!mounted) return;
 
       // For each leader, fetch their cells
-      final leaders = <_LeaderData>[];
+      final leaders = <SupervisedLeaderData>[];
       for (final item in data) {
         final userId = item['id'] as String;
-        List<_CellSummary> cells = [];
+        List<SupervisedCellSummary> cells = [];
         try {
           final cellResp = await _dio.get(
             '/cells',
@@ -159,12 +185,17 @@ class _LeadersTabState extends State<_LeadersTab> {
           final cellList =
               (cellResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
           cells = cellList
-              .map((c) => _CellSummary.fromJson(c as Map<String, dynamic>))
+              .map(
+                (c) =>
+                    SupervisedCellSummary.fromJson(c as Map<String, dynamic>),
+              )
               .toList();
         } catch (_) {
           // fallback: try my-cell style
         }
-        leaders.add(_LeaderData.fromJson(item as Map<String, dynamic>, cells));
+        leaders.add(
+          SupervisedLeaderData.fromJson(item as Map<String, dynamic>, cells),
+        );
       }
       setState(() {
         _leaders = leaders;
@@ -181,7 +212,7 @@ class _LeadersTabState extends State<_LeadersTab> {
     }
   }
 
-  List<_LeaderData> get _filtered {
+  List<SupervisedLeaderData> get _filtered {
     final q = _query.toLowerCase();
     if (q.isEmpty) return _leaders;
     return _leaders.where((l) => l.name.toLowerCase().contains(q)).toList();
@@ -239,7 +270,7 @@ class _LeadersTabState extends State<_LeadersTab> {
             ...filtered.map(
               (l) => Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _LeaderCard(
+                child: SupervisedLeaderCard(
                   leader: l,
                   onViewCells: () => _showCellsSheet(context, l),
                 ),
@@ -250,25 +281,28 @@ class _LeadersTabState extends State<_LeadersTab> {
     );
   }
 
-  void _showCellsSheet(BuildContext context, _LeaderData leader) {
+  void _showCellsSheet(BuildContext context, SupervisedLeaderData leader) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _LeaderCellsSheet(leader: leader, dio: _dio),
+      builder: (_) => LeaderCellsSheet(leader: leader, dio: _dio),
     );
   }
 }
 
 // ── Leader card ────────────────────────────────────────────────────────────
 
-class _LeaderCard extends StatelessWidget {
-  const _LeaderCard({required this.leader, required this.onViewCells});
+class SupervisedLeaderCard extends StatelessWidget {
+  const SupervisedLeaderCard({
+    super.key,
+    required this.leader,
+    required this.onViewCells,
+  });
 
-  final _LeaderData leader;
+  final SupervisedLeaderData leader;
   final VoidCallback onViewCells;
 
   @override
@@ -301,6 +335,16 @@ class _LeaderCard extends StatelessWidget {
                         ),
                       ),
                   ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Redefinir senha',
+                icon: const Icon(Icons.lock_reset, size: 20),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => showResetPasswordSheet(
+                  context,
+                  userId: leader.id,
+                  userName: leader.name,
                 ),
               ),
               AppButton(
@@ -337,20 +381,20 @@ class _LeaderCard extends StatelessWidget {
 
 // ── Leader cells sheet ─────────────────────────────────────────────────────
 
-class _LeaderCellsSheet extends StatefulWidget {
-  const _LeaderCellsSheet({required this.leader, required this.dio});
-  final _LeaderData leader;
+class LeaderCellsSheet extends StatefulWidget {
+  const LeaderCellsSheet({super.key, required this.leader, required this.dio});
+  final SupervisedLeaderData leader;
   final Dio dio;
 
   @override
-  State<_LeaderCellsSheet> createState() => _LeaderCellsSheetState();
+  State<LeaderCellsSheet> createState() => LeaderCellsSheetState();
 }
 
-class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
+class LeaderCellsSheetState extends State<LeaderCellsSheet> {
   bool _loading = false;
-  List<_CellDetail> _cellDetails = [];
-  List<_LeaderOption> _availableLeaders = [];
-  List<_CellTypeOption> _cellTypes = [];
+  List<CellDetail> _cellDetails = [];
+  List<LeaderOption> _availableLeaders = [];
+  List<CellTypeOption> _cellTypes = [];
 
   @override
   void initState() {
@@ -367,7 +411,7 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
           (leadersResp.data as Map<String, dynamic>)['leaders'] as List? ?? [];
       final leaders = leadersList
           .map(
-            (l) => _LeaderOption(
+            (l) => LeaderOption(
               id: l['id'] as String,
               name: l['name'] as String? ?? '',
             ),
@@ -375,7 +419,7 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
           .toList();
 
       // Load cell types
-      List<_CellTypeOption> types = [];
+      List<CellTypeOption> types = [];
       try {
         final typesResp = await widget.dio.get('/cell-types');
         final typesList =
@@ -383,7 +427,7 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
             [];
         types = typesList
             .map(
-              (t) => _CellTypeOption(
+              (t) => CellTypeOption(
                 id: t['id'] as String,
                 name: t['name'] as String? ?? '',
               ),
@@ -401,7 +445,7 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
 
   Future<void> _loadCells() async {
     setState(() => _loading = true);
-    final details = <_CellDetail>[];
+    final details = <CellDetail>[];
     for (final cell in widget.leader.cells) {
       try {
         final resp = await widget.dio.get('/cells/${cell.id}');
@@ -410,7 +454,7 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
         final membResp = await widget.dio.get('/cells/${cell.id}/members');
         final membCount =
             ((membResp.data as Map<String, dynamic>)['members'] as List).length;
-        details.add(_CellDetail.fromJson(cellData, membCount));
+        details.add(CellDetail.fromJson(cellData, membCount));
       } catch (_) {}
     }
     if (!mounted) return;
@@ -420,15 +464,14 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
     });
   }
 
-  Future<void> _editCell(_CellDetail cell) async {
+  Future<void> _editCell(CellDetail cell) async {
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _EditCellDetailsSheet(
+      builder: (_) => EditCellDetailsSheet(
         dio: widget.dio,
         cell: cell,
         availableLeaders: _availableLeaders,
@@ -591,103 +634,262 @@ class _LeaderCellsSheetState extends State<_LeaderCellsSheet> {
 // TAB 2 — OVERVIEW
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _OverviewTab extends StatefulWidget {
-  const _OverviewTab();
+// ═══════════════════════════════════════════════════════════════════════════
+// TAB 3 — CÉLULAS (gestão das células supervisionadas)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class SupervisedCellsTab extends StatefulWidget {
+  const SupervisedCellsTab({super.key});
 
   @override
-  State<_OverviewTab> createState() => _OverviewTabState();
+  State<SupervisedCellsTab> createState() => SupervisedCellsTabState();
 }
 
-class _OverviewTabState extends State<_OverviewTab> {
+class SupervisedCellsTabState extends State<SupervisedCellsTab> {
   late final Dio _dio;
   bool _loading = true;
-  int _totalLeaders = 0;
-  int _totalCells = 0;
-  int _totalMembers = 0;
+  String? _error;
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+  List<CellDetail> _cells = [];
+  List<LeaderOption> _availableLeaders = [];
+  List<CellTypeOption> _cellTypes = [];
 
   @override
   void initState() {
     super.initState();
     _dio = DioClient(AuthStorage()).dio;
-    _loadStats();
+    _loadData();
   }
 
-  Future<void> _loadStats() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final resp = await _dio.get('/users/my-leaders');
       final leaders =
-          (resp.data as Map<String, dynamic>)['leaders'] as List? ?? [];
-      int cells = 0;
-      int members = 0;
-      for (final l in leaders) {
-        final leaderId = l['id'] as String;
-        try {
-          final cResp = await _dio.get(
+          ((resp.data as Map<String, dynamic>)['leaders'] as List? ?? [])
+              .cast<Map<String, dynamic>>();
+      _availableLeaders = leaders
+          .map(
+            (l) => LeaderOption(
+              id: l['id'] as String,
+              name: l['name'] as String? ?? '',
+            ),
+          )
+          .toList();
+
+      try {
+        final typesResp = await _dio.get('/cell-types');
+        final typesList =
+            (typesResp.data as Map<String, dynamic>)['cellTypes'] as List? ??
+            [];
+        _cellTypes = typesList
+            .map(
+              (t) => CellTypeOption(
+                id: t['id'] as String,
+                name: t['name'] as String? ?? '',
+              ),
+            )
+            .toList();
+      } catch (_) {}
+
+      final details = <CellDetail>[];
+      await Future.wait(
+        leaders.map((l) async {
+          final cellsResp = await _dio.get(
             '/cells',
-            queryParameters: {'leaderId': leaderId},
+            queryParameters: {'leaderId': l['id']},
           );
           final cellList =
-              (cResp.data as Map<String, dynamic>)['cells'] as List? ?? [];
-          cells += cellList.length;
-          for (final c in cellList) {
-            final membResp = await _dio.get('/cells/${c['id']}/members');
-            members +=
-                ((membResp.data as Map<String, dynamic>)['members'] as List)
-                    .length;
-          }
-        } catch (_) {}
-      }
+              ((cellsResp.data as Map<String, dynamic>)['cells'] as List? ?? [])
+                  .cast<Map<String, dynamic>>();
+          await Future.wait(
+            cellList.map((c) async {
+              try {
+                final cellResp = await _dio.get('/cells/${c['id']}');
+                final cellData =
+                    (cellResp.data as Map<String, dynamic>)['cell']
+                        as Map<String, dynamic>;
+                final membResp = await _dio.get('/cells/${c['id']}/members');
+                final membCount =
+                    ((membResp.data as Map<String, dynamic>)['members'] as List)
+                        .length;
+                details.add(CellDetail.fromJson(cellData, membCount));
+              } catch (_) {}
+            }),
+          );
+        }),
+      );
+      details.sort((a, b) => a.name.compareTo(b.name));
+
       if (!mounted) return;
       setState(() {
-        _totalLeaders = leaders.length;
-        _totalCells = cells;
-        _totalMembers = members;
+        _cells = details;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _error = 'Erro ao carregar células';
+        _loading = false;
+      });
     }
+  }
+
+  List<CellDetail> get _filtered {
+    final q = _query.toLowerCase();
+    if (q.isEmpty) return _cells;
+    return _cells
+        .where(
+          (c) =>
+              c.name.toLowerCase().contains(q) ||
+              c.leaderName.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
+  Future<void> _editCell(CellDetail cell) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => EditCellDetailsSheet(
+        dio: _dio,
+        cell: cell,
+        availableLeaders: _availableLeaders,
+        cellTypes: _cellTypes,
+      ),
+    );
+    if (changed == true) _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+    final theme = Theme.of(context);
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadData,
+            ),
+          ],
+        ),
+      );
     }
+
+    final filtered = _filtered;
+
     return RefreshIndicator(
-      onRefresh: _loadStats,
+      onRefresh: _loadData,
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
         children: [
-          AppSectionHeader(title: 'Visão Geral'),
+          AppSearchField(
+            hint: 'Pesquisar célula ou líder...',
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v),
+          ),
           const SizedBox(height: AppSpacing.base),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  icon: Icons.people,
-                  label: 'Líderes',
-                  value: '$_totalLeaders',
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _StatCard(
-                  icon: Icons.home,
-                  label: 'Células',
-                  value: '$_totalCells',
-                ),
-              ),
-            ],
+          AppSectionHeader(
+            title: 'Células supervisionadas (${filtered.length})',
           ),
           const SizedBox(height: AppSpacing.sm),
-          _StatCard(
-            icon: Icons.group,
-            label: 'Total de Membros',
-            value: '$_totalMembers',
-          ),
+          if (filtered.isEmpty)
+            const AppEmptyState(
+              title: 'Nenhuma célula encontrada',
+              subtitle: 'As células dos seus líderes aparecerão aqui.',
+              icon: Icons.groups_2_outlined,
+            )
+          else
+            ...filtered.map(
+              (c) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: AppCard(
+                  onTap: () => _editCell(c),
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              c.name,
+                              style: AppTypography.titleSmall,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Editar célula',
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            onPressed: () => _editCell(c),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                      ),
+                      Text(
+                        [
+                          'Líder: ${c.leaderName}',
+                          if ((c.cellTypeName ?? '').isNotEmpty)
+                            c.cellTypeName!,
+                        ].join(' · '),
+                        style: AppTypography.bodySmall.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${c.dayOfWeek} às ${c.time}',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.people_outline,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${c.memberCount} membros',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -696,8 +898,9 @@ class _OverviewTabState extends State<_OverviewTab> {
 
 // ── Edit Cell Sheet ───────────────────────────────────────────────────────
 
-class _EditCellDetailsSheet extends StatefulWidget {
-  const _EditCellDetailsSheet({
+class EditCellDetailsSheet extends StatefulWidget {
+  const EditCellDetailsSheet({
+    super.key,
     required this.dio,
     required this.cell,
     required this.availableLeaders,
@@ -705,15 +908,15 @@ class _EditCellDetailsSheet extends StatefulWidget {
   });
 
   final Dio dio;
-  final _CellDetail cell;
-  final List<_LeaderOption> availableLeaders;
-  final List<_CellTypeOption> cellTypes;
+  final CellDetail cell;
+  final List<LeaderOption> availableLeaders;
+  final List<CellTypeOption> cellTypes;
 
   @override
-  State<_EditCellDetailsSheet> createState() => _EditCellDetailsSheetState();
+  State<EditCellDetailsSheet> createState() => EditCellDetailsSheetState();
 }
 
-class _EditCellDetailsSheetState extends State<_EditCellDetailsSheet> {
+class EditCellDetailsSheetState extends State<EditCellDetailsSheet> {
   late String _selectedLeaderId;
   late String? _selectedCellTypeId;
 
@@ -1216,61 +1419,28 @@ class _EditCellDetailsSheetState extends State<_EditCellDetailsSheet> {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.base),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.primary, size: 28),
-          const SizedBox(height: AppSpacing.sm),
-          Text(value, style: AppTypography.displaySmall),
-          Text(
-            label,
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Data models
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _LeaderData {
+class SupervisedLeaderData {
   final String id;
   final String name;
   final String email;
-  final List<_CellSummary> cells;
+  final List<SupervisedCellSummary> cells;
 
-  const _LeaderData({
+  const SupervisedLeaderData({
     required this.id,
     required this.name,
     required this.email,
     required this.cells,
   });
 
-  factory _LeaderData.fromJson(
+  factory SupervisedLeaderData.fromJson(
     Map<String, dynamic> json,
-    List<_CellSummary> cells,
+    List<SupervisedCellSummary> cells,
   ) {
-    return _LeaderData(
+    return SupervisedLeaderData(
       id: json['id'] as String,
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
@@ -1279,33 +1449,34 @@ class _LeaderData {
   }
 }
 
-class _CellSummary {
+class SupervisedCellSummary {
   final String id;
   final String name;
 
-  const _CellSummary({required this.id, required this.name});
+  const SupervisedCellSummary({required this.id, required this.name});
 
-  factory _CellSummary.fromJson(Map<String, dynamic> json) => _CellSummary(
-    id: json['id'] as String,
-    name: json['name'] as String? ?? '',
-  );
+  factory SupervisedCellSummary.fromJson(Map<String, dynamic> json) =>
+      SupervisedCellSummary(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? '',
+      );
 }
 
-class _LeaderOption {
+class LeaderOption {
   final String id;
   final String name;
 
-  const _LeaderOption({required this.id, required this.name});
+  const LeaderOption({required this.id, required this.name});
 }
 
-class _CellTypeOption {
+class CellTypeOption {
   final String id;
   final String name;
 
-  const _CellTypeOption({required this.id, required this.name});
+  const CellTypeOption({required this.id, required this.name});
 }
 
-class _CellDetail {
+class CellDetail {
   final String id;
   final String name;
   final String address;
@@ -1324,7 +1495,7 @@ class _CellDetail {
   final double? latitude;
   final double? longitude;
 
-  const _CellDetail({
+  const CellDetail({
     required this.id,
     required this.name,
     required this.address,
@@ -1344,8 +1515,8 @@ class _CellDetail {
     this.longitude,
   });
 
-  factory _CellDetail.fromJson(Map<String, dynamic> json, int memberCount) =>
-      _CellDetail(
+  factory CellDetail.fromJson(Map<String, dynamic> json, int memberCount) =>
+      CellDetail(
         id: json['id'] as String,
         name: json['name'] as String? ?? '',
         address: json['address'] as String? ?? '',

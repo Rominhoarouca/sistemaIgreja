@@ -60,3 +60,10 @@ export function requireSupervisorOrAdmin(req: Request, _res: Response, next: Nex
   }
   next();
 }
+
+export function requireStaff(req: Request, _res: Response, next: NextFunction): void {
+  if (req.userRole !== 'ADMIN' && req.userRole !== 'SUPERVISOR' && req.userRole !== 'COORDENADOR') {
+    throw AppError.forbidden('Acesso restrito à equipe de liderança');
+  }
+  next();
+}

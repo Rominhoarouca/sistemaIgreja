@@ -39,6 +39,12 @@ class _MessageTemplate {
     body: j['body'] as String,
     category: j['category'] as String? ?? 'Geral',
   );
+
+  @override
+  bool operator ==(Object other) => other is _MessageTemplate && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class _Recipient {
@@ -774,9 +780,11 @@ class _SendTabState extends State<_SendTab> {
   }
 
   /// Aplica template escolhido via "Usar" na aba Templates ao composer.
-  void _applyIncomingTemplate() {
+  Future<void> _applyIncomingTemplate() async {
     final t = widget.templateToUse.value;
     if (t == null) return;
+    await _loadTemplates();
+    if (!mounted) return;
     setState(() {
       _useTemplate = true;
       _selectedTemplate = t;
@@ -785,7 +793,6 @@ class _SendTabState extends State<_SendTab> {
       _individualSelectedTemplate = t;
       _individualMsgCtrl.text = t.body;
     });
-    _loadTemplates();
     widget.templateToUse.value = null;
   }
 
@@ -986,7 +993,10 @@ class _SendTabState extends State<_SendTab> {
                   label: 'Individual',
                   icon: Icons.person_outlined,
                   selected: _mode == _SendMode.individual,
-                  onTap: () => setState(() => _mode = _SendMode.individual),
+                  onTap: () {
+                    _loadTemplates();
+                    setState(() => _mode = _SendMode.individual);
+                  },
                 ),
               ),
             ],
@@ -1141,7 +1151,10 @@ class _SendTabState extends State<_SendTab> {
                   const SizedBox(height: AppSpacing.base),
                   if (_individualUseTemplate)
                     DropdownButtonFormField<_MessageTemplate>(
-                      value: _individualSelectedTemplate,
+                      initialValue:
+                          _templates.contains(_individualSelectedTemplate)
+                          ? _individualSelectedTemplate
+                          : null,
                       decoration: const InputDecoration(
                         labelText: 'Selecionar template',
                         prefixIcon: Icon(Icons.description_outlined),
@@ -1198,10 +1211,7 @@ class _SendTabState extends State<_SendTab> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Abrindo WhatsApp…',
-                      style: AppTypography.bodySmall,
-                    ),
+                    Text('Abrindo WhatsApp…', style: AppTypography.bodySmall),
                   ],
                 )
               : FilledButton.icon(
@@ -1420,7 +1430,10 @@ class _SendTabState extends State<_SendTab> {
           child: FilledButton.icon(
             onPressed: selectedCount == 0
                 ? null
-                : () => setState(() => _step = _SendStep.composeMessage),
+                : () {
+                    _loadTemplates();
+                    setState(() => _step = _SendStep.composeMessage);
+                  },
             icon: const Icon(Icons.arrow_forward),
             label: Text(
               'Continuar com $selectedCount contato${selectedCount == 1 ? '' : 's'}',
@@ -1478,7 +1491,9 @@ class _SendTabState extends State<_SendTab> {
                     )
                   else
                     DropdownButtonFormField<_MessageTemplate>(
-                      initialValue: _selectedTemplate,
+                      initialValue: _templates.contains(_selectedTemplate)
+                          ? _selectedTemplate
+                          : null,
                       decoration: const InputDecoration(
                         labelText: 'Selecionar template',
                         prefixIcon: Icon(Icons.description_outlined),
@@ -1970,7 +1985,6 @@ class _RoleChip extends StatelessWidget {
       fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
     ),
     side: BorderSide(color: selected ? color : AppColors.grey300),
-    backgroundColor: AppColors.surface,
   );
 }
 

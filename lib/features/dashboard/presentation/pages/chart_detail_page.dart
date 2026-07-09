@@ -105,21 +105,16 @@ class _ChartDetailPageState extends State<ChartDetailPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.title,
-              style: AppTypography.titleLarge.copyWith(color: AppColors.white),
-            ),
+            Text(widget.title, style: AppTypography.titleLarge),
             if (widget.subtitle.isNotEmpty)
               Text(
                 widget.subtitle,
                 style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.white.withValues(alpha: 0.75),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
           ],
         ),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.pagePaddingH),

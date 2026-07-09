@@ -38,6 +38,9 @@ export interface IUserRepository {
   listSupervisors(): Promise<User[]>;
   listCoordinadores(): Promise<User[]>;
   findLeadersBySupervisorId(supervisorId: string): Promise<User[]>;
+  findSupervisorsByCoordinatorId(coordinatorId: string): Promise<User[]>;
+  findLeadersByCoordinatorId(coordinatorId: string): Promise<User[]>;
+  resetPassword(userId: string, passwordHash: string): Promise<void>;
   assignSupervisor(leaderId: string, supervisorId: string | null): Promise<void>;
   promoteUser(userId: string, role: UserRole): Promise<void>;
   assignSupervisorToCoordenacao(supervisorId: string, coordenacaoId: string | null): Promise<void>;

@@ -21,6 +21,7 @@ import 'chart_detail_page.dart';
 import 'admin_dashboard_sheets.dart';
 import 'dashboard_tab.dart';
 import 'more_menu_tab.dart';
+import 'report_metric_detail_page.dart';
 import '../widgets/admin_scaffold.dart';
 import '../../../../core/constants/app_constants.dart';
 
@@ -667,8 +668,7 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                     IconButton(
                       tooltip: 'Fechar',
                       icon: const Icon(Icons.close, size: 20),
-                      onPressed: () =>
-                          setState(() => _selectedVisitor = null),
+                      onPressed: () => setState(() => _selectedVisitor = null),
                     ),
                   ],
                 ),
@@ -797,6 +797,39 @@ class _CellsAdminTabState extends State<_CellsAdminTab> {
     'domingo': 'Domingo',
   };
 
+  Widget _buildCellCard(Map<String, dynamic> c) {
+    final id = c['id'] as String;
+    final name = c['name'] as String;
+    final leader = c['leaderName'] as String? ?? '—';
+    final day =
+        _dayLabels[c['dayOfWeek'] as String] ?? c['dayOfWeek'] as String;
+    final members = '${c['currentCount']}/${c['maxCapacity']}';
+    final address = (c['address'] as String?) ?? 'Não informado';
+    return _CellAdminCard(
+      id: id,
+      name: name,
+      leader: leader,
+      day: day,
+      members: members,
+      address: address,
+      onTap: () async {
+        final changed = await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => _CellDetailsPage(
+              id: id,
+              name: name,
+              leader: leader,
+              day: day,
+              members: members,
+              address: address,
+            ),
+          ),
+        );
+        if (changed == true) _loadCells();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -858,42 +891,30 @@ class _CellsAdminTabState extends State<_CellsAdminTab> {
                         ),
                       )
                     else
-                      ..._filtered.map((c) {
-                        final id = c['id'] as String;
-                        final name = c['name'] as String;
-                        final leader = c['leaderName'] as String? ?? '—';
-                        final day =
-                            _dayLabels[c['dayOfWeek'] as String] ??
-                            c['dayOfWeek'] as String;
-                        final members =
-                            '${c['currentCount']}/${c['maxCapacity']}';
-                        final address =
-                            (c['address'] as String?) ?? 'Não informado';
-                        return _CellAdminCard(
-                          id: id,
-                          name: name,
-                          leader: leader,
-                          day: day,
-                          members: members,
-                          address: address,
-                          onTap: () async {
-                            final changed = await Navigator.of(context)
-                                .push<bool>(
-                                  MaterialPageRoute<bool>(
-                                    builder: (_) => _CellDetailsPage(
-                                      id: id,
-                                      name: name,
-                                      leader: leader,
-                                      day: day,
-                                      members: members,
-                                      address: address,
-                                    ),
-                                  ),
-                                );
-                            if (changed == true) _loadCells();
-                          },
-                        );
-                      }),
+                      // Grid 3 colunas no desktop, lista no mobile.
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = constraints.maxWidth >= 1100
+                              ? 3
+                              : constraints.maxWidth >= 720
+                              ? 2
+                              : 1;
+                          final cards = _filtered.map(_buildCellCard).toList();
+                          if (columns == 1) return Column(children: cards);
+                          return GridView.custom(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: columns,
+                                  crossAxisSpacing: AppSpacing.base,
+                                  mainAxisSpacing: AppSpacing.xs,
+                                  mainAxisExtent: 96,
+                                ),
+                            childrenDelegate: SliverChildListDelegate(cards),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -1019,6 +1040,15 @@ class _ReportsTabState extends State<_ReportsTab> {
 
   static const _exportService = ReportExportService();
 
+  void _openMetricDetail(ReportMetric metric, String headerValue) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ReportMetricDetailPage(metric: metric, headerValue: headerValue),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1112,24 +1142,38 @@ class _ReportsTabState extends State<_ReportsTab> {
                 value: integrationRate,
                 icon: Icons.trending_up,
                 color: AppColors.success,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.integrationRate,
+                  integrationRate,
+                ),
               ),
               StatCard(
                 label: 'Líderes Ativos',
                 value: '$leaders',
                 icon: Icons.people,
                 color: AppColors.primary,
+                onTap: () =>
+                    _openMetricDetail(ReportMetric.activeLeaders, '$leaders'),
               ),
               StatCard(
                 label: 'Visitantes (mês)',
                 value: '$newThisMonth',
                 icon: Icons.calendar_month_outlined,
                 color: AppColors.accent,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.visitorsMonth,
+                  '$newThisMonth',
+                ),
               ),
               StatCard(
                 label: 'Média Frequência',
                 value: '${avgAttendance.toStringAsFixed(1)}%',
                 icon: Icons.bar_chart,
                 color: AppColors.secondary,
+                onTap: () => _openMetricDetail(
+                  ReportMetric.avgAttendance,
+                  '${avgAttendance.toStringAsFixed(1)}%',
+                ),
               ),
             ]),
           ),
@@ -1428,22 +1472,14 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Detalhes da Célula'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-        ),
+        appBar: AppBar(title: const Text('Detalhes da Célula')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Detalhes da Célula'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-        ),
+        appBar: AppBar(title: const Text('Detalhes da Célula')),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1479,8 +1515,6 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detalhes da Célula'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
         actions: [
           IconButton(
             tooltip: 'Editar',

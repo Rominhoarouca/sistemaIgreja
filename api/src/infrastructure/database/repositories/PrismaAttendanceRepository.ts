@@ -75,6 +75,55 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
     return Number(result[0]?.rate ?? 0);
   }
 
+  async getAttendanceRateByCell(): Promise<
+    Array<{
+      cellId: string;
+      cellName: string;
+      leaderName: string;
+      meetings: number;
+      total: number;
+      present: number;
+      rate: number;
+    }>
+  > {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        cell_id: string;
+        cell_name: string;
+        leader_name: string | null;
+        meetings: bigint;
+        total: bigint;
+        present: bigint;
+      }>
+    >`
+      SELECT
+        c.id                                    AS cell_id,
+        c.name                                  AS cell_name,
+        u.name                                  AS leader_name,
+        COUNT(DISTINCT a.meeting_date)          AS meetings,
+        COUNT(a.id)                             AS total,
+        COUNT(a.id) FILTER (WHERE a.is_present) AS present
+      FROM cells c
+      LEFT JOIN users u ON u.id = c.leader_id
+      LEFT JOIN attendances a ON a.cell_id = c.id
+      GROUP BY c.id, c.name, u.name
+      ORDER BY c.name
+    `;
+    return rows.map((r) => {
+      const total = Number(r.total);
+      const present = Number(r.present);
+      return {
+        cellId: r.cell_id,
+        cellName: r.cell_name,
+        leaderName: r.leader_name ?? '',
+        meetings: Number(r.meetings),
+        total,
+        present,
+        rate: total === 0 ? 0 : Math.round((present / total) * 1000) / 10,
+      };
+    });
+  }
+
   async findMeetingsByCellId(
     cellId: string,
   ): Promise<Array<{ meetingDate: Date; total: number; present: number }>> {

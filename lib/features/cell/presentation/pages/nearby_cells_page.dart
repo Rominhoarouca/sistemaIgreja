@@ -78,12 +78,7 @@ class _NearbyCellsPageState extends State<NearbyCellsPage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Células Próximas'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Células Próximas'), elevation: 0),
       body: Column(
         children: [
           // ── Sub-header ─────────────────────────────────────────────────
