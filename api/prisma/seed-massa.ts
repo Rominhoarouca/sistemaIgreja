@@ -34,7 +34,7 @@ const LIDERES_POR_SUPERVISOR = 3;
 const CELULAS_POR_LIDER = 2; // 2×2×3×2 = 24 células
 const MEMBROS_POR_CELULA = 8;
 const VISITANTES_POR_CELULA = 5; // requisito
-const VISITANTES_SEM_ = 5; // requisito
+const VISITANTES_SEM_CELULA = 5; // requisito
 
 const SENHA_PADRAO = 'senha123';
 
