@@ -7,6 +7,14 @@ import type { IVisitorRepository } from '@domain/repositories/IVisitorRepository
 import type { ICellMemberRepository } from '@domain/repositories/ICellMemberRepository';
 import { AppError } from '@shared/errors/AppError';
 
+const genderSchema = z.enum(['MASCULINO', 'FEMININO']);
+
+/** Aceita 'YYYY-MM-DD' (input de data) ou ISO completo. */
+const birthDateSchema = z
+  .string()
+  .datetime({ local: true, offset: true })
+  .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+
 const createSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(8),
@@ -14,19 +22,27 @@ const createSchema = z.object({
   address: z.string().optional(),
   bairroId: z.string().uuid().optional(),
   originChurch: z.string().optional(),
+  birthDate: birthDateSchema.optional(),
+  gender: genderSchema.optional(),
+  maritalStatus: z.string().optional(),
   leaderId: z.string().uuid().optional(),
   cellId: z.string().uuid().optional(),
   referredById: z.string().uuid().optional(),
 });
 
 const selfRegisterSchema = z.object({
+  // Identifica a igreja do formulário. O middleware publicTenant já resolveu o
+  // slug antes de chegar aqui; fica declarado para não ser descartado em
+  // silêncio e para constar no schema público.
+  churchSlug: z.string().min(1),
   name: z.string().min(2),
   phone: z.string().min(8),
   address: z.string().min(3),
   numero: z.string().min(1),
   complemento: z.string().optional(),
   bairroId: z.string().uuid(),
-  birthDate: z.string().datetime({ local: true, offset: true }).optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
+  birthDate: birthDateSchema.optional(),
+  gender: genderSchema.optional(),
   maritalStatus: z.string().optional(),
   isBaptized: z.boolean().default(false),
   knownPersonName: z.string().optional(),
@@ -69,7 +85,10 @@ export class VisitorController {
 
   create = async (req: Request, res: Response): Promise<void> => {
     const data = createSchema.parse(req.body);
-    const visitor = await this.registerUseCase.execute(data);
+    const visitor = await this.registerUseCase.execute({
+      ...data,
+      birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+    });
     res.status(201).json({ visitor });
   };
 
@@ -86,6 +105,7 @@ export class VisitorController {
       complemento: data.complemento,
       bairroId: data.bairroId,
       birthDate,
+      gender: data.gender,
       maritalStatus: data.maritalStatus,
       isBaptized: data.isBaptized,
       knownPersonName: data.knownPersonName,

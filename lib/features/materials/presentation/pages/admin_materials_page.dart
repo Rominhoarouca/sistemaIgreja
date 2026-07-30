@@ -78,6 +78,11 @@ class _GroupedMaterial {
 }
 
 class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
+  /// Limite de tamanho de upload — abaixo do limite do backend (100 MB) pra
+  /// barrar no cliente antes de gastar banda subindo um arquivo que vai
+  /// ser rejeitado de qualquer forma.
+  static const int _maxUploadBytes = 50 * 1024 * 1024;
+
   final _searchCtrl = TextEditingController();
   late final Dio _dio;
 
@@ -202,6 +207,14 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
+
+    if (file.size > _maxUploadBytes) {
+      AppSnackbar.warning(
+        'Arquivo muito grande (${_formatBytes(file.size)}). '
+        'O limite é ${_formatBytes(_maxUploadBytes)}. Envio bloqueado.',
+      );
+      return;
+    }
 
     if (!mounted) return;
     final params = await showDialog<_UploadParams>(

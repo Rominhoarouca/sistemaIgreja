@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_constants.dart';
+import '../features/auth/domain/entities/user_entity.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
@@ -23,9 +24,15 @@ import '../features/visitor/presentation/pages/visitor_self_register_page.dart';
 import '../features/supervisor/presentation/pages/supervisor_home_page.dart';
 import '../features/coordinator/presentation/pages/coordinator_home_page.dart';
 import '../features/admin/presentation/pages/admin_cell_types_page.dart';
+import '../features/admin/presentation/pages/admin_qrcode_page.dart';
+import '../features/leader/presentation/pages/leader_qrcode_page.dart';
 import '../features/whatsapp/presentation/pages/admin_whatsapp_page.dart';
 import '../features/admin/presentation/pages/admin_users_register_page.dart';
 import '../features/dashboard/presentation/widgets/admin_scaffold.dart';
+import '../features/saas/presentation/pages/church_admin_page.dart';
+import '../features/saas/presentation/pages/church_signup_page.dart';
+import '../features/saas/presentation/pages/super_admin_page.dart';
+import '../features/saas/presentation/pages/plan_management_page.dart';
 
 /// Public routes that can be accessed without authentication.
 const _publicRoutes = {
@@ -33,11 +40,34 @@ const _publicRoutes = {
   AppRoutes.register,
   '/forgot-password',
   AppRoutes.visitorSelfRegister,
+  AppRoutes.signup,
 };
 
 /// Routes that authenticated users are still allowed to visit freely
 /// (not redirected to their home dashboard).
 const _alwaysAllowedRoutes = {AppRoutes.visitorSelfRegister};
+
+/// Home route for the user's role — used both to land after login and to
+/// bounce a user away from a section that isn't theirs.
+String _homeForRole(UserEntity user) {
+  if (user.isSuperAdmin) return AppRoutes.superAdmin;
+  if (user.isAdmin) return AppRoutes.adminDashboard;
+  if (user.isSupervisor) return AppRoutes.supervisorHome;
+  if (user.isCoordinator) return AppRoutes.coordinatorHome;
+  return AppRoutes.leaderHome;
+}
+
+/// Whether [user] is allowed on [location]. Each role-owned section
+/// (super-admin panel, admin shell, supervisor/coordinator/leader home) is
+/// off-limits to every other role — only the owning role passes.
+bool _isAllowedForRole(UserEntity user, String location) {
+  if (location.startsWith(AppRoutes.superAdmin)) return user.isSuperAdmin;
+  if (location.startsWith(AppRoutes.adminDashboard)) return user.isAdmin;
+  if (location.startsWith(AppRoutes.supervisorHome)) return user.isSupervisor;
+  if (location.startsWith(AppRoutes.coordinatorHome)) return user.isCoordinator;
+  if (location.startsWith(AppRoutes.leaderHome)) return user.isLeader;
+  return true; // shared routes (profile, notifications, visitor flows, etc.)
+}
 
 /// Creates a [GoRouter] that reacts to [AuthBloc] state changes.
 GoRouter createRouter(AuthBloc authBloc) {
@@ -62,16 +92,19 @@ GoRouter createRouter(AuthBloc authBloc) {
 
       if (!isAuthenticated && !isPublic) return AppRoutes.login;
 
-      if (authState is AuthAuthenticated && isPublic) {
+      if (authState is AuthAuthenticated) {
         // Some public routes (e.g. visitor self-register) must remain
         // accessible even while the user is logged in.
         if (_alwaysAllowedRoutes.any((r) => location.startsWith(r))) {
           return null;
         }
-        if (authState.user.isAdmin) return AppRoutes.adminDashboard;
-        if (authState.user.isSupervisor) return AppRoutes.supervisorHome;
-        if (authState.user.isCoordinator) return AppRoutes.coordinatorHome;
-        return AppRoutes.leaderHome;
+        if (isPublic) return _homeForRole(authState.user);
+
+        // Authenticated but on a route owned by a different role (e.g. a
+        // SUPERADMIN typing "/admin" in the address bar) — bounce home.
+        if (!_isAllowedForRole(authState.user, location)) {
+          return _homeForRole(authState.user);
+        }
       }
 
       return null;
@@ -96,6 +129,28 @@ GoRouter createRouter(AuthBloc authBloc) {
         name: 'forgot-password',
         pageBuilder: (context, state) =>
             const MaterialPage(child: ForgotPasswordPage()),
+      ),
+
+      // ── SaaS: cadastro público de igreja ──────────────────────────────
+      GoRoute(
+        path: AppRoutes.signup,
+        name: 'signup',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: ChurchSignupPage()),
+      ),
+
+      // ── SaaS: painel super-admin (dono do SaaS) ───────────────────────
+      GoRoute(
+        path: AppRoutes.superAdmin,
+        name: 'super-admin',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SuperAdminPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.superAdminPlans,
+        name: 'super-admin-plans',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: PlanManagementPage()),
       ),
 
       // ── Supervisor ────────────────────────────────────────────────────
@@ -179,6 +234,14 @@ GoRouter createRouter(AuthBloc authBloc) {
                 const NoTransitionPage(child: AdminLocationPage()),
           ),
 
+          // ── Admin QR Code de cadastro ─────────────────────────────────
+          GoRoute(
+            path: AppRoutes.adminQrCode,
+            name: 'admin-qrcode',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AdminQrCodePage()),
+          ),
+
           // ── Admin Cell Types ──────────────────────────────────────────
           GoRoute(
             path: AppRoutes.adminCellTypes,
@@ -201,6 +264,14 @@ GoRouter createRouter(AuthBloc authBloc) {
             name: 'admin-users-register',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: AdminUsersRegisterPage()),
+          ),
+
+          // ── SaaS: configurações da igreja ─────────────────────────────
+          GoRoute(
+            path: AppRoutes.adminChurch,
+            name: 'admin-church',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ChurchAdminPage()),
           ),
         ],
       ),
@@ -236,6 +307,14 @@ GoRouter createRouter(AuthBloc authBloc) {
         pageBuilder: (context, state) => const MaterialPage(child: AboutPage()),
       ),
 
+      // ── Líder: QR Code de cadastro da célula ──────────────────────────
+      GoRoute(
+        path: AppRoutes.leaderQrCode,
+        name: 'leader-qrcode',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: LeaderQrCodePage()),
+      ),
+
       // ── Visitor flow ──────────────────────────────────────────────────
       GoRoute(
         path: AppRoutes.visitorRegister,
@@ -246,8 +325,16 @@ GoRouter createRouter(AuthBloc authBloc) {
       GoRoute(
         path: AppRoutes.visitorSelfRegister,
         name: 'visitor-self-register',
-        pageBuilder: (context, state) =>
-            const MaterialPage(child: VisitorSelfRegisterPage()),
+        pageBuilder: (context, state) {
+          // A igreja (e opcionalmente a célula) vem do QR Code / link.
+          final q = state.uri.queryParameters;
+          return MaterialPage(
+            child: VisitorSelfRegisterPage(
+              churchSlug: q['igreja'],
+              presetCellId: q['celula'],
+            ),
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.nearbyCells,

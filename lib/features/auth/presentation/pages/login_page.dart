@@ -309,6 +309,19 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
+          Center(
+            child: TextButton.icon(
+              onPressed: isLoading ? null : () => context.push(AppRoutes.signup),
+              icon: const Icon(Icons.add_business_outlined, size: 18),
+              label: Text(
+                'Cadastrar minha igreja',
+                style: AppTypography.bodySmall.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

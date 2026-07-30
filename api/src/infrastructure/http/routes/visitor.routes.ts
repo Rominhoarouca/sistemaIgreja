@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import type { VisitorController } from '../controllers/VisitorController';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import type { RequestHandler } from 'express';
 
-export function visitorRoutes(controller: VisitorController): Router {
+export function visitorRoutes(
+  controller: VisitorController,
+  publicTenant: RequestHandler,
+): Router {
   const router = Router();
-  // Public endpoint — no auth required
-  router.post('/self-register', controller.selfRegister);
+  // Público (sem login). O publicTenant resolve a igreja pelo slug do link/QR
+  // Code — sem ele o visitante seria gravado sem church_id e ficaria invisível
+  // para a própria igreja.
+  router.post('/self-register', publicTenant, controller.selfRegister);
   // All other routes require authentication
   router.use(authMiddleware);
   router.post('/', controller.create);

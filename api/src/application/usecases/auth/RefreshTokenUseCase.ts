@@ -43,7 +43,7 @@ export class RefreshTokenUseCase {
     await this.refreshTokenRepo.deleteByToken(token);
 
     const accessToken = jwt.sign(
-      { sub: user.id, role: user.role },
+      { sub: user.id, role: user.role, churchId: user.churchId },
       jwtSecret,
       { expiresIn } as jwt.SignOptions,
     );

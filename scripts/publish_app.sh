@@ -42,7 +42,11 @@ echo "================================================"
 echo ""
 echo "→ [1/3] Building Flutter web..."
 cd "$ROOT_DIR"
-flutter build web --release --dart-define=API_BASE_URL="$API_BASE_URL"
+# --no-web-resources-cdn: canvaskit sai deste servidor em vez do gstatic.com —
+# o nginx da imagem (Dockerfile.web) serve brotli, então a variante chromium
+# do canvaskit (~1,5 MB) já vence o que o gstatic manda (~2,25 MB).
+flutter build web --release --no-web-resources-cdn \
+  --dart-define=API_BASE_URL="$API_BASE_URL"
 
 # ── 2. Precompress ─────────────────────────────────────────────────────────────
 echo ""

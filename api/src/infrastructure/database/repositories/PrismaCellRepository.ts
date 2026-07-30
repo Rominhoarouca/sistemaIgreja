@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { ICellRepository } from '@domain/repositories/ICellRepository';
 import type { Cell, CellWithDistance, NearbySearchParams, CreateCellData } from '@domain/entities/Cell';
+import { getEffectiveChurchId } from '@shared/context/tenant-context';
 
 type BairroRow = {
   id: string;
@@ -53,6 +54,7 @@ export class PrismaCellRepository implements ICellRepository {
   // Haversine formula in raw SQL for nearby search
   async findNearby(params: NearbySearchParams): Promise<CellWithDistance[]> {
     const { latitude, longitude, radiusKm } = params;
+    const churchId = getEffectiveChurchId() ?? null;
 
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -98,6 +100,7 @@ export class PrismaCellRepository implements ICellRepository {
       FROM cells c
       LEFT JOIN cell_members m ON m.cell_id = c.id
       WHERE c.latitude IS NOT NULL AND c.longitude IS NOT NULL
+        AND (${churchId}::text IS NULL OR c.church_id = ${churchId})
       GROUP BY c.id
       HAVING (
         6371 * acos(

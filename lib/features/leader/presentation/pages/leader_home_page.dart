@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -10,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../widgets/attendee_widgets.dart';
 import '../../../../shared/widgets/address_selector.dart';
 import 'leader_dashboard_view.dart';
 
@@ -228,8 +230,10 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
       key: ValueKey(cell.id),
       index: _selectedTab,
       children: [
-        _LeaderVisitorsTab(cellId: cell.id),
-        _CellMembersTab(cellId: cell.id),
+        _AttendeesTab(
+          cellId: cell.id,
+          onOpenAttendance: () => setState(() => _selectedTab = 1),
+        ),
         _AttendanceTab(cellId: cell.id),
         _MaterialsTab(cellId: cell.id),
         _SpiritualHistoryTab(cellId: cell.id),
@@ -319,25 +323,32 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAB 1: VISITORS
+// TAB 1: FREQUENTADORES (membros + visitantes)
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _LeaderVisitorsTab extends StatefulWidget {
-  const _LeaderVisitorsTab({required this.cellId});
+class _AttendeesTab extends StatefulWidget {
+  const _AttendeesTab({required this.cellId, required this.onOpenAttendance});
 
   final String cellId;
 
+  /// Abre a aba Presença — usado pelo "Mais reuniões".
+  final VoidCallback onOpenAttendance;
+
   @override
-  State<_LeaderVisitorsTab> createState() => _LeaderVisitorsTabState();
+  State<_AttendeesTab> createState() => _AttendeesTabState();
 }
 
-class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
+/// Membros e visitantes da célula em uma lista só. O que diferencia é a badge,
+/// e o filtro permite isolar um dos dois grupos.
+class _AttendeesTabState extends State<_AttendeesTab> {
   late final Dio _dio;
   final _searchCtrl = TextEditingController();
   String _query = '';
+  AttendeeFilter _filter = AttendeeFilter.all;
   bool _loading = true;
   String? _error;
-  List<_VisitorData> _allVisitors = [];
+  List<CellAttendee> _attendees = [];
+  List<CellMeetingSummary> _meetings = [];
 
   @override
   void initState() {
@@ -358,15 +369,22 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       _error = null;
     });
     try {
-      final visitorsResp = await _dio.get(
-        '/visitors',
-        queryParameters: {'cellId': widget.cellId},
-      );
-      final data = (visitorsResp.data as Map<String, dynamic>)['data'] as List;
+      final results = await Future.wait([
+        _dio.get('/attendance/cell/${widget.cellId}/attendees'),
+        _dio.get('/attendance/cell/${widget.cellId}/meetings'),
+      ]);
+      final attendees =
+          (results[0].data as Map<String, dynamic>)['attendees'] as List? ?? [];
+      final meetings =
+          (results[1].data as Map<String, dynamic>)['meetings'] as List? ?? [];
+
       if (!mounted) return;
       setState(() {
-        _allVisitors = data
-            .map((e) => _VisitorData.fromJson(e as Map<String, dynamic>))
+        _attendees = attendees
+            .map((e) => CellAttendee.fromJson(e as Map<String, dynamic>))
+            .toList();
+        _meetings = meetings
+            .map((e) => CellMeetingSummary.fromJson(e as Map<String, dynamic>))
             .toList();
         _loading = false;
       });
@@ -375,18 +393,95 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       setState(() {
         _error =
             e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar visitantes';
+            'Erro ao carregar frequentadores';
         _loading = false;
       });
     }
   }
 
-  List<_VisitorData> get _cellVisitors {
-    final q = _query.toLowerCase();
-    if (q.isEmpty) return _allVisitors;
-    return _allVisitors
-        .where((v) => v.name.toLowerCase().contains(q) || v.phone.contains(q))
-        .toList();
+  List<CellAttendee> get _filtered {
+    final q = _query.trim().toLowerCase();
+    return _attendees.where((a) {
+      if (!_filter.matches(a)) return false;
+      if (q.isEmpty) return true;
+      return a.name.toLowerCase().contains(q) ||
+          (a.phone ?? '').contains(q) ||
+          (a.email ?? '').toLowerCase().contains(q);
+    }).toList();
+  }
+
+  int _countFor(AttendeeFilter filter) =>
+      _attendees.where(filter.matches).length;
+
+  Future<void> _openDetails(CellAttendee attendee) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => attendee.isMember
+          ? _MemberDetailSheet(member: attendee)
+          : _VisitorDetailSheet(
+              visitor: _VisitorData.fromAttendee(attendee, widget.cellId),
+              dio: _dio,
+              cellId: widget.cellId,
+            ),
+    );
+    if (changed == true) _loadData();
+  }
+
+  /// Duas origens de cadastro (visitante e membro) atrás de um único botão.
+  Future<void> _showAddOptions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.sm),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.grey300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            ListTile(
+              leading: const Icon(Icons.person_add_outlined),
+              title: const Text('Novo visitante'),
+              subtitle: const Text('Entra no funil de acompanhamento'),
+              onTap: () => Navigator.of(ctx).pop('visitor'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.group_add_outlined),
+              title: const Text('Adicionar membro'),
+              subtitle: const Text('Já faz parte da célula'),
+              onTap: () => Navigator.of(ctx).pop('member'),
+            ),
+            const SizedBox(height: AppSpacing.base),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => action == 'visitor'
+          ? _NewVisitorSheet(dio: _dio, cellId: widget.cellId)
+          : _AddMemberSheet(dio: _dio, cellId: widget.cellId),
+    );
+    if (created == true) _loadData();
   }
 
   @override
@@ -403,6 +498,7 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
             Text(
               _error!,
               style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.base),
             AppButton(
@@ -416,97 +512,107 @@ class _LeaderVisitorsTabState extends State<_LeaderVisitorsTab> {
       );
     }
 
-    final visitorList = _cellVisitors;
+    final meetingsCard = LastMeetingsCard(
+      meetings: _meetings,
+      onSeeAll: widget.onOpenAttendance,
+    );
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: _loadData,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  AppSearchField(
-                    hint: 'Pesquisar visitante...',
-                    controller: _searchCtrl,
-                    onChanged: (v) => setState(() => _query = v),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Acima de 1000px cabe a coluna de reuniões ao lado, como no
+            // layout de referência; abaixo ela vai para o fim da lista.
+            final isWide = constraints.maxWidth >= 1000;
+            if (!isWide) {
+              return ListView(
+                padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+                children: [
+                  ..._buildListSection(),
+                  const SizedBox(height: AppSpacing.xl),
+                  meetingsCard,
+                  const SizedBox(height: AppSpacing.xl2),
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+                    children: [
+                      ..._buildListSection(),
+                      const SizedBox(height: AppSpacing.xl2),
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.base),
-                  AppSectionHeader(title: 'Visitantes da Célula'),
-                  const SizedBox(height: AppSpacing.sm),
-                ]),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.pagePaddingH,
-              ),
-              sliver: visitorList.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: AppEmptyState(
-                        title: 'Nenhum visitante na célula',
-                        subtitle:
-                            'Cadastre um novo visitante usando o botão abaixo.',
-                        icon: Icons.people_outline,
-                        actionLabel: 'Novo visitante',
-                        action: () => _showNewVisitorSheet(context),
-                      ),
-                    )
-                  : SliverList.separated(
-                      itemCount: visitorList.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, i) => _VisitorListTile(
-                        visitor: visitorList[i],
-                        onOpenDetails: () =>
-                            _openVisitorDetails(visitorList[i]),
-                      ),
+                ),
+                SizedBox(
+                  width: 360,
+                  child: ListView(
+                    padding: const EdgeInsets.only(
+                      top: AppSpacing.pagePaddingH,
+                      right: AppSpacing.pagePaddingH,
+                      bottom: AppSpacing.xl2,
                     ),
-            ),
-            const SliverPadding(
-              padding: EdgeInsets.only(bottom: AppSpacing.xl2),
-            ),
-          ],
+                    children: [meetingsCard],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showNewVisitorSheet(context),
+        onPressed: _showAddOptions,
         icon: const Icon(Icons.person_add_outlined),
-        label: const Text('Novo visitante'),
+        label: const Text('Adicionar'),
       ),
     );
   }
 
-  Future<void> _showNewVisitorSheet(BuildContext context) async {
-    final created = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  List<Widget> _buildListSection() {
+    final filtered = _filtered;
+    return [
+      AppSearchField(
+        hint: 'Pesquisar por nome, telefone ou e-mail...',
+        controller: _searchCtrl,
+        onChanged: (v) => setState(() => _query = v),
       ),
-      builder: (_) => _NewVisitorSheet(dio: _dio, cellId: widget.cellId),
-    );
-    if (created == true) _loadData();
-  }
-
-  Future<void> _openVisitorDetails(_VisitorData visitor) async {
-    final changed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      const SizedBox(height: AppSpacing.base),
+      Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: [
+          for (final filter in AttendeeFilter.values)
+            FilterChip(
+              label: Text('${filter.label} (${_countFor(filter)})'),
+              selected: _filter == filter,
+              onSelected: (_) => setState(() => _filter = filter),
+            ),
+        ],
       ),
-      builder: (_) => _VisitorDetailSheet(
-        visitor: visitor,
-        dio: _dio,
-        cellId: widget.cellId,
-      ),
-    );
-
-    if (changed == true) {
-      _loadData();
-    }
+      const SizedBox(height: AppSpacing.base),
+      AppSectionHeader(title: 'Frequentadores (${filtered.length})'),
+      const SizedBox(height: AppSpacing.sm),
+      if (filtered.isEmpty)
+        AppEmptyState(
+          title: _query.isNotEmpty || _filter != AttendeeFilter.all
+              ? 'Nada encontrado'
+              : 'Ninguém na célula ainda',
+          subtitle: _query.isNotEmpty || _filter != AttendeeFilter.all
+              ? 'Ajuste a busca ou o filtro.'
+              : 'Cadastre um visitante ou adicione um membro pelo botão abaixo.',
+          icon: Icons.groups_outlined,
+        )
+      else
+        for (final attendee in filtered) ...[
+          AttendeeCard(attendee: attendee, onTap: () => _openDetails(attendee)),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+    ];
   }
 }
 
@@ -533,20 +639,20 @@ class _VisitorData {
     this.address,
   );
 
-  factory _VisitorData.fromJson(Map<String, dynamic> json) {
-    final createdAt = DateTime.tryParse((json['createdAt'] as String?) ?? '');
-    return _VisitorData(
-      json['id'] as String,
-      (json['name'] as String?) ?? 'Sem nome',
-      (json['status'] as String?) ?? 'novo',
-      json['cellId'] as String?,
-      json['memberId'] as String?,
-      _relativeTime(createdAt),
-      (json['phone'] as String?) ?? 'Nao informado',
-      (json['neighborhood'] as String?) ?? 'Nao informado',
-      (json['address'] as String?) ?? 'Nao informado',
-    );
-  }
+  /// `memberId` é sempre nulo aqui: a lista de frequentadores já exclui os
+  /// visitantes convertidos em membro, senão a pessoa apareceria duas vezes.
+  factory _VisitorData.fromAttendee(CellAttendee attendee, String cellId) =>
+      _VisitorData(
+        attendee.id,
+        attendee.name,
+        attendee.status ?? 'novo',
+        cellId,
+        null,
+        _relativeTime(attendee.createdAt),
+        attendee.phone ?? 'Nao informado',
+        attendee.neighborhood ?? 'Nao informado',
+        attendee.address ?? 'Nao informado',
+      );
 
   static String _relativeTime(DateTime? createdAt) {
     if (createdAt == null) return 'Sem data';
@@ -556,46 +662,6 @@ class _VisitorData {
     if (diff.inDays < 7) return 'ha ${diff.inDays} dias';
     if (diff.inDays < 14) return 'ha 1 sem.';
     return 'ha ${(diff.inDays / 7).round()} sem.';
-  }
-}
-
-class _VisitorListTile extends StatelessWidget {
-  const _VisitorListTile({required this.visitor, required this.onOpenDetails});
-
-  final _VisitorData visitor;
-  final VoidCallback onOpenDetails;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Row(
-        children: [
-          AppAvatar(
-            initials: visitor.name.split(' ').map((e) => e[0]).take(2).join(),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(visitor.name, style: AppTypography.titleSmall),
-                const SizedBox(height: AppSpacing.xs2),
-                VisitorStatusBadge(status: visitor.status),
-              ],
-            ),
-          ),
-          AppButton(
-            label: 'Ver detalhes',
-            variant: AppButtonVariant.ghost,
-            size: AppButtonSize.sm,
-            isFullWidth: false,
-            suffixIcon: Icons.chevron_right,
-            onPressed: onOpenDetails,
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -1297,213 +1363,172 @@ class _StatusChip extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TAB 2: CELL MEMBERS
+// DETALHE DE MEMBRO
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _CellMembersTab extends StatefulWidget {
-  const _CellMembersTab({required this.cellId});
+/// Detalhes de um membro de célula. Visitante usa [_VisitorDetailSheet], que
+/// tem as ações do funil de acompanhamento — membro não precisa delas.
+class _MemberDetailSheet extends StatelessWidget {
+  const _MemberDetailSheet({required this.member});
 
-  final String cellId;
+  final CellAttendee member;
 
-  @override
-  State<_CellMembersTab> createState() => _CellMembersTabState();
-}
-
-class _CellMember {
-  final String id;
-  final String name;
-  final String phone;
-  final String cellId;
-  final String cellName;
-
-  const _CellMember({
-    required this.id,
-    required this.name,
-    required this.phone,
-    required this.cellId,
-    required this.cellName,
-  });
-
-  factory _CellMember.fromJson(
-    Map<String, dynamic> json,
-    String cellId,
-    String cellName,
-  ) => _CellMember(
-    id: json['id'] as String,
-    name: json['name'] as String? ?? '',
-    phone: json['phone'] as String? ?? '',
-    cellId: cellId,
-    cellName: cellName,
-  );
-}
-
-class _CellMembersTabState extends State<_CellMembersTab> {
-  late final Dio _dio;
-  bool _loading = true;
-  String? _error;
-  final _searchCtrl = TextEditingController();
-  String _query = '';
-  List<_CellMember> _members = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _dio = DioClient(AuthStorage()).dio;
-    _loadData();
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final membResp = await _dio.get('/cells/${widget.cellId}/members');
-      final membList =
-          (membResp.data as Map<String, dynamic>)['members'] as List? ?? [];
-      final members = membList
-          .map(
-            (m) => _CellMember.fromJson(
-              m as Map<String, dynamic>,
-              widget.cellId,
-              '',
-            ),
-          )
-          .toList();
-
-      if (!mounted) return;
-      setState(() {
-        _members = members;
-        _loading = false;
-      });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error =
-            e.response?.data?['error']?['message'] as String? ??
-            'Erro ao carregar membros';
-        _loading = false;
-      });
-    }
-  }
-
-  List<_CellMember> get _filtered {
-    final q = _query.toLowerCase();
-    if (q.isEmpty) return _members;
-    return _members
-        .where((m) => m.name.toLowerCase().contains(q) || m.phone.contains(q))
-        .toList();
-  }
-
-  Future<void> _addMember() async {
-    final added = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _AddMemberSheet(dio: _dio, cellId: widget.cellId),
-    );
-    if (added == true) _loadData();
-  }
+  String get _genderLabel => switch (member.gender) {
+    'MASCULINO' => 'Masculino',
+    'FEMININO' => 'Feminino',
+    _ => 'Não informado',
+  };
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    final address = member.address;
+    final hasAddress = address != null && address.isNotEmpty;
+    final locality = [
+      member.neighborhood,
+      member.city,
+    ].where((p) => p != null && p.isNotEmpty).join(' · ');
 
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _error!,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
-            ),
-            const SizedBox(height: AppSpacing.base),
-            AppButton(
-              label: 'Tentar novamente',
-              variant: AppButtonVariant.outline,
-              isFullWidth: false,
-              onPressed: _loadData,
-            ),
-          ],
-        ),
-      );
-    }
-
-    final filtered = _filtered;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: ListView(
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (_, controller) => SingleChildScrollView(
+        controller: controller,
+        child: Padding(
           padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-          children: [
-            AppSearchField(
-              hint: 'Pesquisar membro...',
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _query = v),
-            ),
-            const SizedBox(height: AppSpacing.base),
-            AppSectionHeader(title: 'Membros (${filtered.length})'),
-            const SizedBox(height: AppSpacing.sm),
-            if (filtered.isEmpty)
-              AppEmptyState(
-                title: 'Nenhum membro cadastrado',
-                subtitle:
-                    'Adicione membros à sua célula usando o botão abaixo.',
-                icon: Icons.group_outlined,
-              )
-            else
-              ...filtered.map(
-                (m) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: AppCard(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.grey300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              Row(
+                children: [
+                  AppAvatar(initials: member.initials, size: 56),
+                  const SizedBox(width: AppSpacing.base),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppAvatar(
-                          initials: m.name
-                              .split(' ')
-                              .map((e) => e[0])
-                              .take(2)
-                              .join(),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(m.name, style: AppTypography.titleSmall),
-                              const SizedBox(height: AppSpacing.xs2),
-                              Text(
-                                m.phone,
-                                style: AppTypography.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
+                        Text(member.name, style: AppTypography.headlineSmall),
+                        const SizedBox(height: AppSpacing.xs),
+                        const AppBadge(
+                          label: 'Membro',
+                          variant: AppBadgeVariant.success,
                         ),
                       ],
                     ),
                   ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.xl),
+
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    _DetailRow(
+                      icon: Icons.insights_outlined,
+                      label: 'Frequência',
+                      value: member.meetingsCount == 0
+                          ? 'Sem presença registrada'
+                          : '${formatPercentBr(member.attendanceRate)} '
+                                '(${member.presentCount} de ${member.meetingsCount} encontros)',
+                    ),
+                    const Divider(height: 1),
+                    _DetailRow(
+                      icon: Icons.phone_outlined,
+                      label: 'Telefone',
+                      value: member.phone?.isNotEmpty == true
+                          ? member.phone!
+                          : 'Não informado',
+                    ),
+                    const Divider(height: 1),
+                    _DetailRow(
+                      icon: Icons.email_outlined,
+                      label: 'E-mail',
+                      value: member.email?.isNotEmpty == true
+                          ? member.email!
+                          : 'Não informado',
+                    ),
+                    const Divider(height: 1),
+                    _DetailRow(
+                      icon: Icons.cake_outlined,
+                      label: 'Aniversário',
+                      value: member.birthDate != null
+                          ? formatDateBr(member.birthDate!.toLocal())
+                          : 'Não informado',
+                    ),
+                    const Divider(height: 1),
+                    _DetailRow(
+                      icon: Icons.favorite_outline,
+                      label: 'Estado civil',
+                      value: member.maritalStatus?.isNotEmpty == true
+                          ? member.maritalStatus!
+                          : 'Não informado',
+                    ),
+                    const Divider(height: 1),
+                    _DetailRow(
+                      icon: Icons.wc_outlined,
+                      label: 'Gênero',
+                      value: _genderLabel,
+                    ),
+                    const Divider(height: 1),
+                    if (hasAddress)
+                      _TappableDetailRow(
+                        icon: Icons.location_on_outlined,
+                        label: 'Endereço',
+                        value: locality.isEmpty
+                            ? address
+                            : '$address — $locality',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20),
+                              ),
+                            ),
+                            builder: (_) => _VisitorMapSheet(
+                              address: address,
+                              visitorName: member.name,
+                            ),
+                          );
+                        },
+                      )
+                    else
+                      _DetailRow(
+                        icon: Icons.location_on_outlined,
+                        label: 'Endereço',
+                        value: 'Não informado',
+                      ),
+                    const Divider(height: 1),
+                    _DetailRow(
+                      icon: Icons.access_time_outlined,
+                      label: 'Membro desde',
+                      value: formatDateBr(member.createdAt.toLocal()),
+                    ),
+                  ],
                 ),
               ),
-          ],
+
+              const SizedBox(height: AppSpacing.xl2),
+            ],
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addMember,
-        icon: const Icon(Icons.person_add_outlined),
-        label: const Text('Adicionar membro'),
       ),
     );
   }
@@ -1800,6 +1825,8 @@ class _AttendanceTabState extends State<_AttendanceTab> {
         dio: _dio,
         cellId: widget.cellId,
         meetingDateIso: meeting['meetingDate'] as String,
+        lesson: meeting['lesson'] as String?,
+        ministrante: meeting['ministrante'] as String?,
       ),
     );
 
@@ -1818,12 +1845,13 @@ class _MeetingSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final d = DateTime.parse(meeting['meetingDate'] as String).toLocal();
-    final label =
-        'Encontro de ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-    final total = (meeting['total'] as num).toInt();
-    final present = (meeting['present'] as num).toInt();
-    final pct = total > 0 ? (present / total * 100).round() : 0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mutedColor = isDark ? AppColors.text3Dark : AppColors.textSecondary;
+    final labelStyle = AppTypography.bodySmall.copyWith(color: mutedColor);
+
+    final summary = CellMeetingSummary.fromJson(meeting);
+    final total = (meeting['total'] as num?)?.toInt() ?? 0;
+    final pct = total > 0 ? (summary.present / total * 100).round() : 0;
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -1833,25 +1861,68 @@ class _MeetingSummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.event_available_outlined,
-                color: AppColors.primary,
+                color: isDark ? AppColors.linkDark : AppColors.primary,
               ),
               const SizedBox(width: AppSpacing.md),
-              Expanded(child: Text(label, style: AppTypography.titleSmall)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              const SizedBox(width: 36),
-              Text(
-                '$present de $total presentes ($pct%)',
-                style: AppTypography.bodySmall.copyWith(
-                  color: AppColors.textSecondary,
+              Expanded(
+                child: Text(
+                  'Encontro de ${formatDateBr(summary.meetingDate.toLocal())}',
+                  style: AppTypography.titleSmall,
                 ),
               ),
+              AppBadge(
+                label: summary.isRecorded ? 'Realizada' : 'Pendente',
+                variant: summary.isRecorded
+                    ? AppBadgeVariant.success
+                    : AppBadgeVariant.warning,
+                size: AppBadgeSize.sm,
+              ),
             ],
+          ),
+          Padding(
+            // Alinha o corpo com o título, depois do ícone.
+            padding: const EdgeInsets.only(left: 36, top: AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (summary.lesson != null)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'Lição: ', style: labelStyle),
+                        TextSpan(
+                          text: summary.lesson,
+                          style: AppTypography.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                if (summary.ministrante != null)
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'Ministrante: ', style: labelStyle),
+                        TextSpan(
+                          text: summary.ministrante,
+                          style: AppTypography.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                if (summary.lesson != null || summary.ministrante != null)
+                  const SizedBox(height: AppSpacing.xs),
+                Text(
+                  total == 0
+                      ? 'Presença ainda não registrada'
+                      : '${summary.present} de $total presentes ($pct%) · '
+                            'membros ${summary.membersPresent} · '
+                            'visitantes ${summary.visitorsPresent}',
+                  style: labelStyle,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1865,32 +1936,43 @@ class _MeetingSummaryCard extends StatelessWidget {
 
 class _PhotoSection extends StatelessWidget {
   const _PhotoSection({
-    required this.photo,
+    required this.photoBytes,
     required this.existingPhotoUrl,
     required this.onPick,
     required this.onRemove,
   });
 
-  final XFile? photo;
+  /// Bytes da foto recém-escolhida. Guardamos os bytes em vez de um caminho de
+  /// arquivo porque `dart:io` não existe no Flutter web, onde o app roda como
+  /// PWA — `Image.file` deixaria o preview em branco no navegador.
+  final Uint8List? photoBytes;
   final String? existingPhotoUrl;
   final VoidCallback onPick;
   final VoidCallback onRemove;
 
+  void _openViewer(BuildContext context, {Uint8List? bytes, String? url}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        // fullscreenDialog dá o botão de fechar e o gesto/back nativo.
+        fullscreenDialog: true,
+        builder: (_) => _MeetingPhotoViewer(bytes: bytes, url: url),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // New photo selected locally
-    if (photo != null) {
+    if (photoBytes != null) {
       return AppCard(
         padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
-              child: Image.file(
-                File(photo!.path),
+            _ZoomableThumb(
+              onTap: () => _openViewer(context, bytes: photoBytes),
+              child: Image.memory(
+                photoBytes!,
                 height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -1940,10 +2022,8 @@ class _PhotoSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
+            _ZoomableThumb(
+              onTap: () => _openViewer(context, url: existingPhotoUrl),
               child: Image.network(
                 existingPhotoUrl!,
                 height: 180,
@@ -2004,6 +2084,96 @@ class _PhotoSection extends StatelessWidget {
   }
 }
 
+/// Miniatura clicável da foto do encontro, com dica visual de que amplia.
+class _ZoomableThumb extends StatelessWidget {
+  const _ZoomableThumb({required this.child, required this.onTap});
+
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      child: Stack(
+        children: [
+          child,
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(onTap: onTap),
+            ),
+          ),
+          Positioned(
+            right: AppSpacing.sm,
+            bottom: AppSpacing.sm,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                ),
+                child: const Icon(
+                  Icons.zoom_out_map,
+                  size: 18,
+                  color: AppColors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Foto do encontro em tela cheia, com pinch/scroll para ampliar.
+class _MeetingPhotoViewer extends StatelessWidget {
+  const _MeetingPhotoViewer({this.bytes, this.url});
+
+  final Uint8List? bytes;
+  final String? url;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget image = bytes != null
+        ? Image.memory(bytes!, fit: BoxFit.contain)
+        : Image.network(
+            url!,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const Center(
+              child: Icon(
+                Icons.broken_image_outlined,
+                size: AppSpacing.iconXl,
+                color: AppColors.white,
+              ),
+            ),
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const Center(
+                    child: CircularProgressIndicator(color: AppColors.white),
+                  ),
+          );
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppColors.white,
+        elevation: 0,
+        title: Text('Foto do encontro', style: AppTypography.titleSmall),
+      ),
+      body: InteractiveViewer(
+        minScale: 1,
+        maxScale: 5,
+        child: Center(child: image),
+      ),
+    );
+  }
+}
+
 class _NewMeetingSheet extends StatefulWidget {
   const _NewMeetingSheet({required this.dio, required this.cellId});
 
@@ -2016,14 +2186,27 @@ class _NewMeetingSheet extends StatefulWidget {
 
 class _NewMeetingSheetState extends State<_NewMeetingSheet> {
   DateTime _selectedDate = DateTime.now();
+  final _lessonCtrl = TextEditingController();
+  final _ministranteCtrl = TextEditingController();
   bool _saving = false;
+
+  @override
+  void dispose() {
+    _lessonCtrl.dispose();
+    _ministranteCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _create() async {
     setState(() => _saving = true);
     try {
       await widget.dio.post(
         '/attendance/cell/${widget.cellId}/meetings',
-        data: {'meetingDate': _selectedDate.toIso8601String()},
+        data: {
+          'meetingDate': _selectedDate.toIso8601String(),
+          'lesson': _lessonCtrl.text.trim(),
+          'ministrante': _ministranteCtrl.text.trim(),
+        },
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -2042,68 +2225,87 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.grey300,
-                  borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.grey300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.base),
-            Text('Novo Encontro', style: AppTypography.headlineSmall),
-            const SizedBox(height: AppSpacing.xl),
-            Text(
-              'Data do encontro',
-              style: AppTypography.labelMedium.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.grey700,
+              const SizedBox(height: AppSpacing.base),
+              Text('Novo Encontro', style: AppTypography.headlineSmall),
+              const SizedBox(height: AppSpacing.xl),
+              Text(
+                'Data do encontro',
+                style: AppTypography.labelMedium.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.grey700,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            AppCard(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now().add(const Duration(days: 30)),
-                );
-                if (picked != null) setState(() => _selectedDate = picked);
-              },
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_today_outlined,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Text(
-                    '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
-                    style: AppTypography.titleSmall,
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.edit_outlined, color: AppColors.grey400),
-                ],
+              const SizedBox(height: AppSpacing.sm),
+              AppCard(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now().add(const Duration(days: 30)),
+                  );
+                  if (picked != null) setState(() => _selectedDate = picked);
+                },
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Text(
+                      '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                      style: AppTypography.titleSmall,
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.edit_outlined, color: AppColors.grey400),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            AppButton(
-              label: 'Criar encontro',
-              prefixIcon: Icons.add,
-              isLoading: _saving,
-              onPressed: _saving ? null : _create,
-            ),
-            const SizedBox(height: AppSpacing.base),
-          ],
+              const SizedBox(height: AppSpacing.base),
+              AppTextField(
+                controller: _lessonCtrl,
+                label: 'Lição (opcional)',
+                hint: 'Tema ministrado no encontro',
+                prefixIcon: Icons.menu_book_outlined,
+                maxLines: 2,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.base),
+              AppTextField(
+                controller: _ministranteCtrl,
+                label: 'Ministrante (opcional)',
+                hint: 'Quem ministrou',
+                prefixIcon: Icons.person_outline,
+                textInputAction: TextInputAction.done,
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              AppButton(
+                label: 'Criar encontro',
+                prefixIcon: Icons.add,
+                isLoading: _saving,
+                onPressed: _saving ? null : _create,
+              ),
+              const SizedBox(height: AppSpacing.base),
+            ],
+          ),
         ),
       ),
     );
@@ -2115,11 +2317,17 @@ class _MeetingAttendanceSheet extends StatefulWidget {
     required this.dio,
     required this.cellId,
     required this.meetingDateIso,
+    this.lesson,
+    this.ministrante,
   });
 
   final Dio dio;
   final String cellId;
   final String meetingDateIso;
+
+  /// Valores atuais do encontro, para pré-preencher os campos editáveis.
+  final String? lesson;
+  final String? ministrante;
 
   @override
   State<_MeetingAttendanceSheet> createState() =>
@@ -2139,12 +2347,33 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
 
   // Optional photo for this meeting
   XFile? _photo;
+  Uint8List? _photoBytes;
   String? _existingPhotoUrl;
+
+  late final TextEditingController _lessonCtrl;
+  late final TextEditingController _ministranteCtrl;
+  late final String _initialLesson;
+  late final String _initialMinistrante;
+
+  /// A lista costuma ser longa; começa aberta só quando ninguém foi marcado
+  /// ainda, que é o caso em que o líder precisa mexer nela.
+  bool _participantsExpanded = true;
 
   @override
   void initState() {
     super.initState();
+    _initialLesson = widget.lesson?.trim() ?? '';
+    _initialMinistrante = widget.ministrante?.trim() ?? '';
+    _lessonCtrl = TextEditingController(text: _initialLesson);
+    _ministranteCtrl = TextEditingController(text: _initialMinistrante);
     _loadInitialData();
+  }
+
+  @override
+  void dispose() {
+    _lessonCtrl.dispose();
+    _ministranteCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -2224,6 +2453,7 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
         _initialPresentIds = Set<String>.from(presentIds);
         _existingPhotoUrl =
             (photoResp.data as Map<String, dynamic>)['photoUrl'] as String?;
+        _participantsExpanded = presentIds.isEmpty;
         _loading = false;
       });
     } on DioException catch (e) {
@@ -2290,7 +2520,12 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
       return _presentIds.contains(id) != _initialPresentIds.contains(id);
     }).toList();
 
-    if (changedParticipants.isEmpty && _photo == null) {
+    final lesson = _lessonCtrl.text.trim();
+    final ministrante = _ministranteCtrl.text.trim();
+    final detailsChanged =
+        lesson != _initialLesson || ministrante != _initialMinistrante;
+
+    if (changedParticipants.isEmpty && _photo == null && !detailsChanged) {
       if (!mounted) return;
       Navigator.of(context).pop(false);
       return;
@@ -2317,11 +2552,26 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
         );
       }
 
-      // 2. Upload photo if selected
-      if (_photo != null) {
-        final bytes = await File(_photo!.path).readAsBytes();
+      // 2. Lição e ministrante. O POST faz upsert, então também funciona para
+      //    encontros que só existem como presença lançada (sem cell_meetings).
+      if (detailsChanged) {
+        await widget.dio.post(
+          '/attendance/cell/${widget.cellId}/meetings',
+          data: {
+            'meetingDate': widget.meetingDateIso,
+            'lesson': lesson,
+            'ministrante': ministrante,
+          },
+        );
+      }
+
+      // 3. Upload photo if selected
+      if (_photo != null && _photoBytes != null) {
         final formData = FormData.fromMap({
-          'photo': MultipartFile.fromBytes(bytes, filename: _photo!.name),
+          'photo': MultipartFile.fromBytes(
+            _photoBytes!,
+            filename: _photo!.name,
+          ),
         });
         await widget.dio.post(
           '/attendance/cell/${widget.cellId}/meetings/${Uri.encodeComponent(widget.meetingDateIso)}/photo',
@@ -2366,9 +2616,14 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
     );
     if (source == null) return;
     final picked = await picker.pickImage(source: source, imageQuality: 80);
-    if (picked != null && mounted) {
-      setState(() => _photo = picked);
-    }
+    if (picked == null) return;
+    // XFile.readAsBytes funciona nas duas plataformas; File(path) só em nativo.
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _photo = picked;
+      _photoBytes = bytes;
+    });
   }
 
   Future<void> _showAddVisitorSheet() async {
@@ -2399,151 +2654,318 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          minChildSize: 0.45,
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
           maxChildSize: 0.95,
           expand: false,
-          builder: (_, controller) => SingleChildScrollView(
-            controller: controller,
-            padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.grey300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+          // Column, não SingleChildScrollView na raiz: o cabeçalho e o botão
+          // de salvar ficam fixos e só o meio rola.
+          builder: (_, controller) => Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: controller,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.pagePaddingH,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _PhotoSection(
+                        photoBytes: _photoBytes,
+                        existingPhotoUrl: _existingPhotoUrl,
+                        onPick: _pickPhoto,
+                        onRemove: () => setState(() {
+                          _photo = null;
+                          _photoBytes = null;
+                        }),
+                      ),
+                      const SizedBox(height: AppSpacing.base),
+                      AppTextField(
+                        controller: _lessonCtrl,
+                        label: 'Lição',
+                        hint: 'Tema ministrado no encontro',
+                        prefixIcon: Icons.menu_book_outlined,
+                        maxLines: 2,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      const SizedBox(height: AppSpacing.base),
+                      AppTextField(
+                        controller: _ministranteCtrl,
+                        label: 'Ministrante',
+                        hint: 'Quem ministrou',
+                        prefixIcon: Icons.person_outline,
+                        textInputAction: TextInputAction.done,
+                      ),
+                      const SizedBox(height: AppSpacing.base),
+                      _buildParticipantsSection(),
+                      const SizedBox(height: AppSpacing.base),
+                    ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.base),
-                Text('Participantes', style: AppTypography.headlineSmall),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Encontro de ${_formatMeetingDate()}',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.base),
-                AppButton(
-                  label: 'Incluir visitante',
-                  variant: AppButtonVariant.outline,
-                  isFullWidth: false,
-                  prefixIcon: Icons.person_add_outlined,
-                  onPressed: _showAddVisitorSheet,
-                ),
-                const SizedBox(height: AppSpacing.sm),
+              ),
+              _buildFooter(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-                // ── Optional photo ────────────────────────────────
-                _PhotoSection(
-                  photo: _photo,
-                  existingPhotoUrl: _existingPhotoUrl,
-                  onPick: _pickPhoto,
-                  onRemove: () => setState(() => _photo = null),
-                ),
-                const SizedBox(height: AppSpacing.base),
-                if (_loading)
-                  const Center(child: CircularProgressIndicator())
-                else if (_error != null)
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _error!,
-                          style: AppTypography.bodyMedium.copyWith(
-                            color: AppColors.error,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.base),
-                        AppButton(
-                          label: 'Tentar novamente',
-                          variant: AppButtonVariant.outline,
-                          isFullWidth: false,
-                          onPressed: _loadInitialData,
-                        ),
-                      ],
-                    ),
-                  )
-                else if (_participants.isEmpty)
-                  AppEmptyState(
-                    title: 'Nenhum participante na célula',
-                    subtitle: 'Use o botão acima para incluir visitante.',
-                    icon: Icons.people_outline,
-                  )
-                else
-                  Column(
-                    children: _participants.map((participant) {
-                      final participantId = participant['id'] as String;
-                      final name =
-                          (participant['name'] as String?) ?? 'Sem nome';
-                      final isMember =
-                          (participant['_type'] as String?) == 'member';
-                      final checked = _presentIds.contains(participantId);
-
-                      return AppCard(
-                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        onTap: () {
-                          setState(() {
-                            if (checked) {
-                              _presentIds.remove(participantId);
-                            } else {
-                              _presentIds.add(participantId);
-                            }
-                          });
-                        },
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(name, style: AppTypography.titleSmall),
-                                  if (isMember)
-                                    Text(
-                                      'Membro',
-                                      style: AppTypography.labelSmall.copyWith(
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            Checkbox(
-                              value: checked,
-                              onChanged: (v) {
-                                setState(() {
-                                  if (v ?? false) {
-                                    _presentIds.add(participantId);
-                                  } else {
-                                    _presentIds.remove(participantId);
-                                  }
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                const SizedBox(height: AppSpacing.xl),
-                AppButton(
-                  label: 'Salvar presença',
-                  prefixIcon: Icons.check_circle_outline,
-                  isLoading: _saving,
-                  onPressed: (_loading || _saving || _error != null)
-                      ? null
-                      : _save,
-                ),
-                const SizedBox(height: AppSpacing.base),
-              ],
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.pagePaddingH,
+        AppSpacing.sm,
+        AppSpacing.pagePaddingH,
+        AppSpacing.base,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.grey300,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
+          const SizedBox(height: AppSpacing.base),
+          Text('Registro de presença', style: AppTypography.headlineSmall),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Encontro de ${_formatMeetingDate()}',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Lista colapsável. O cabeçalho mostra a contagem, então o líder vê o total
+  /// de presentes sem precisar abrir.
+  Widget _buildParticipantsSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final Widget body;
+    if (_loading) {
+      body = const Padding(
+        padding: EdgeInsets.all(AppSpacing.xl),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else if (_error != null) {
+      body = Padding(
+        padding: const EdgeInsets.all(AppSpacing.base),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _error!,
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.base),
+            AppButton(
+              label: 'Tentar novamente',
+              variant: AppButtonVariant.outline,
+              isFullWidth: false,
+              onPressed: _loadInitialData,
+            ),
+          ],
+        ),
+      );
+    } else if (_participants.isEmpty) {
+      body = Padding(
+        padding: const EdgeInsets.all(AppSpacing.base),
+        child: AppEmptyState(
+          title: 'Nenhum participante na célula',
+          subtitle: 'Use "Incluir visitante" para adicionar alguém.',
+          icon: Icons.people_outline,
+        ),
+      );
+    } else {
+      body = Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        child: Column(
+          children: [
+            for (final participant in _participants)
+              _ParticipantRow(
+                name: (participant['name'] as String?) ?? 'Sem nome',
+                isMember: (participant['_type'] as String?) == 'member',
+                checked: _presentIds.contains(participant['id'] as String),
+                onToggle: () => _toggle(participant['id'] as String),
+              ),
+            const SizedBox(height: AppSpacing.sm),
+            AppButton(
+              label: 'Incluir visitante',
+              variant: AppButtonVariant.outline,
+              size: AppButtonSize.sm,
+              prefixIcon: Icons.person_add_outlined,
+              onPressed: _showAddVisitorSheet,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () =>
+                setState(() => _participantsExpanded = !_participantsExpanded),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.groups_outlined,
+                    size: AppSpacing.iconSm,
+                    color: isDark ? AppColors.linkDark : AppColors.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Participantes',
+                      style: AppTypography.titleSmall,
+                    ),
+                  ),
+                  Text(
+                    _presenceLabel,
+                    style: AppTypography.labelMedium.copyWith(
+                      color: isDark
+                          ? AppColors.text3Dark
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Icon(
+                    _participantsExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    color: isDark
+                        ? AppColors.text3Dark
+                        : AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_participantsExpanded) ...[
+            Divider(
+              height: 1,
+              color: isDark ? AppColors.borderSoftDark : AppColors.borderSoft,
+            ),
+            body,
+          ],
+        ],
+      ),
+    );
+  }
+
+  String get _presenceLabel {
+    if (_loading || _error != null) return '';
+    return '${_presentIds.length} de ${_participants.length}';
+  }
+
+  void _toggle(String participantId) {
+    setState(() {
+      if (_presentIds.contains(participantId)) {
+        _presentIds.remove(participantId);
+      } else {
+        _presentIds.add(participantId);
+      }
+    });
+  }
+
+  /// Rodapé fixo: o botão de salvar fica sempre visível, sem depender de
+  /// rolar a lista de participantes até o fim.
+  Widget _buildFooter() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? AppColors.dividerDark : AppColors.divider,
+          ),
+        ),
+      ),
+      child: AppButton(
+        label: _loading
+            ? 'Carregando...'
+            : 'Salvar presença (${_presentIds.length})',
+        prefixIcon: Icons.check_circle_outline,
+        isLoading: _saving,
+        onPressed: (_loading || _saving || _error != null) ? null : _save,
+      ),
+    );
+  }
+}
+
+/// Linha de participante com badge de tipo bem visível e a marcação de presença.
+class _ParticipantRow extends StatelessWidget {
+  const _ParticipantRow({
+    required this.name,
+    required this.isMember,
+    required this.checked,
+    required this.onToggle,
+  });
+
+  final String name;
+  final bool isMember;
+  final bool checked;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onToggle,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Row(
+          children: [
+            Checkbox(
+              value: checked,
+              onChanged: (_) => onToggle(),
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: Text(
+                name,
+                style: AppTypography.bodyMedium.copyWith(
+                  fontWeight: checked ? FontWeight.w600 : FontWeight.w400,
+                  color: isDark ? AppColors.textDark : AppColors.textPrimary,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppBadge(
+              label: isMember ? 'Membro' : 'Visitante',
+              variant: isMember
+                  ? AppBadgeVariant.success
+                  : AppBadgeVariant.info,
+              size: AppBadgeSize.sm,
+            ),
+          ],
         ),
       ),
     );

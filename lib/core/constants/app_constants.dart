@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// App-wide string constants
 abstract final class AppConstants {
   // ── API ──────────────────────────────────────────────────────────────────
@@ -8,6 +10,15 @@ abstract final class AppConstants {
     defaultValue: 'http://192.168.0.190/v1',
     //defaultValue: 'http://127.0.0.1:3000/v1',
   );
+
+  /// Origem pública do app (sem `/v1`), usada para montar os links dos QR
+  /// Codes de cadastro. No web usa a origem real da página aberta; fora dele
+  /// deriva de [baseUrl], que aponta para `<origem>/v1`.
+  static String get publicAppOrigin {
+    if (kIsWeb) return Uri.base.origin;
+    final api = Uri.parse(baseUrl);
+    return '${api.scheme}://${api.authority}';
+  }
 
   static const Duration connectTimeout = Duration(seconds: 10);
   static const Duration receiveTimeout = Duration(seconds: 30);
@@ -91,4 +102,14 @@ abstract final class AppRoutes {
   static const String adminCellTypes = '/admin/cell-types';
   static const String adminWhatsapp = '/admin/whatsapp';
   static const String adminUsersRegister = '/admin/users/register';
+  static const String adminChurch = '/admin/church';
+  static const String adminQrCode = '/admin/qrcode';
+
+  // Líder — sob /leader para herdar o guard de papel do router.
+  static const String leaderQrCode = '/leader/qrcode';
+
+  // SaaS
+  static const String signup = '/signup';
+  static const String superAdmin = '/superadmin';
+  static const String superAdminPlans = '/superadmin/plans';
 }

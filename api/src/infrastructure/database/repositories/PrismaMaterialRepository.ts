@@ -16,6 +16,14 @@ export class PrismaMaterialRepository implements IMaterialRepository {
     });
   }
 
+  async findByCellIds(cellIds: string[]): Promise<Material[]> {
+    if (cellIds.length === 0) return [];
+    return this.prisma.material.findMany({
+      where: { cellId: { in: cellIds } },
+      orderBy: { uploadedAt: 'desc' },
+    });
+  }
+
   async findAll(): Promise<Material[]> {
     return this.prisma.material.findMany({
       orderBy: { uploadedAt: 'desc' },

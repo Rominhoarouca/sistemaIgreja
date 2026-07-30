@@ -40,6 +40,13 @@ class _CellOption {
   String get display => '$name (Líder: $leaderName)';
 }
 
+/// Valor enviado à API × rótulo exibido. `null` (nada selecionado) fica como
+/// "Não informado" nos relatórios demográficos.
+const _genderOptions = <String, String>{
+  'MASCULINO': 'Masculino',
+  'FEMININO': 'Feminino',
+};
+
 const _maritalOptions = [
   'Solteiro(a)',
   'Casado(a)',
@@ -57,12 +64,83 @@ const _interestOptions = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Church error screen
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Sem igreja identificada não há onde gravar o cadastro. Em vez de deixar o
+/// formulário aberto e falhar no envio, explicamos o que fazer.
+class _ChurchErrorScreen extends StatelessWidget {
+  const _ChurchErrorScreen({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.brandGradient),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.qr_code_scanner_outlined,
+                      size: AppSpacing.iconXl2,
+                      color: AppColors.white.withValues(alpha: .8),
+                    ),
+                    const SizedBox(height: AppSpacing.base),
+                    Text(
+                      'Igreja não identificada',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.titleLarge.copyWith(
+                        color: AppColors.white,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.white.withValues(alpha: .75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Public visitor self-registration page — no login required.
+///
+/// A igreja vem sempre da URL (`?igreja=<slug>`), gerada pelo QR Code do admin
+/// ou do líder. Sem ela o backend não tem como saber onde gravar o visitante,
+/// então a tela mostra um aviso em vez do formulário.
 class VisitorSelfRegisterPage extends StatefulWidget {
-  const VisitorSelfRegisterPage({super.key});
+  const VisitorSelfRegisterPage({
+    super.key,
+    required this.churchSlug,
+    this.presetCellId,
+  });
+
+  /// Slug da igreja (`?igreja=`). Nulo/vazio quando o link foi digitado à mão.
+  final String? churchSlug;
+
+  /// Célula já definida pelo QR Code do líder (`?celula=`).
+  final String? presetCellId;
 
   @override
   State<VisitorSelfRegisterPage> createState() =>
@@ -94,10 +172,19 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
 
   DateTime? _birthDate;
   String? _maritalStatus;
+  String? _gender;
   bool _attendsCell = false;
   String? _selectedCellId; // null when "other"
   bool _customCellSelected = false;
   final Set<String> _interests = {};
+
+  // ── Church (identificada pelo slug da URL) ─────────────────────────────────
+  bool _churchLoading = true;
+  String? _churchName;
+  String? _churchLogoUrl;
+  String? _churchError;
+
+  bool get _hasSlug => (widget.churchSlug ?? '').trim().isNotEmpty;
 
   // ── Cell list state ────────────────────────────────────────────────────────
   bool _cellsLoading = true;
@@ -130,7 +217,61 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
         headers: {'Content-Type': 'application/json'},
       ),
     );
-    _loadCells();
+    _bootstrap();
+  }
+
+  /// Resolve a igreja pelo slug e só então carrega as células — a lista é
+  /// escopada por igreja no backend, então depende do slug.
+  Future<void> _bootstrap() async {
+    if (!_hasSlug) {
+      setState(() {
+        _churchLoading = false;
+        _cellsLoading = false;
+        _churchError =
+            'Link sem identificação da igreja. Use o QR Code ou o link '
+            'enviado pela sua igreja.';
+      });
+      return;
+    }
+
+    final slug = widget.churchSlug!.trim();
+    try {
+      final resp = await _dio.get('/church/public/$slug');
+      final church =
+          (resp.data as Map<String, dynamic>)['church'] as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _churchName = church['name'] as String?;
+        _churchLogoUrl = church['logoUrl'] as String?;
+        _churchLoading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _churchLoading = false;
+        _cellsLoading = false;
+        _churchError = e.response?.statusCode == 404
+            ? 'Igreja não encontrada. Confira o link com a sua igreja.'
+            : 'Não foi possível identificar a igreja. Tente novamente.';
+      });
+      return;
+    }
+
+    await _loadCells();
+    if (mounted) _applyPresetCell();
+  }
+
+  /// QR Code do líder já traz a célula: marca como frequentador e fixa a
+  /// seleção, para o visitante não precisar procurar na lista.
+  void _applyPresetCell() {
+    final presetId = widget.presetCellId;
+    if (presetId == null || presetId.isEmpty) return;
+    if (!_cells.any((c) => c.id == presetId)) return;
+    setState(() {
+      _attendsCell = true;
+      _customCellSelected = false;
+      _selectedCellId = presetId;
+    });
   }
 
   @override
@@ -148,7 +289,10 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
 
   Future<void> _loadCells() async {
     try {
-      final resp = await _dio.get('/cells/public');
+      final resp = await _dio.get(
+        '/cells/public',
+        queryParameters: {'churchSlug': widget.churchSlug},
+      );
       final list = ((resp.data as Map<String, dynamic>)['cells'] as List)
           .cast<Map<String, dynamic>>();
       if (!mounted) return;
@@ -388,6 +532,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
       }
 
       final body = <String, dynamic>{
+        'churchSlug': widget.churchSlug,
         'name': _nameCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
@@ -399,6 +544,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
         'interests': interests,
         if (_birthDate != null) 'birthDate': _birthDate!.toIso8601String(),
         if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
+        if (_gender != null) 'gender': _gender,
         if (_attendsCell && !_customCellSelected && _selectedCellId != null)
           'cellId': _selectedCellId,
         if (_attendsCell &&
@@ -432,6 +578,17 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
   Widget build(BuildContext context) {
     if (_success) return _SuccessScreen();
     final isWide = MediaQuery.sizeOf(context).width >= 720.0;
+    if (_churchError != null) return _ChurchErrorScreen(message: _churchError!);
+    if (_churchLoading) {
+      return const Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(gradient: AppColors.brandGradient),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.white),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       body: Container(
@@ -481,13 +638,40 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
               borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Image.asset(
-              'assets/images/logo.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  const Icon(Icons.church_outlined, color: AppColors.gold),
-            ),
+            // Logo da própria igreja quando existir; o asset é o fallback.
+            child: _churchLogoUrl != null
+                ? Image.network(
+                    _churchLogoUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.church_outlined,
+                        color: AppColors.gold,
+                      ),
+                    ),
+                  )
+                : Image.asset(
+                    'assets/images/logo.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const Icon(
+                      Icons.church_outlined,
+                      color: AppColors.gold,
+                    ),
+                  ),
           ),
+          if (_churchName != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              _churchName!,
+              textAlign: TextAlign.center,
+              style: AppTypography.labelLarge.copyWith(
+                color: AppColors.gold,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Text(
             'Que alegria receber você!',
@@ -734,6 +918,15 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           value: _birthDate,
           onTap: _pickBirthDate,
           validator: () => _birthDate == null ? 'Campo obrigatório' : null,
+        ),
+        const SizedBox(height: AppSpacing.fieldGap),
+        _DropdownField<String>(
+          label: 'Gênero (opcional)',
+          value: _gender,
+          hint: 'Selecione',
+          items: _genderOptions.keys.toList(),
+          itemLabel: (v) => _genderOptions[v] ?? v,
+          onChanged: (v) => setState(() => _gender = v),
         ),
         const SizedBox(height: AppSpacing.fieldGap),
         _DropdownField<String>(

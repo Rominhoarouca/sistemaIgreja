@@ -451,6 +451,10 @@ class _ProfilePageState extends State<ProfilePage> {
             ? 'Administrador'
             : 'Líder';
 
+        // O QR Code de cadastro é por célula, então só faz sentido para quem
+        // lidera uma. Admin tem o QR Code geral da igreja na sidebar.
+        final isLeader = user?.role.value == AppConstants.roleLeader;
+
         if (_loadingProfile) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -805,6 +809,29 @@ class _ProfilePageState extends State<ProfilePage> {
                                   padding: EdgeInsets.zero,
                                   child: Column(
                                     children: [
+                                      if (isLeader) ...[
+                                        ListTile(
+                                          leading: const Icon(
+                                            Icons.qr_code_2_outlined,
+                                            color: AppColors.primary,
+                                          ),
+                                          title: const Text(
+                                            'QR Code da célula',
+                                          ),
+                                          subtitle: const Text(
+                                            'Cadastro de visitante direto na '
+                                            'sua célula',
+                                          ),
+                                          trailing: const Icon(
+                                            Icons.chevron_right,
+                                            color: AppColors.grey400,
+                                          ),
+                                          onTap: () => context.push(
+                                            AppRoutes.leaderQrCode,
+                                          ),
+                                        ),
+                                        const Divider(height: 1),
+                                      ],
                                       ListTile(
                                         leading: const Icon(
                                           Icons.lock_outline,

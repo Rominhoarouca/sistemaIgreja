@@ -14,18 +14,57 @@ RUN flutter config --enable-web && \
 # Copy all source code
 COPY . .
 
+# O .dockerignore mantém build/web no contexto de propósito (Dockerfile.web
+# espera um build feito no host). Aqui o build é feito dentro da imagem, então
+# o build/web que vem do host é só resíduo: `flutter build` sobrescreve o que
+# regenera, mas não apaga arquivos que deixaram de existir — foi assim que
+# fontes removidas do pubspec continuaram sendo publicadas.
+RUN rm -rf build/web
+
 # Build web with API base URL
 ARG API_BASE_URL=http://192.168.0.190/v1
-RUN flutter build web --release --dart-define=API_BASE_URL="$API_BASE_URL" 2>&1 || true
+# --no-web-resources-cdn: canvaskit sai deste servidor em vez do gstatic.com.
+# Vale a pena porque o nginx do stage 2 serve brotli: a variante chromium do
+# canvaskit sai com 1,5 MB, contra 2,25 MB do gstatic.
+# Sem `|| true`: build quebrado tem de falhar aqui, não gerar imagem com
+# assets velhos.
+RUN flutter build web --release --no-web-resources-cdn \
+      --dart-define=API_BASE_URL="$API_BASE_URL"
 
-# Stage 2: Serve with nginx
-FROM nginx:alpine
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: nginx com brotli
+#
+# Não usa a imagem `nginx:alpine`: ela traz nginx 1.31.x do repositório da
+# própria nginx, e o módulo brotli do Alpine é compilado contra 1.28.x —
+# binariamente incompatíveis, o nginx recusa carregar. Partindo do `alpine`,
+# nginx e módulo vêm do mesmo repositório oficial do Alpine, com versão casada.
+#
+# brotli importa aqui porque o `flutter build web` já gera os .br: sem o módulo
+# eles ficavam no disco sem uso e o main.dart.js era servido 480 KB maior.
+# ─────────────────────────────────────────────────────────────────────────────
+FROM alpine:3.22
+
+RUN apk add --no-cache nginx nginx-mod-http-brotli brotli \
+    && rm -f /etc/nginx/http.d/default.conf \
+    && mkdir -p /usr/share/nginx/html
 
 COPY --from=builder /app/build/web /usr/share/nginx/html
-COPY nginx-app.conf /etc/nginx/conf.d/default.conf
+# Alpine inclui os server blocks de http.d (conf.d é contexto main, não http).
+COPY nginx-app.conf /etc/nginx/http.d/default.conf
 COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /entrypoint.sh
+# Pré-compressão para brotli_static/gzip_static. O `flutter build web` não gera
+# esses pares, ao contrário do que o nome das diretivas sugere — sem este passo
+# elas não têm o que servir e cai tudo no gzip on-the-fly (nível 5).
+# Feito no build, uma vez: nível máximo sem custo por requisição.
+RUN find /usr/share/nginx/html -type f \
+      \( -name '*.js' -o -name '*.json' -o -name '*.wasm' -o -name '*.html' \
+         -o -name '*.css' -o -name '*.ttf' -o -name '*.otf' -o -name '*.svg' \) \
+      -size +1k \
+      -exec gzip -9 -k -f {} \; \
+      -exec brotli -q 11 -f {} \;
+
+RUN chmod +x /entrypoint.sh && nginx -t
 
 EXPOSE 80
 

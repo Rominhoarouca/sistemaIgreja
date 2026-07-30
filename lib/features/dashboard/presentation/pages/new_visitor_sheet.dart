@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../utils/snackbar_helper.dart';
+import '../widgets/demographic_fields.dart';
 
 /// SRP: responsável apenas pelo formulário de novo visitante.
 class NewVisitorSheet extends StatefulWidget {
@@ -19,6 +20,9 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
   final _addressCtrl = TextEditingController();
   final _neighborhoodCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
+  String? _gender;
+  DateTime? _birthDate;
+  String? _maritalStatus;
   bool _isSaving = false;
 
   @override
@@ -57,6 +61,9 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
           if (_neighborhoodCtrl.text.trim().isNotEmpty)
             'neighborhood': _neighborhoodCtrl.text.trim(),
           if (_cityCtrl.text.trim().isNotEmpty) 'city': _cityCtrl.text.trim(),
+          if (_gender != null) 'gender': _gender,
+          if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
+          if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
         },
       );
       if (!mounted) return;
@@ -144,6 +151,16 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
                 hint: 'São Paulo',
                 prefixIcon: Icons.location_city_outlined,
                 textInputAction: TextInputAction.done,
+              ),
+              const SizedBox(height: AppSpacing.base),
+              DemographicFields(
+                gender: _gender,
+                birthDate: _birthDate,
+                maritalStatus: _maritalStatus,
+                onGenderChanged: (v) => setState(() => _gender = v),
+                onBirthDateChanged: (v) => setState(() => _birthDate = v),
+                onMaritalStatusChanged: (v) =>
+                    setState(() => _maritalStatus = v),
               ),
               const SizedBox(height: AppSpacing.xl),
               AppButton(

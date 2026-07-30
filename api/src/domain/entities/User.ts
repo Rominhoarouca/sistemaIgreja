@@ -1,7 +1,8 @@
-export type UserRole = 'ADMIN' | 'LIDER' | 'SUPERVISOR' | 'COORDENADOR';
+export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'LIDER' | 'SUPERVISOR' | 'COORDENADOR';
 
 export interface User {
   readonly id: string;
+  readonly churchId: string | null;
   readonly name: string;
   readonly email: string;
   readonly role: UserRole;

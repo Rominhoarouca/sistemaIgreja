@@ -13,12 +13,18 @@ fi
 
 echo "Precompressing files in $BUILD_DIR ..."
 
-# Gzip JS/CSS/HTML/JSON
-find "$BUILD_DIR" -type f \( -iname "*.js" -o -iname "*.css" -o -iname "*.html" -o -iname "*.json" -o -iname "*.wasm" \) -print0 |
+# ttf/otf/svg incluídos porque Sora e Instrument Sans (assets/fonts) são
+# empacotadas como asset — sem essas extensões aqui elas ficam sem par
+# pré-comprimido e nginx_app.conf's brotli_static/gzip_static não tem o que servir.
+TYPES=( -iname "*.js" -o -iname "*.css" -o -iname "*.html" -o -iname "*.json" \
+        -o -iname "*.wasm" -o -iname "*.ttf" -o -iname "*.otf" -o -iname "*.svg" )
+
+# Gzip
+find "$BUILD_DIR" -type f \( "${TYPES[@]}" \) -print0 |
   xargs -0 -n1 -P4 -I{} sh -c 'gzip -9 -c "{}" > "{}.gz"'
 
-# Brotli (better compression) for same types
-find "$BUILD_DIR" -type f \( -iname "*.js" -o -iname "*.css" -o -iname "*.html" -o -iname "*.json" -o -iname "*.wasm" \) -print0 |
+# Brotli (melhor compressão) para os mesmos tipos
+find "$BUILD_DIR" -type f \( "${TYPES[@]}" \) -print0 |
   xargs -0 -n1 -P4 -I{} sh -c 'brotli -q 11 -f -o "{}.br" "{}"'
 
 # Optionally compress images to webp (not done here) — keep originals

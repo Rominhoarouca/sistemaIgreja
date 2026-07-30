@@ -1,11 +1,17 @@
 import { Router } from 'express';
 import type { CellController } from '../controllers/CellController';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import type { RequestHandler } from 'express';
 
-export function cellRoutes(controller: CellController): Router {
+export function cellRoutes(
+  controller: CellController,
+  publicTenant: RequestHandler,
+): Router {
   const router = Router();
-  // Public endpoint — no auth required (used by visitor self-registration form)
-  router.get('/public', controller.findAll);
+  // Público (sem login), usado pelo formulário de auto-cadastro. Exige o slug
+  // da igreja: sem tenant no contexto a lista devolveria células de todas as
+  // igrejas do SaaS.
+  router.get('/public', publicTenant, controller.findAll);
   // All other routes require authentication
   router.get('/nearby', authMiddleware, controller.findNearby);
   router.get('/my-cell', authMiddleware, controller.findByLeader);

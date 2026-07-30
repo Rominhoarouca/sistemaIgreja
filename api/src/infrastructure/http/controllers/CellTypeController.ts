@@ -25,7 +25,7 @@ export class CellTypeController {
 
   create = async (req: Request, res: Response): Promise<void> => {
     const data = createSchema.parse(req.body);
-    const exists = await this.prisma.cellType.findUnique({ where: { name: data.name } });
+    const exists = await this.prisma.cellType.findFirst({ where: { name: data.name } });
     if (exists) throw new AppError('Já existe um tipo de célula com esse nome', 409);
     const cellType = await this.prisma.cellType.create({ data: { name: data.name, description: data.description ?? null } });
     res.status(201).json({ cellType });
@@ -37,7 +37,7 @@ export class CellTypeController {
     const exists = await this.prisma.cellType.findUnique({ where: { id } });
     if (!exists) throw AppError.notFound('Tipo de célula não encontrado');
     if (data.name && data.name !== exists.name) {
-      const nameConflict = await this.prisma.cellType.findUnique({ where: { name: data.name } });
+      const nameConflict = await this.prisma.cellType.findFirst({ where: { name: data.name } });
       if (nameConflict) throw new AppError('Já existe um tipo de célula com esse nome', 409);
     }
     const cellType = await this.prisma.cellType.update({

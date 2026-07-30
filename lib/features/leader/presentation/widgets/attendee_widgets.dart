@@ -1,0 +1,642 @@
+import 'package:flutter/material.dart';
+import '../../../../design_system/design_system.dart';
+
+/// Pessoa que frequenta a célula — membro ou visitante na mesma lista, como
+/// vem de `GET /attendance/cell/:cellId/attendees`.
+class CellAttendee {
+  const CellAttendee({
+    required this.id,
+    required this.kind,
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.birthDate,
+    required this.gender,
+    required this.maritalStatus,
+    required this.address,
+    required this.neighborhood,
+    required this.city,
+    required this.status,
+    required this.isBaptized,
+    required this.meetingsCount,
+    required this.presentCount,
+    required this.attendanceRate,
+    required this.createdAt,
+  });
+
+  factory CellAttendee.fromJson(Map<String, dynamic> json) => CellAttendee(
+    id: json['id'] as String,
+    kind: json['kind'] as String? ?? 'MEMBER',
+    name: json['name'] as String? ?? 'Sem nome',
+    phone: json['phone'] as String?,
+    email: json['email'] as String?,
+    birthDate: DateTime.tryParse(json['birthDate'] as String? ?? ''),
+    gender: json['gender'] as String?,
+    maritalStatus: json['maritalStatus'] as String?,
+    address: json['address'] as String?,
+    neighborhood: json['neighborhood'] as String?,
+    city: json['city'] as String?,
+    status: json['status'] as String?,
+    isBaptized: json['isBaptized'] as bool?,
+    meetingsCount: (json['meetingsCount'] as num?)?.toInt() ?? 0,
+    presentCount: (json['presentCount'] as num?)?.toInt() ?? 0,
+    attendanceRate: (json['attendanceRate'] as num?)?.toDouble() ?? 0,
+    createdAt:
+        DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+  );
+
+  final String id;
+
+  /// `MEMBER` ou `VISITOR`.
+  final String kind;
+  final String name;
+  final String? phone;
+  final String? email;
+  final DateTime? birthDate;
+  final String? gender;
+  final String? maritalStatus;
+  final String? address;
+  final String? neighborhood;
+  final String? city;
+
+  /// Só visitantes têm status de acompanhamento.
+  final String? status;
+  final bool? isBaptized;
+  final int meetingsCount;
+  final int presentCount;
+  final double attendanceRate;
+  final DateTime createdAt;
+
+  bool get isMember => kind == 'MEMBER';
+
+  String get initials {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+    if (parts.isEmpty) return '?';
+    return parts.map((p) => p[0].toUpperCase()).take(2).join();
+  }
+}
+
+/// Filtro da lista de frequentadores.
+enum AttendeeFilter {
+  all('Todos'),
+  members('Membros'),
+  visitors('Visitantes');
+
+  const AttendeeFilter(this.label);
+
+  final String label;
+
+  bool matches(CellAttendee attendee) => switch (this) {
+    AttendeeFilter.all => true,
+    AttendeeFilter.members => attendee.isMember,
+    AttendeeFilter.visitors => !attendee.isMember,
+  };
+}
+
+/// Encontro da célula, de `GET /attendance/cell/:cellId/meetings`.
+class CellMeetingSummary {
+  const CellMeetingSummary({
+    required this.meetingDate,
+    required this.present,
+    required this.membersPresent,
+    required this.visitorsPresent,
+    required this.lesson,
+    required this.ministrante,
+    required this.isRecorded,
+  });
+
+  factory CellMeetingSummary.fromJson(Map<String, dynamic> json) =>
+      CellMeetingSummary(
+        meetingDate:
+            DateTime.tryParse(json['meetingDate'] as String? ?? '') ??
+            DateTime.now(),
+        present: (json['present'] as num?)?.toInt() ?? 0,
+        membersPresent: (json['membersPresent'] as num?)?.toInt() ?? 0,
+        visitorsPresent: (json['visitorsPresent'] as num?)?.toInt() ?? 0,
+        lesson: json['lesson'] as String?,
+        ministrante: json['ministrante'] as String?,
+        isRecorded: json['isRecorded'] as bool? ?? false,
+      );
+
+  final DateTime meetingDate;
+  final int present;
+  final int membersPresent;
+  final int visitorsPresent;
+  final String? lesson;
+  final String? ministrante;
+  final bool isRecorded;
+}
+
+/// pt-BR: 91.4 → "91,4%".
+String formatPercentBr(double value) =>
+    '${value.toStringAsFixed(1).replaceAll('.', ',')}%';
+
+/// dd/MM/yyyy.
+String formatDateBr(DateTime date) {
+  final d = date.day.toString().padLeft(2, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  return '$d/$m/${date.year}';
+}
+
+/// dd/MM — aniversário não precisa do ano.
+String formatDayMonthBr(DateTime date) {
+  final d = date.day.toString().padLeft(2, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  return '$d/$m';
+}
+
+/// Estágios de frequência individual.
+///
+/// É uma escala de **status** (quanto aquela pessoa precisa de atenção
+/// pastoral), não um conjunto de categorias — por isso passos vizinhos são
+/// parecidos de propósito: é o que faz ler como escala, e não como cinco
+/// rótulos sem relação. Como o matiz sozinho não separa vizinhos, cada estágio
+/// carrega o próprio nome em texto; a cor reforça, nunca decide.
+///
+/// Vermelho fica reservado para abaixo de 30%: acima disso a leitura é
+/// "precisa de atenção", não "crítico".
+///
+/// Os valores foram medidos nas duas superfícies (clara e escura) para
+/// luminosidade e contraste. Trocar um hex exige remedir o conjunto.
+enum AttendanceStage {
+  excellent('Excelente', Color(0xFF047857), Color(0xFF0E9F6E)),
+  good('Boa', Color(0xFF0E9F6E), Color(0xFF12B886)),
+  fair('Regular', Color(0xFFE8A33D), Color(0xFFC2851C)),
+  low('Baixa', Color(0xFFEA580C), Color(0xFFD2570A)),
+  critical('Crítica', Color(0xFFD92D20), Color(0xFFDC4A3D));
+
+  const AttendanceStage(this.label, this._light, this._dark);
+
+  final String label;
+  final Color _light;
+  final Color _dark;
+
+  Color color({required bool isDark}) => isDark ? _dark : _light;
+
+  static AttendanceStage of(double rate) {
+    if (rate >= 90) return excellent;
+    if (rate >= 75) return good;
+    if (rate >= 50) return fair;
+    if (rate >= 30) return low;
+    return critical;
+  }
+}
+
+/// Card de um frequentador: identificação + contato resumido + frequência.
+/// O restante das informações abre ao toque.
+class AttendeeCard extends StatelessWidget {
+  const AttendeeCard({super.key, required this.attendee, required this.onTap});
+
+  final CellAttendee attendee;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mutedColor = isDark ? AppColors.text3Dark : AppColors.textSecondary;
+
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppAvatar(initials: attendee.initials),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      attendee.name,
+                      style: AppTypography.titleSmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _ContactLine(attendee: attendee, color: mutedColor),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _KindBadge(attendee: attendee),
+                  const SizedBox(height: AppSpacing.xs),
+                  Icon(Icons.chevron_right, size: 20, color: mutedColor),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _FrequencyStrip(attendee: attendee, isDark: isDark),
+        ],
+      ),
+    );
+  }
+}
+
+/// Aniversário · telefone · e-mail. Quebra em várias linhas em telas estreitas.
+class _ContactLine extends StatelessWidget {
+  const _ContactLine({required this.attendee, required this.color});
+
+  final CellAttendee attendee;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTypography.bodySmall.copyWith(color: color);
+    final items = <(IconData, String)>[
+      if (attendee.birthDate != null)
+        (Icons.cake_outlined, formatDayMonthBr(attendee.birthDate!)),
+      if (attendee.phone != null && attendee.phone!.isNotEmpty)
+        (Icons.phone_outlined, attendee.phone!),
+      if (attendee.email != null && attendee.email!.isNotEmpty)
+        (Icons.email_outlined, attendee.email!),
+    ];
+
+    if (items.isEmpty) {
+      return Text('Sem contato cadastrado', style: style);
+    }
+
+    // Dentro de um Wrap os filhos recebem largura ilimitada, então um e-mail
+    // longo estouraria o card. O LayoutBuilder devolve o teto para cada item.
+    return LayoutBuilder(
+      builder: (context, constraints) => Wrap(
+        spacing: AppSpacing.md,
+        runSpacing: AppSpacing.xs,
+        children: [
+          for (final (icon, text) in items)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14, color: color),
+                  const SizedBox(width: AppSpacing.xs),
+                  Flexible(
+                    child: Text(
+                      text,
+                      style: style,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KindBadge extends StatelessWidget {
+  const _KindBadge({required this.attendee});
+
+  final CellAttendee attendee;
+
+  @override
+  Widget build(BuildContext context) {
+    if (attendee.isMember) {
+      return const AppBadge(
+        label: 'Membro',
+        variant: AppBadgeVariant.success,
+        size: AppBadgeSize.sm,
+      );
+    }
+    // Para visitantes o status de acompanhamento diz mais que "Visitante".
+    return AppBadge(
+      label: switch (attendee.status) {
+        'novo' => 'Novo',
+        'em_acompanhamento' => 'Em acompanhamento',
+        'integrado' => 'Integrado',
+        'inativo' => 'Não retornou',
+        _ => 'Visitante',
+      },
+      variant: switch (attendee.status) {
+        'novo' => AppBadgeVariant.info,
+        'em_acompanhamento' => AppBadgeVariant.warning,
+        'integrado' => AppBadgeVariant.success,
+        'inativo' => AppBadgeVariant.neutral,
+        _ => AppBadgeVariant.info,
+      },
+      size: AppBadgeSize.sm,
+    );
+  }
+}
+
+/// Faixa com a frequência individual: estágio nomeado, percentual e barra.
+///
+/// O texto usa tokens de tinta, não a cor do estágio: parte da escala (o âmbar,
+/// por exemplo) fica em 2,1:1 sobre fundo claro e seria ilegível como texto. A
+/// cor vive na barra e no ponto ao lado do nome.
+class _FrequencyStrip extends StatelessWidget {
+  const _FrequencyStrip({required this.attendee, required this.isDark});
+
+  final CellAttendee attendee;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final mutedColor = isDark ? AppColors.text3Dark : AppColors.textSecondary;
+    final inkColor = isDark ? AppColors.textDark : AppColors.textPrimary;
+    final hasData = attendee.meetingsCount > 0;
+
+    final stage = hasData ? AttendanceStage.of(attendee.attendanceRate) : null;
+    final barColor =
+        stage?.color(isDark: isDark) ??
+        (isDark ? AppColors.mutedDark : AppColors.grey400);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceVariantDark : AppColors.grey50,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: barColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  stage?.label ?? 'Sem registro',
+                  style: AppTypography.labelMedium.copyWith(
+                    color: mutedColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (hasData) ...[
+                Text(
+                  formatPercentBr(attendee.attendanceRate),
+                  style: AppTypography.labelLarge.copyWith(
+                    color: inkColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  '(${attendee.presentCount}/${attendee.meetingsCount})',
+                  style: AppTypography.bodySmall.copyWith(color: mutedColor),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+            child: Container(
+              height: 6,
+              color: isDark ? AppColors.dividerDark : AppColors.grey200,
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: (attendee.attendanceRate / 100).clamp(0.0, 1.0),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: barColor,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Card "Últimas reuniões": data, se a presença já foi registrada, lição,
+/// ministrante e quantos membros/visitantes estiveram presentes.
+class LastMeetingsCard extends StatelessWidget {
+  const LastMeetingsCard({
+    super.key,
+    required this.meetings,
+    required this.onSeeAll,
+    this.maxItems = 3,
+  });
+
+  final List<CellMeetingSummary> meetings;
+  final VoidCallback onSeeAll;
+  final int maxItems;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mutedColor = isDark ? AppColors.text3Dark : AppColors.textSecondary;
+    final shown = meetings.take(maxItems).toList();
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.base),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_month_outlined,
+                size: AppSpacing.iconSm,
+                color: isDark ? AppColors.linkDark : AppColors.primary,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text('Últimas reuniões', style: AppTypography.titleSmall),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (shown.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.base),
+              child: Text(
+                'Nenhum encontro registrado ainda.',
+                style: AppTypography.bodySmall.copyWith(color: mutedColor),
+              ),
+            )
+          else
+            for (final meeting in shown) ...[
+              _MeetingTile(meeting: meeting, isDark: isDark),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+          AppButton(
+            label: 'Mais reuniões',
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
+            onPressed: onSeeAll,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MeetingTile extends StatelessWidget {
+  const _MeetingTile({required this.meeting, required this.isDark});
+
+  final CellMeetingSummary meeting;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final mutedColor = isDark ? AppColors.text3Dark : AppColors.textSecondary;
+    final labelStyle = AppTypography.bodySmall.copyWith(color: mutedColor);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceVariantDark : AppColors.grey50,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  formatDateBr(meeting.meetingDate.toLocal()),
+                  style: AppTypography.labelLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              AppBadge(
+                label: meeting.isRecorded ? 'Realizada' : 'Pendente',
+                variant: meeting.isRecorded
+                    ? AppBadgeVariant.success
+                    : AppBadgeVariant.warning,
+                size: AppBadgeSize.sm,
+              ),
+            ],
+          ),
+          if (meeting.lesson != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _IconLine(
+              icon: Icons.menu_book_outlined,
+              color: mutedColor,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Lição: ', style: labelStyle),
+                    TextSpan(
+                      text: meeting.lesson,
+                      style: AppTypography.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (meeting.ministrante != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            _IconLine(
+              icon: Icons.person_outline,
+              color: mutedColor,
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Ministrante: ', style: labelStyle),
+                    TextSpan(
+                      text: meeting.ministrante,
+                      style: AppTypography.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          // Wrap, não Row: em coluna estreita os dois contadores quebram de
+          // linha em vez de estourar o card.
+          Wrap(
+            spacing: AppSpacing.base,
+            runSpacing: AppSpacing.xs,
+            children: [
+              _CountLine(
+                icon: Icons.groups_outlined,
+                label: 'Presentes: ${meeting.membersPresent}',
+                color: mutedColor,
+                style: labelStyle,
+              ),
+              _CountLine(
+                icon: Icons.person_add_alt_outlined,
+                label: 'Visitantes: ${meeting.visitorsPresent}',
+                color: mutedColor,
+                style: labelStyle,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountLine extends StatelessWidget {
+  const _CountLine({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.style,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: AppSpacing.xs),
+        Text(label, style: style),
+      ],
+    );
+  }
+}
+
+class _IconLine extends StatelessWidget {
+  const _IconLine({
+    required this.icon,
+    required this.color,
+    required this.child,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, size: 14, color: color),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(child: child),
+      ],
+    );
+  }
+}

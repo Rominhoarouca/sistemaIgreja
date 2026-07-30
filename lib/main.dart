@@ -4,6 +4,8 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'design_system/design_system.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/saas/presentation/church_context_controller.dart';
+import 'features/saas/presentation/church_theme.dart';
 import 'injection/injection.dart';
 import 'routing/app_router.dart';
 import 'shared/utils/app_snackbar.dart';
@@ -72,16 +74,34 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
   Widget build(BuildContext context) {
     return BlocProvider<AuthBloc>.value(
       value: _authBloc,
-      child: ListenableBuilder(
-        listenable: ThemeController.instance,
-        builder: (context, _) => MaterialApp.router(
-          title: 'Sistema Igreja',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeController.instance.mode,
-          routerConfig: _router,
-          scaffoldMessengerKey: scaffoldMessengerKey,
+      child: BlocListener<AuthBloc, AuthState>(
+        listenWhen: (prev, curr) => prev.runtimeType != curr.runtimeType,
+        listener: (context, state) {
+          // Carrega/limpa o contexto da igreja conforme autenticação.
+          if (state is AuthAuthenticated) {
+            ChurchContextController.instance.load();
+          } else if (state is AuthUnauthenticated) {
+            ChurchContextController.instance.reset();
+          }
+        },
+        child: ListenableBuilder(
+          // Reconstrói ao mudar o tema OU a cor do menu da igreja.
+          listenable: Listenable.merge([
+            ThemeController.instance,
+            ChurchContextController.instance,
+          ]),
+          builder: (context, _) {
+            final menuColor = ChurchContextController.instance.context?.church.menuColor;
+            return MaterialApp.router(
+              title: 'Sistema Igreja',
+              debugShowCheckedModeBanner: false,
+              theme: applyChurchMenuColor(AppTheme.light, menuColor),
+              darkTheme: applyChurchMenuColor(AppTheme.dark, menuColor),
+              themeMode: ThemeController.instance.mode,
+              routerConfig: _router,
+              scaffoldMessengerKey: scaffoldMessengerKey,
+            );
+          },
         ),
       ),
     );

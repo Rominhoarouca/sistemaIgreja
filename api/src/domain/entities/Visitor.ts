@@ -1,3 +1,5 @@
+import type { Gender } from '@domain/entities/Gender';
+
 export type VisitorStatus = 'novo' | 'em_acompanhamento' | 'integrado' | 'inativo';
 
 export interface Visitor {
@@ -15,6 +17,7 @@ export interface Visitor {
   readonly state: string | null;
   readonly originChurch: string | null;
   readonly birthDate: Date | null;
+  readonly gender: Gender | null;
   readonly maritalStatus: string | null;
   readonly isBaptized: boolean;
   readonly knownPersonName: string | null;
@@ -38,6 +41,7 @@ export interface CreateVisitorData {
   readonly bairroId?: string | undefined;
   readonly originChurch?: string | undefined;
   readonly birthDate?: Date | undefined;
+  readonly gender?: Gender | undefined;
   readonly maritalStatus?: string | undefined;
   readonly isBaptized?: boolean | undefined;
   readonly knownPersonName?: string | undefined;

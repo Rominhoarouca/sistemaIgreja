@@ -128,6 +128,25 @@ class _ButtonContent extends StatelessWidget {
       );
     }
 
+    final text = Text(
+      label,
+      style: AppTypography.buttonLabel.copyWith(
+        fontSize: fontSize,
+        color: color,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+    );
+
+    // `Flexible` no rótulo: num Row com `mainAxisSize.min`, um filho não
+    // flexível é medido sem limite de largura e leva o próprio tamanho
+    // natural — então em `Expanded`/`SizedBox` estreito o texto estourava o
+    // botão. Flexível, ele cede espaço e corta com "…".
+    //
+    // Sem LayoutBuilder de propósito: ele não sabe responder dimensões
+    // intrínsecas e quebraria AppButton dentro de IntrinsicWidth/DataTable.
+    // RenderFlex sabe, inclusive com filho flexível.
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -136,13 +155,7 @@ class _ButtonContent extends StatelessWidget {
           Icon(prefixIcon, size: 18, color: color),
           const SizedBox(width: AppSpacing.sm),
         ],
-        Text(
-          label,
-          style: AppTypography.buttonLabel.copyWith(
-            fontSize: fontSize,
-            color: color,
-          ),
-        ),
+        Flexible(child: text),
         if (suffixIcon != null) ...[
           const SizedBox(width: AppSpacing.sm),
           Icon(suffixIcon, size: 18, color: color),

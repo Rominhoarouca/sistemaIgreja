@@ -45,6 +45,9 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
         ...(data.email !== undefined ? { email: data.email } : {}),
         ...(data.address !== undefined ? { address: data.address } : {}),
         ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
+        ...(data.gender !== undefined ? { gender: data.gender } : {}),
+        ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
         ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
       },
       include: { ...bairroInclude },
@@ -83,6 +86,9 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
           email: visitor.email,
           address: visitor.address,
           bairroId: visitor.bairroId,
+          birthDate: visitor.birthDate,
+          gender: visitor.gender,
+          maritalStatus: visitor.maritalStatus,
           leaderId: visitor.leaderId,
           sourceVisitorId: visitor.id,
         },
@@ -112,6 +118,9 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
     address: string | null;
     bairroId: string | null;
     bairro?: BairroRow;
+    birthDate?: Date | null;
+    gender?: CellMember['gender'];
+    maritalStatus?: string | null;
     leaderId: string | null;
     sourceVisitorId: string | null;
     createdAt: Date;
@@ -129,6 +138,9 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
       neighborhood: loc.neighborhood,
       city: loc.city,
       state: loc.state,
+      birthDate: row.birthDate ?? null,
+      gender: row.gender ?? null,
+      maritalStatus: row.maritalStatus ?? null,
       leaderId: row.leaderId,
       sourceVisitorId: row.sourceVisitorId,
       createdAt: row.createdAt,

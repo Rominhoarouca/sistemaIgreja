@@ -13,7 +13,9 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findByEmail(email: string): Promise<UserWithPassword | null> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    // email é único por igreja; o guard multi-tenant injeta church_id quando há
+    // contexto. Sem contexto (login público) retorna a 1ª correspondência.
+    const user = await this.prisma.user.findFirst({ where: { email } });
     return user ?? null;
   }
 
@@ -25,6 +27,7 @@ export class PrismaUserRepository implements IUserRepository {
         email: data.email,
         password: data.password,
         role: data.role,
+        ...(data.churchId ? { churchId: data.churchId } : {}),
       },
     });
     const { password: _p, ...rest } = user;
@@ -218,22 +221,18 @@ export class PrismaUserRepository implements IUserRepository {
       where: { userId, id: { notIn: existingIds } },
     });
 
-    const results: Child[] = [];
-    for (const child of children) {
-      if (child.id) {
-        const updated = await this.prisma.child.update({
-          where: { id: child.id },
-          data: { name: child.name, birthDate: child.birthDate ?? null },
-        });
-        results.push(updated);
-      } else {
-        const created = await this.prisma.child.create({
-          data: { userId, name: child.name, birthDate: child.birthDate ?? null },
-        });
-        results.push(created);
-      }
-    }
-    return results;
+    return Promise.all(
+      children.map((child) =>
+        child.id
+          ? this.prisma.child.update({
+              where: { id: child.id },
+              data: { name: child.name, birthDate: child.birthDate ?? null },
+            })
+          : this.prisma.child.create({
+              data: { userId, name: child.name, birthDate: child.birthDate ?? null },
+            }),
+      ),
+    );
   }
 
   async promoteUser(userId: string, role: UserRole): Promise<void> {

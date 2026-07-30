@@ -9,6 +9,7 @@ interface RegisterUserInput {
   readonly email: string;
   readonly password: string;
   readonly role: UserRole;
+  readonly churchId?: string | null;
 }
 
 export class RegisterUserUseCase {
@@ -23,6 +24,7 @@ export class RegisterUserUseCase {
     const hashed = await bcrypt.hash(input.password, 12);
     const user = await this.userRepo.save({
       id: randomUUID(),
+      churchId: input.churchId ?? null,
       name: input.name,
       email: input.email,
       password: hashed,

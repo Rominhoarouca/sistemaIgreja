@@ -8,5 +8,6 @@ export function dashboardRoutes(controller: DashboardController): Router {
   router.get('/stats', controller.getStats);
   router.get('/monthly-stats', controller.getMonthlyStats);
   router.get('/attendance-by-cell', controller.getAttendanceByCell);
+  router.get('/demographics', controller.getDemographics);
   return router;
 }

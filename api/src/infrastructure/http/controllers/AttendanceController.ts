@@ -19,8 +19,22 @@ const registerSchema = z
     message: 'visitorId or memberId is required',
   });
 
+/** Campo de texto vindo de formulário: em branco vira `null` (campo limpo). */
+const optionalText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .nullish()
+    .transform((v) => {
+      if (v === undefined) return undefined;
+      const trimmed = v?.trim() ?? '';
+      return trimmed === '' ? null : trimmed;
+    });
+
 const createMeetingSchema = z.object({
   meetingDate: z.coerce.date(),
+  lesson: optionalText(300),
+  ministrante: optionalText(150),
 });
 
 export class AttendanceController {
@@ -55,10 +69,19 @@ export class AttendanceController {
 
   createMeeting = async (req: Request, res: Response): Promise<void> => {
     const { cellId } = req.params as { cellId: string };
-    const { meetingDate } = createMeetingSchema.parse(req.body);
+    const { meetingDate, lesson, ministrante } = createMeetingSchema.parse(req.body);
     const createdById = req.userId!;
-    await this.attendanceRepo.createMeeting(cellId, meetingDate, createdById);
+    await this.attendanceRepo.createMeeting(cellId, meetingDate, createdById, {
+      lesson,
+      ministrante,
+    });
     res.status(201).json({ message: 'Encontro criado com sucesso' });
+  };
+
+  findAttendeesByCell = async (req: Request, res: Response): Promise<void> => {
+    const { cellId } = req.params as { cellId: string };
+    const attendees = await this.attendanceRepo.findAttendeesByCellId(cellId);
+    res.json({ attendees });
   };
 
   uploadMeetingPhoto = async (req: Request, res: Response): Promise<void> => {

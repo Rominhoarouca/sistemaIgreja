@@ -8,7 +8,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/stat_detail_page.dart';
 
 /// Destinos de navegação do perfil Líder — Início + abas da célula.
-/// Índices 1..5 correspondem às abas 0..4 da gestão de célula.
+/// Índices 1..4 correspondem às abas 0..3 da gestão de célula.
 const kLeaderNavDestinations = [
   NavigationDestination(
     icon: Icon(Icons.grid_view_outlined),
@@ -16,14 +16,9 @@ const kLeaderNavDestinations = [
     label: 'Início',
   ),
   NavigationDestination(
-    icon: Icon(Icons.people_outline),
-    selectedIcon: Icon(Icons.people),
-    label: 'Visitantes',
-  ),
-  NavigationDestination(
-    icon: Icon(Icons.group_outlined),
-    selectedIcon: Icon(Icons.group),
-    label: 'Membros',
+    icon: Icon(Icons.groups_outlined),
+    selectedIcon: Icon(Icons.groups),
+    label: 'Frequentadores',
   ),
   NavigationDestination(
     icon: Icon(Icons.check_circle_outline),
@@ -544,7 +539,7 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
                   child: OutlinedButton.icon(
                     onPressed: widget.cells.isEmpty
                         ? null
-                        : () => widget.onOpenCell(widget.cells.first, tab: 2),
+                        : () => widget.onOpenCell(widget.cells.first, tab: 1),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
                     label: const Text('Registrar presença'),
                   ),

@@ -14,6 +14,8 @@ import '../../data/report_export_service.dart';
 
 import '../utils/snackbar_helper.dart';
 import '../widgets/chart_legend.dart';
+import '../widgets/demographic_fields.dart';
+import '../widgets/demographics_section.dart';
 import '../widgets/monthly_bar_chart.dart';
 import '../widgets/visitor_details_sheet.dart';
 import '../widgets/visitor_widgets.dart';
@@ -1035,6 +1037,7 @@ class _ReportsTabState extends State<_ReportsTab> {
   String? _error;
   Map<String, dynamic> _stats = {};
   List<Map<String, dynamic>> _months = [];
+  Map<String, dynamic> _demographics = {};
   bool _exportingPdf = false;
   bool _exportingExcel = false;
 
@@ -1065,6 +1068,7 @@ class _ReportsTabState extends State<_ReportsTab> {
       final results = await Future.wait([
         _dio.get('/dashboard/stats'),
         _dio.get('/dashboard/monthly-stats'),
+        _dio.get('/dashboard/demographics'),
       ]);
       if (!mounted) return;
       setState(() {
@@ -1073,6 +1077,9 @@ class _ReportsTabState extends State<_ReportsTab> {
                 as Map<String, dynamic>;
         _months = ((results[1].data as Map<String, dynamic>)['months'] as List)
             .cast<Map<String, dynamic>>();
+        _demographics =
+            (results[2].data as Map<String, dynamic>)['demographics']
+                as Map<String, dynamic>;
         _loading = false;
       });
     } on DioException catch (e) {
@@ -1177,6 +1184,10 @@ class _ReportsTabState extends State<_ReportsTab> {
               ),
             ]),
           ),
+
+          const SizedBox(height: AppSpacing.xl),
+
+          DemographicsSection(demographics: _demographics),
 
           const SizedBox(height: AppSpacing.xl),
 
@@ -1686,6 +1697,9 @@ class _AddCellMemberSheet extends StatefulWidget {
 class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  String? _gender;
+  DateTime? _birthDate;
+  String? _maritalStatus;
   bool _saving = false;
 
   @override
@@ -1711,7 +1725,13 @@ class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
     try {
       await widget.dio.post(
         '/cells/${widget.cellId}/members',
-        data: {'name': name, 'phone': phone},
+        data: {
+          'name': name,
+          'phone': phone,
+          if (_gender != null) 'gender': _gender,
+          if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
+          if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
+        },
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -1752,6 +1772,16 @@ class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
                 hint: '(11) 99999-9999',
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: AppSpacing.base),
+              DemographicFields(
+                gender: _gender,
+                birthDate: _birthDate,
+                maritalStatus: _maritalStatus,
+                onGenderChanged: (v) => setState(() => _gender = v),
+                onBirthDateChanged: (v) => setState(() => _birthDate = v),
+                onMaritalStatusChanged: (v) =>
+                    setState(() => _maritalStatus = v),
               ),
               const SizedBox(height: AppSpacing.base),
               AppButton(

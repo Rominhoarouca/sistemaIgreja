@@ -46,7 +46,7 @@ export class LoginUseCase {
     const { password: _password, ...user } = userWithPassword;
 
     const accessToken = jwt.sign(
-      { sub: user.id, role: user.role },
+      { sub: user.id, role: user.role, churchId: user.churchId },
       jwtSecret,
       { expiresIn: expiresIn } as jwt.SignOptions,
     );

@@ -1,5 +1,6 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 import type { IVisitorRepository } from '@domain/repositories/IVisitorRepository';
+import { getEffectiveChurchId } from '@shared/context/tenant-context';
 import type {
   Visitor,
   CreateVisitorData,
@@ -90,6 +91,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
         ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
         ...(data.originChurch !== undefined ? { originChurch: data.originChurch } : {}),
         ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
+        ...(data.gender !== undefined ? { gender: data.gender } : {}),
         ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
         ...(data.isBaptized !== undefined ? { isBaptized: data.isBaptized } : {}),
         ...(data.knownPersonName !== undefined ? { knownPersonName: data.knownPersonName } : {}),
@@ -136,6 +138,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
   async countByMonth(
     months: number,
   ): Promise<Array<{ month: string; total: number; integrated: number }>> {
+    const churchId = getEffectiveChurchId() ?? null;
     const rows = await this.prisma.$queryRaw<
       Array<{ month: string; total: bigint; integrated: bigint }>
     >`
@@ -145,6 +148,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
         SUM(CASE WHEN status = 'integrado' THEN 1 ELSE 0 END)::bigint AS integrated
       FROM visitors
       WHERE created_at >= DATE_TRUNC('month', NOW() - (${months - 1} || ' months')::interval)
+        AND (${churchId}::text IS NULL OR church_id = ${churchId})
       GROUP BY DATE_TRUNC('month', created_at)
       ORDER BY DATE_TRUNC('month', created_at)
     `;
@@ -167,6 +171,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     bairro?: BairroRow;
     originChurch: string | null;
     birthDate?: Date | null;
+    gender?: Visitor['gender'];
     maritalStatus?: string | null;
     isBaptized?: boolean;
     knownPersonName?: string | null;
@@ -194,6 +199,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
       state: loc.state,
       originChurch: row.originChurch,
       birthDate: row.birthDate ?? null,
+      gender: row.gender ?? null,
       maritalStatus: row.maritalStatus ?? null,
       isBaptized: row.isBaptized ?? false,
       knownPersonName: row.knownPersonName ?? null,

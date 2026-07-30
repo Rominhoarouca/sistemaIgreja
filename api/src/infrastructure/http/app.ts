@@ -15,9 +15,16 @@ import { userRoutes } from './routes/user.routes';
 import { coordenacaoRoutes } from './routes/coordenacao.routes';
 import { locationRoutes } from './routes/location.routes';
 import { cellTypeRoutes } from './routes/cell-type.routes';
+import { churchRoutes } from './routes/church.routes';
+import { planRoutes } from './routes/plan.routes';
+import { billingRoutes } from './routes/billing.routes';
+import { signupRoutes } from './routes/signup.routes';
+import { superAdminRoutes } from './routes/super-admin.routes';
+import { authMiddleware } from './middlewares/auth.middleware';
 import { errorMiddleware } from './middlewares/error.middleware';
 import { requestLoggerMiddleware } from './middlewares/request-logger.middleware';
 import { openApiSpec } from '@shared/swagger/openapi.spec';
+import { FEATURES } from '@shared/plans/features';
 import type { Container } from '@shared/container';
 
 export function createApp(container: Container): Application {
@@ -95,16 +102,55 @@ export function createApp(container: Container): Application {
   // Routes
   const v1 = '/v1';
   app.use(`${v1}/auth`, authRoutes(container.authController));
-  app.use(`${v1}/visitors`, visitorRoutes(container.visitorController));
-  app.use(`${v1}/cells`, cellRoutes(container.cellController));
+  app.use(
+    `${v1}/visitors`,
+    visitorRoutes(container.visitorController, container.publicTenantRequired),
+  );
+  app.use(
+    `${v1}/cells`,
+    cellRoutes(container.cellController, container.publicTenantRequired),
+  );
   app.use(`${v1}/attendance`, attendanceRoutes(container.attendanceController));
-  app.use(`${v1}/spiritual-history`, spiritualHistoryRoutes(container.spiritualHistoryController));
   app.use(`${v1}/dashboard`, dashboardRoutes(container.dashboardController));
-  app.use(`${v1}/materials`, materialRoutes(container.materialController));
   app.use(`${v1}/users`, userRoutes(container.userController));
-  app.use(`${v1}/coordenacoes`, coordenacaoRoutes(container.coordenacaoController));
   app.use(`${v1}/location`, locationRoutes(container.locationController));
   app.use(`${v1}/cell-types`, cellTypeRoutes(container.cellTypeController));
+
+  // Recursos com gating por plano (authMiddleware → requireFeature → rotas).
+  app.use(
+    `${v1}/spiritual-history`,
+    authMiddleware,
+    container.requireFeature(FEATURES.SPIRITUAL_HISTORY),
+    spiritualHistoryRoutes(container.spiritualHistoryController),
+  );
+  app.use(
+    `${v1}/materials`,
+    authMiddleware,
+    container.requireFeature(FEATURES.MATERIALS),
+    materialRoutes(container.materialController),
+  );
+  app.use(
+    `${v1}/coordenacoes`,
+    authMiddleware,
+    container.requireFeature(FEATURES.COORDENACAO),
+    coordenacaoRoutes(container.coordenacaoController),
+  );
+
+  // ── SaaS ────────────────────────────────────────────────────────────────
+  // Planos públicos (landing page — sem autenticação).
+  app.get(`${v1}/public/plans`, container.planController.listPublic);
+  app.use(`${v1}/church`, churchRoutes(container.churchController));
+  app.use(`${v1}/plans`, planRoutes(container.planController));
+  app.use(`${v1}/billing`, billingRoutes(container.billingController));
+  app.use(`${v1}/signup`, signupRoutes(container.signupController));
+  app.use(
+    `${v1}/admin`,
+    superAdminRoutes(
+      container.superAdminController,
+      container.planController,
+      container.billingController,
+    ),
+  );
 
   // Error handler (must be last)
   app.use(errorMiddleware);

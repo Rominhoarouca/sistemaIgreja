@@ -13,7 +13,6 @@ dependencies:
 
   # UI & Design
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
   flutter_svg: ^2.0.10+1
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
@@ -75,6 +74,7 @@ dependencies:
   flutter_local_notifications: ^17.2.4
   firebase_core: ^3.8.1
   firebase_messaging: ^15.1.6
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -94,14 +94,27 @@ flutter:
     - assets/lottie/
 
   fonts:
-    - family: Inter
+    # Empacotadas de propósito: antes vinham do google_fonts em tempo de
+    # execução, o que custava um round-trip ao fonts.gstatic.com por
+    # família+peso DEPOIS do boot — texto só aparecia no fim disso.
+    # Instâncias estáticas com subset latino (acentuação pt-BR).
+    - family: Sora
       fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-        - asset: assets/fonts/Inter-Medium.ttf
+        - asset: assets/fonts/Sora-400.ttf
+        - asset: assets/fonts/Sora-500.ttf
           weight: 500
-        - asset: assets/fonts/Inter-SemiBold.ttf
+        - asset: assets/fonts/Sora-600.ttf
           weight: 600
-        - asset: assets/fonts/Inter-Bold.ttf
+        - asset: assets/fonts/Sora-700.ttf
+          weight: 700
+    - family: Instrument Sans
+      fonts:
+        - asset: assets/fonts/InstrumentSans-400.ttf
+        - asset: assets/fonts/InstrumentSans-500.ttf
+          weight: 500
+        - asset: assets/fonts/InstrumentSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/InstrumentSans-700.ttf
           weight: 700
 
   # To add assets to your application, add an assets section, like this:

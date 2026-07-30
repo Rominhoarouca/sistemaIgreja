@@ -43,6 +43,14 @@ const createMemberSchema = z.object({
   email: z.string().email().optional(),
   address: z.string().optional(),
   bairroId: z.string().uuid().optional(),
+  // Aceita 'YYYY-MM-DD' (input de data) ou ISO completo.
+  birthDate: z
+    .string()
+    .datetime({ local: true, offset: true })
+    .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+    .optional(),
+  gender: z.enum(['MASCULINO', 'FEMININO']).optional(),
+  maritalStatus: z.string().optional(),
   leaderId: z.string().uuid().optional(),
 });
 
@@ -143,6 +151,9 @@ export class CellController {
       ...(data.email !== undefined ? { email: data.email } : {}),
       ...(data.address !== undefined ? { address: data.address } : {}),
       ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
+      ...(data.birthDate !== undefined ? { birthDate: new Date(data.birthDate) } : {}),
+      ...(data.gender !== undefined ? { gender: data.gender } : {}),
+      ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
       ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
     });
 

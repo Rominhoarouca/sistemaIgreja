@@ -55,6 +55,17 @@ export class MaterialController {
 
     if (targetCellIds.length === 0) throw new AppError('Nenhuma célula alvo informada', 400);
 
+    // `cellTypeId` e `allCells` já resolvem via queries escopadas pelo guard
+    // (tenant-guard). `cellId`/`cellIds` vêm direto do client — confirma que
+    // toda célula alvo realmente pertence à igreja do usuário antes de gravar.
+    const ownedCells = await this.prisma.cell.findMany({
+      where: { id: { in: targetCellIds } },
+      select: { id: true },
+    });
+    if (ownedCells.length !== new Set(targetCellIds).size) {
+      throw AppError.forbidden('Uma ou mais células informadas não pertencem à sua igreja');
+    }
+
     const created: any[] = [];
     for (const cellId of targetCellIds) {
       const material = await this.uploadUseCase.execute({
@@ -88,12 +99,8 @@ export class MaterialController {
     // Leader without cellId: return materials for all their cells
     if (req.userRole === 'LIDER') {
       const cells = await this.cellRepo.findByLeaderId(req.userId);
-      const allMaterials: any[] = [];
-      for (const cell of cells) {
-        const mats = await this.materialRepo.findByCell(cell.id);
-        allMaterials.push(...mats);
-      }
-      res.json({ materials: allMaterials });
+      const materials = await this.materialRepo.findByCellIds(cells.map((c) => c.id));
+      res.json({ materials });
       return;
     }
     const materials = await this.materialRepo.findAll();

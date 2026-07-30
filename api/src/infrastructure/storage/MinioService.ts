@@ -81,4 +81,23 @@ export class MinioService {
       // Ignore deletion errors — object may not exist
     }
   }
+
+  /**
+   * Lista todos os objetos do bucket com nome e tamanho. Usado pelo painel
+   * de uso do superadmin para calcular espaço em disco por igreja.
+   */
+  async listAllObjects(): Promise<Array<{ name: string; size: number }>> {
+    const exists = await this.client.bucketExists(this.bucket).catch(() => false);
+    if (!exists) return [];
+
+    return new Promise((resolve, reject) => {
+      const objects: Array<{ name: string; size: number }> = [];
+      const stream = this.client.listObjectsV2(this.bucket, '', true);
+      stream.on('data', (obj) => {
+        if (obj.name) objects.push({ name: obj.name, size: obj.size ?? 0 });
+      });
+      stream.on('end', () => resolve(objects));
+      stream.on('error', (err) => reject(AppError.internal(`MinIO list error: ${String(err)}`)));
+    });
+  }
 }

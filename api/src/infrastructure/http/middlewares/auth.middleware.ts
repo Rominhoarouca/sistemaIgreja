@@ -2,10 +2,12 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from '@shared/errors/AppError';
 import type { UserRole } from '@domain/entities/User';
+import { runWithTenant } from '@shared/context/tenant-context';
 
 interface JwtPayload {
   sub: string;
   role: UserRole;
+  churchId?: string | null;
 }
 
 declare global {
@@ -14,6 +16,7 @@ declare global {
     interface Request {
       userId: string;
       userRole: UserRole;
+      churchId: string | null;
     }
   }
 }
@@ -32,16 +35,48 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
 
   try {
     const payload = jwt.verify(token, secret) as JwtPayload;
+
+    // Todo usuário não-SUPERADMIN precisa de churchId no token. Um token
+    // emitido antes de uma migration/backfill de tenant (ou de qualquer
+    // alteração no churchId do usuário) pode ficar "órfão" — sem essa
+    // checagem, o guard do Prisma simplesmente não filtra nem preenche
+    // churchId, e dados cross-tenant/sem-igreja são criados/lidos em
+    // silêncio. Força relogin em vez disso.
+    if (payload.role !== 'SUPERADMIN' && !payload.churchId) {
+      throw AppError.unauthorized('Sessão desatualizada. Faça login novamente.');
+    }
+
     req.userId = payload.sub;
     req.userRole = payload.role;
-    next();
-  } catch {
+    req.churchId = payload.churchId ?? null;
+
+    // Ativa o contexto de tenant para todo o restante da requisição.
+    // SUPERADMIN opera cross-tenant (guard do Prisma não filtra).
+    runWithTenant(
+      {
+        churchId: payload.churchId ?? undefined,
+        userId: payload.sub,
+        role: payload.role,
+        crossTenant: payload.role === 'SUPERADMIN',
+      },
+      () => next(),
+    );
+  } catch (err) {
+    if (err instanceof AppError) throw err;
     throw AppError.unauthorized('Token inválido ou expirado');
   }
 }
 
+export function requireSuperAdmin(req: Request, _res: Response, next: NextFunction): void {
+  if (req.userRole !== 'SUPERADMIN') {
+    throw AppError.forbidden('Acesso restrito ao super-administrador');
+  }
+  next();
+}
+
 export function requireAdmin(req: Request, _res: Response, next: NextFunction): void {
-  if (req.userRole !== 'ADMIN') {
+  // SUPERADMIN também passa nas rotas de admin de igreja.
+  if (req.userRole !== 'ADMIN' && req.userRole !== 'SUPERADMIN') {
     throw AppError.forbidden('Acesso restrito a administradores');
   }
   next();
