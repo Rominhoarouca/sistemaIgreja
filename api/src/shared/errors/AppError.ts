@@ -1,6 +1,12 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly code: string;
+  /**
+   * Contexto estruturado que o cliente precisa para agir sobre o erro — por
+   * exemplo, a lista de crianças que impede o fechamento de uma sala. Só use
+   * para dado que a tela realmente exibe.
+   */
+  public details?: Record<string, unknown>;
 
   constructor(message: string, statusCode = 400, code = 'BAD_REQUEST') {
     super(message);
@@ -8,6 +14,11 @@ export class AppError extends Error {
     this.code = code;
     this.name = 'AppError';
     Object.setPrototypeOf(this, new.target.prototype);
+  }
+
+  withDetails(details: Record<string, unknown>): AppError {
+    this.details = details;
+    return this;
   }
 
   static unauthorized(message = 'Não autorizado'): AppError {

@@ -2,6 +2,22 @@
 
 Projeto de recepcao e integracao de visitantes em celulas, com aplicativo Flutter e API REST em Node.js/TypeScript.
 
+## Perfis de usuario
+
+Sistema multi-tenant: cada igreja (`churchId`) so enxerga seus proprios dados (isolamento via tenant-guard no Prisma). O unico perfil sem igreja fixa e o `SUPERADMIN`, dono do SaaS, que opera cross-tenant.
+
+Usuarios reais abaixo, um por perfil (base local de desenvolvimento). Senha exibida em texto puro apenas por serem contas de teste/seed — nunca faca isso com dados de producao.
+
+| Perfil | Funcionalidades | Igreja (tenant) | Email | Senha |
+|---|---|---|---|---|
+| `SUPERADMIN` | Acesso irrestrito a todas as rotas; gestao de igrejas, planos e billing do SaaS; passa em toda checagem de admin/staff/feature-gate. | Nenhuma fixa — cross-tenant (`churchId = null`), enxerga todas as igrejas. | `superadmin@sistema.local` | `superadmin123` |
+| `ADMIN` | CRUD de celulas; gestao de membros e materiais; conversao de visitante em membro; dashboard com indicadores; passa como staff, supervisor e equipe kids/responsavel para depuracao. | Igreja Principal (`00000000-0000-0000-0000-000000000001`) | `admin@sistemaigreja.com.br` | `admin123` |
+| `COORDENADOR` | Gestao de coordenacao (supervisores e lideres vinculados); acesso de "equipe de liderança" (`requireStaff`); feature `coordenacao` (depende do plano da igreja). | Igreja Principal (`00000000-0000-0000-0000-000000000001`) | `coordenador1@teste.igreja.com` | `senha123` |
+| `SUPERVISOR` | Acompanhamento dos lideres/celulas sob sua coordenacao; acesso de "equipe de liderança" (`requireStaff`). | Igreja Principal (`00000000-0000-0000-0000-000000000001`) | `supervisor1@teste.igreja.com` | `senha123` |
+| `LIDER` | Lista e detalhe de visitantes com busca/filtro; alteracao de status; conversao de visitante em membro; registro e consulta de presenca por celula/data; historico espiritual dos visitantes; listagem/download de materiais da celula; perfil e foto proprios. | Igreja Principal (`00000000-0000-0000-0000-000000000001`) | `lider1@teste.igreja.com` | `senha123` |
+| `KIDS` | Equipe da salinha infantil: check-in/check-out de criancas por QR ou senha, anotacoes de aula e alertas aos responsaveis — restrito as salas em que e professor (`makeRequireRoomAccess`); feature `kids` (depende do plano). | Igreja Principal (`00000000-0000-0000-0000-000000000001`) | `cris.kids@teste.com` | `kids123` |
+| `RESPONSAVEL` | So visualiza os proprios filhos: acompanha check-in/check-out e recebe alertas da salinha; nao faz parte da equipe de liderança. | Igreja Principal (`00000000-0000-0000-0000-000000000001`) | `maria.mae@teste.com` | `mae123` |
+
 ## Documentacao em formato Book
 
 Para manter o README enxuto, toda a documentacao detalhada foi organizada em capitulos:

@@ -93,6 +93,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
       AppRoutes.adminMaterials: AppFeatures.materials,
       AppRoutes.adminCoordenacoes: AppFeatures.coordenacao,
       AppRoutes.adminWhatsapp: AppFeatures.whatsapp,
+      AppRoutes.adminKidsRooms: AppFeatures.kids,
     };
     final ctrl = ChurchContextController.instance;
     // Sem contexto carregado ainda: não bloqueia nada (evita flicker).
@@ -213,6 +214,18 @@ class _AdminSidebarState extends State<AdminSidebar> {
         Icons.hub_outlined,
         'Coordenações',
         AppRoutes.adminCoordenacoes,
+      ),
+    ]),
+    _SidebarGroup('Kids', [
+      const _SidebarItem(
+        Icons.child_care_outlined,
+        'Salas',
+        AppRoutes.adminKidsRooms,
+      ),
+      const _SidebarItem(
+        Icons.qr_code_scanner_outlined,
+        'Check-in',
+        AppRoutes.kidsHome,
       ),
     ]),
     _SidebarGroup('Sistema', [

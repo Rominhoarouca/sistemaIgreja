@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Somente builds de debug. A API de desenvolvimento roda em HTTP na máquina do
+  desenvolvedor (`http://<ip-da-lan>:3999/v1`), e o IP muda de rede para rede —
+  por isso o cleartext é liberado de forma ampla aqui, e apenas aqui.
+
+  O arquivo de `src/main` mantém release exigindo HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

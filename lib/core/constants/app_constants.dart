@@ -108,6 +108,19 @@ abstract final class AppRoutes {
   // Líder — sob /leader para herdar o guard de papel do router.
   static const String leaderQrCode = '/leader/qrcode';
 
+  // Kids — equipe do ministério infantil (professor e admin).
+  static const String kidsHome = '/kids';
+  static const String kidsScan = '/kids/scan';
+  static const String kidsSession = '/kids/sessions/:id';
+  static const String kidsChild = '/kids/children/:id';
+  static const String adminKidsRooms = '/admin/kids/rooms';
+  static const String adminKidsReports = '/admin/kids/reports';
+
+  // Kids — responsável (app do pai).
+  static const String guardianHome = '/meus-filhos';
+  static const String guardianQrCode = '/meus-filhos/qrcode';
+  static const String guardianAlerts = '/meus-filhos/alertas';
+
   // SaaS
   static const String signup = '/signup';
   static const String superAdmin = '/superadmin';

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 9+ bloqueia HTTP em texto puro por padrão.
+
+  Em release, nada de cleartext: a API tem de ser HTTPS. A exceção fica no
+  arquivo equivalente de `src/debug`, que libera texto puro para a API de
+  desenvolvimento rodando na rede local sem TLS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

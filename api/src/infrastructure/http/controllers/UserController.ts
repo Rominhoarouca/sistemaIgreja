@@ -207,7 +207,10 @@ export class UserController {
       numero: z.string().optional(),
       complemento: z.string().optional(),
       bairroId: z.string().uuid().optional(),
-      role: z.enum(['LIDER', 'SUPERVISOR', 'COORDENADOR']),
+      // KIDS e RESPONSAVEL entram aqui porque o ministério infantil cadastra
+      // professor e pai pelo mesmo fluxo de admin. Nenhum dos dois participa
+      // da hierarquia de células (cellIds/leaderIds ficam vazios para eles).
+      role: z.enum(['LIDER', 'SUPERVISOR', 'COORDENADOR', 'KIDS', 'RESPONSAVEL']),
       cellIds: z.array(z.string().uuid()).optional(),
       leaderIds: z.array(z.string().uuid()).optional(),
       supervisorIds: z.array(z.string().uuid()).optional(),

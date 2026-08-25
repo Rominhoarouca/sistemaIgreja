@@ -76,6 +76,7 @@ dependencies:
   # Rich text & video
   flutter_quill: ^11.5.0
   youtube_player_iframe: ^5.2.0
+  mobile_scanner: ^7.4.0
 
 dev_dependencies:
   flutter_test:

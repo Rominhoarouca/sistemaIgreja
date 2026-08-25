@@ -27,6 +27,8 @@ class UserEntity extends Equatable {
   bool get isLeader => role == UserRole.leader;
   bool get isSupervisor => role == UserRole.supervisor;
   bool get isCoordinator => role == UserRole.coordinator;
+  bool get isKidsTeacher => role == UserRole.kids;
+  bool get isGuardian => role == UserRole.responsavel;
 
   @override
   List<Object?> get props => [id, email, role];
@@ -37,13 +39,21 @@ enum UserRole {
   admin,
   leader,
   supervisor,
-  coordinator;
+  coordinator,
+
+  /// Professor da salinha (módulo Kids).
+  kids,
+
+  /// Pai/responsável — vê apenas os próprios filhos (módulo Kids).
+  responsavel;
 
   static UserRole fromString(String value) => switch (value.toUpperCase()) {
     'SUPERADMIN' => superAdmin,
     'ADMIN' => admin,
     'SUPERVISOR' => supervisor,
     'COORDENADOR' => coordinator,
+    'KIDS' => kids,
+    'RESPONSAVEL' => responsavel,
     _ => leader,
   };
 
@@ -53,5 +63,7 @@ enum UserRole {
     UserRole.leader => 'LIDER',
     UserRole.supervisor => 'SUPERVISOR',
     UserRole.coordinator => 'COORDENADOR',
+    UserRole.kids => 'KIDS',
+    UserRole.responsavel => 'RESPONSAVEL',
   };
 }

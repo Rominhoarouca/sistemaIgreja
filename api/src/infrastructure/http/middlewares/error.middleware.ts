@@ -25,7 +25,13 @@ export function errorMiddleware(
   }
 
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ error: { code: err.code, message: err.message } });
+    res.status(err.statusCode).json({
+      error: {
+        code: err.code,
+        message: err.message,
+        ...(err.details ? { details: err.details } : {}),
+      },
+    });
     return;
   }
 

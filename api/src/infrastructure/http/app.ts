@@ -13,6 +13,7 @@ import { dashboardRoutes } from './routes/dashboard.routes';
 import { materialRoutes } from './routes/material.routes';
 import { userRoutes } from './routes/user.routes';
 import { notificationRoutes } from './routes/notification.routes';
+import { kidsRoutes } from './routes/kids.routes';
 import { coordenacaoRoutes } from './routes/coordenacao.routes';
 import { locationRoutes } from './routes/location.routes';
 import { cellTypeRoutes } from './routes/cell-type.routes';
@@ -136,6 +137,12 @@ export function createApp(container: Container): Application {
     authMiddleware,
     container.requireFeature(FEATURES.COORDENACAO),
     coordenacaoRoutes(container.coordenacaoController),
+  );
+  app.use(
+    `${v1}/kids`,
+    authMiddleware,
+    container.requireFeature(FEATURES.KIDS),
+    kidsRoutes(container.kidsController, container.requireRoomAccess),
   );
 
   // ── SaaS ────────────────────────────────────────────────────────────────

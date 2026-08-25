@@ -92,7 +92,8 @@ abstract class ApiEndpoints {
   static const String dashboardStats = '/dashboard/stats';
   static const String dashboardMonthlyStats = '/dashboard/monthly-stats';
   static const String dashboardDemographics = '/dashboard/demographics';
-  static const String dashboardAttendanceByCell = '/dashboard/attendance-by-cell';
+  static const String dashboardAttendanceByCell =
+      '/dashboard/attendance-by-cell';
 
   // ── SaaS: church / planos / billing ───────────────────────────────────
   static const String churchMe = '/church/me';

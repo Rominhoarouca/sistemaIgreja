@@ -33,6 +33,10 @@ import '../features/saas/presentation/pages/church_admin_page.dart';
 import '../features/saas/presentation/pages/church_signup_page.dart';
 import '../features/saas/presentation/pages/super_admin_page.dart';
 import '../features/saas/presentation/pages/plan_management_page.dart';
+import '../features/kids/presentation/pages/guardian_home_page.dart';
+import '../features/kids/presentation/pages/kids_home_page.dart';
+import '../features/kids/presentation/pages/kids_rooms_admin_page.dart';
+import '../features/kids/presentation/pages/kids_session_page.dart';
 
 /// Public routes that can be accessed without authentication.
 const _publicRoutes = {
@@ -54,6 +58,10 @@ String _homeForRole(UserEntity user) {
   if (user.isAdmin) return AppRoutes.adminDashboard;
   if (user.isSupervisor) return AppRoutes.supervisorHome;
   if (user.isCoordinator) return AppRoutes.coordinatorHome;
+  // Kids: professor e responsável não têm nada fora do módulo — a home deles é
+  // a própria sala / a lista de filhos.
+  if (user.isKidsTeacher) return AppRoutes.kidsHome;
+  if (user.isGuardian) return AppRoutes.guardianHome;
   return AppRoutes.leaderHome;
 }
 
@@ -66,6 +74,13 @@ bool _isAllowedForRole(UserEntity user, String location) {
   if (location.startsWith(AppRoutes.supervisorHome)) return user.isSupervisor;
   if (location.startsWith(AppRoutes.coordinatorHome)) return user.isCoordinator;
   if (location.startsWith(AppRoutes.leaderHome)) return user.isLeader;
+  // Salas do Kids: professor e admin. O responsável tem a própria área.
+  if (location.startsWith(AppRoutes.kidsHome)) {
+    return user.isKidsTeacher || user.isAdmin;
+  }
+  if (location.startsWith(AppRoutes.guardianHome)) {
+    return user.isGuardian || user.isAdmin;
+  }
   return true; // shared routes (profile, notifications, visitor flows, etc.)
 }
 
@@ -177,6 +192,45 @@ GoRouter createRouter(AuthBloc authBloc) {
             const NoTransitionPage(child: LeaderHomePage()),
       ),
 
+      // ── Kids — equipe do ministério infantil ──────────────────────────
+      GoRoute(
+        path: AppRoutes.kidsHome,
+        name: 'kids-home',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: KidsHomePage()),
+        routes: [
+          GoRoute(
+            path: 'sessions/:id',
+            name: 'kids-session',
+            pageBuilder: (context, state) => MaterialPage(
+              child: KidsSessionPage(sessionId: state.pathParameters['id']!),
+            ),
+          ),
+        ],
+      ),
+
+      // ── Kids — responsável (app do pai) ───────────────────────────────
+      GoRoute(
+        path: AppRoutes.guardianHome,
+        name: 'guardian-home',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: GuardianHomePage()),
+        routes: [
+          GoRoute(
+            path: 'qrcode',
+            name: 'guardian-qrcode',
+            pageBuilder: (context, state) =>
+                const MaterialPage(child: GuardianQrPage()),
+          ),
+          GoRoute(
+            path: 'alertas',
+            name: 'guardian-alerts',
+            pageBuilder: (context, state) =>
+                const MaterialPage(child: GuardianAlertsPage()),
+          ),
+        ],
+      ),
+
       // ── Admin (shell com sidebar no desktop) ──────────────────────────
       ShellRoute(
         builder: (context, state, child) => AdminScaffold(child: child),
@@ -192,6 +246,14 @@ GoRouter createRouter(AuthBloc authBloc) {
                 child: AdminDashboardPage(initialTab: tab),
               );
             },
+          ),
+
+          // ── Admin Kids ────────────────────────────────────────────────
+          GoRoute(
+            path: AppRoutes.adminKidsRooms,
+            name: 'admin-kids-rooms',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: KidsRoomsAdminPage()),
           ),
 
           // ── Admin Materials ───────────────────────────────────────────

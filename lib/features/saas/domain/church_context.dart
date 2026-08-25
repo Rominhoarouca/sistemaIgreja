@@ -31,18 +31,18 @@ class ChurchInfo {
   Color get menuColor => _hexToColor(menuColorHex);
 
   factory ChurchInfo.fromJson(Map<String, dynamic> json) => ChurchInfo(
-        id: json['id'] as String,
-        name: json['name'] as String? ?? '',
-        slug: json['slug'] as String? ?? '',
-        address: json['address'] as String?,
-        site: json['site'] as String?,
-        instagram: json['instagram'] as String?,
-        youtube: json['youtube'] as String?,
-        tiktok: json['tiktok'] as String?,
-        logoUrl: json['logoUrl'] as String?,
-        menuColorHex: json['menuColor'] as String? ?? '#3F51B5',
-        isActive: json['isActive'] as bool? ?? true,
-      );
+    id: json['id'] as String,
+    name: json['name'] as String? ?? '',
+    slug: json['slug'] as String? ?? '',
+    address: json['address'] as String?,
+    site: json['site'] as String?,
+    instagram: json['instagram'] as String?,
+    youtube: json['youtube'] as String?,
+    tiktok: json['tiktok'] as String?,
+    logoUrl: json['logoUrl'] as String?,
+    menuColorHex: json['menuColor'] as String? ?? '#3F51B5',
+    isActive: json['isActive'] as bool? ?? true,
+  );
 }
 
 class PlanInfo {
@@ -65,18 +65,20 @@ class PlanInfo {
   });
 
   factory PlanInfo.fromJson(Map<String, dynamic> json) => PlanInfo(
-        id: json['id'] as String,
-        tier: json['tier'] as String,
-        name: json['name'] as String? ?? '',
-        description: json['description'] as String?,
-        priceMonth: (json['priceMonth'] as num?)?.toInt() ?? 0,
-        priceYear: (json['priceYear'] as num?)?.toInt() ?? 0,
-        features:
-            (json['features'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
-      );
+    id: json['id'] as String,
+    tier: json['tier'] as String,
+    name: json['name'] as String? ?? '',
+    description: json['description'] as String?,
+    priceMonth: (json['priceMonth'] as num?)?.toInt() ?? 0,
+    priceYear: (json['priceYear'] as num?)?.toInt() ?? 0,
+    features: (json['features'] as List<dynamic>? ?? [])
+        .map((e) => e.toString())
+        .toList(),
+  );
 
-  String get priceMonthLabel =>
-      priceMonth == 0 ? 'Grátis' : 'R\$ ${(priceMonth / 100).toStringAsFixed(2)}/mês';
+  String get priceMonthLabel => priceMonth == 0
+      ? 'Grátis'
+      : 'R\$ ${(priceMonth / 100).toStringAsFixed(2)}/mês';
 }
 
 /// Contexto multi-tenant: igreja + plano + features ativas.
@@ -94,14 +96,15 @@ class ChurchContext {
   });
 
   factory ChurchContext.fromJson(Map<String, dynamic> json) => ChurchContext(
-        church: ChurchInfo.fromJson(json['church'] as Map<String, dynamic>),
-        plan: json['plan'] != null
-            ? PlanInfo.fromJson(json['plan'] as Map<String, dynamic>)
-            : null,
-        subscriptionStatus: json['subscriptionStatus'] as String?,
-        features:
-            (json['features'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
-      );
+    church: ChurchInfo.fromJson(json['church'] as Map<String, dynamic>),
+    plan: json['plan'] != null
+        ? PlanInfo.fromJson(json['plan'] as Map<String, dynamic>)
+        : null,
+    subscriptionStatus: json['subscriptionStatus'] as String?,
+    features: (json['features'] as List<dynamic>? ?? [])
+        .map((e) => e.toString())
+        .toList(),
+  );
 }
 
 /// Item do catálogo de features (chave + rótulo amigável) vindo do backend.
@@ -116,7 +119,8 @@ class FeatureCatalogItem {
     required this.description,
   });
 
-  factory FeatureCatalogItem.fromJson(Map<String, dynamic> json) => FeatureCatalogItem(
+  factory FeatureCatalogItem.fromJson(Map<String, dynamic> json) =>
+      FeatureCatalogItem(
         key: json['key'] as String,
         label: json['label'] as String? ?? json['key'] as String,
         description: json['description'] as String? ?? '',
@@ -131,6 +135,7 @@ abstract final class AppFeatures {
   static const mapGeolocation = 'map_geolocation';
   static const advancedDashboard = 'advanced_dashboard';
   static const whatsapp = 'whatsapp';
+  static const kids = 'kids';
 }
 
 Color _hexToColor(String hex) {

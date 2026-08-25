@@ -43,6 +43,7 @@ import { PrismaMaterialRepository } from '@infrastructure/database/repositories/
 import { PrismaCoordenacaoRepository } from '@infrastructure/database/repositories/PrismaCoordenacaoRepository';
 import { PrismaLocationRepository } from '@infrastructure/database/repositories/PrismaLocationRepository';
 import { PrismaNotificationRepository } from '@infrastructure/database/repositories/PrismaNotificationRepository';
+import { PrismaKidsRepository } from '@infrastructure/database/repositories/PrismaKidsRepository';
 
 // Storage
 import { MinioService } from '@infrastructure/storage/MinioService';
@@ -62,6 +63,17 @@ import { GetDemographicsUseCase } from '@application/usecases/dashboard/GetDemog
 import { UploadMaterialUseCase } from '@application/usecases/material/UploadMaterialUseCase';
 import { CreateNotificationUseCase } from '@application/usecases/notification/CreateNotificationUseCase';
 import { UpdateNotificationUseCase } from '@application/usecases/notification/UpdateNotificationUseCase';
+import { CheckInChildrenUseCase } from '@application/usecases/kids/CheckInChildrenUseCase';
+import { CheckOutChildUseCase } from '@application/usecases/kids/CheckOutChildUseCase';
+import { CreateAlertUseCase } from '@application/usecases/kids/CreateAlertUseCase';
+import { KidsQrService } from '@application/services/KidsQrService';
+import { PickupCodeService } from '@application/services/PickupCodeService';
+import {
+  InAppAlertChannel,
+  KidsAlertDispatcher,
+  ManualCallChannel,
+  WhatsappAlertChannel,
+} from '@application/services/KidsAlertDispatcher';
 
 // Controllers
 import { AuthController } from '@infrastructure/http/controllers/AuthController';
@@ -76,6 +88,8 @@ import { CoordenacaoController } from '@infrastructure/http/controllers/Coordena
 import { LocationController } from '@infrastructure/http/controllers/LocationController';
 import { CellTypeController } from '@infrastructure/http/controllers/CellTypeController';
 import { NotificationController } from '@infrastructure/http/controllers/NotificationController';
+import { KidsController } from '@infrastructure/http/controllers/KidsController';
+import { makeRequireRoomAccess } from '@infrastructure/http/middlewares/kids.middleware';
 
 // User use cases
 import { GetProfileUseCase } from '@application/usecases/user/GetProfileUseCase';
@@ -95,6 +109,8 @@ export interface Container {
   coordenacaoController: CoordenacaoController;
   locationController: LocationController;
   notificationController: NotificationController;
+  kidsController: KidsController;
+  requireRoomAccess: ReturnType<typeof makeRequireRoomAccess>;
   churchController: ChurchController;
   planController: PlanController;
   billingController: BillingController;
@@ -125,6 +141,7 @@ export function createContainer(): Container {
   const coordenacaoRepo = new PrismaCoordenacaoRepository(prisma);
   const locationRepo = new PrismaLocationRepository(prisma);
   const notificationRepo = new PrismaNotificationRepository(prisma);
+  const kidsRepo = new PrismaKidsRepository(prisma);
   const churchRepo = new PrismaChurchRepository(prisma);
   const planRepo = new PrismaPlanRepository(prisma);
   const subscriptionRepo = new PrismaSubscriptionRepository(prisma);
@@ -173,6 +190,26 @@ export function createContainer(): Container {
   const createNotificationUseCase = new CreateNotificationUseCase(notificationRepo, minioService);
   const updateNotificationUseCase = new UpdateNotificationUseCase(notificationRepo, minioService);
 
+  // Kids
+  const kidsQrService = new KidsQrService(prisma);
+  const pickupCodeService = new PickupCodeService();
+  // Ordem dos canais não importa: o dispatcher escolhe pelo tipo da entrega.
+  // O canal in-app é o único que funciona sem credencial externa; o WhatsApp
+  // registra FAILED com o motivo enquanto a Cloud API não estiver configurada.
+  const kidsAlertDispatcher = new KidsAlertDispatcher(kidsRepo, [
+    new InAppAlertChannel(prisma),
+    new WhatsappAlertChannel(),
+    new ManualCallChannel(),
+  ]);
+  const checkInChildrenUseCase = new CheckInChildrenUseCase(kidsRepo, pickupCodeService);
+  const checkOutChildUseCase = new CheckOutChildUseCase(
+    kidsRepo,
+    pickupCodeService,
+    kidsQrService,
+  );
+  const createKidsAlertUseCase = new CreateAlertUseCase(kidsRepo, kidsAlertDispatcher);
+  const requireRoomAccess = makeRequireRoomAccess(kidsRepo);
+
   // User use cases
   const getProfileUseCase = new GetProfileUseCase(userRepo, minioService);
   const updateProfileUseCase = new UpdateProfileUseCase(userRepo, minioService);
@@ -206,6 +243,14 @@ export function createContainer(): Container {
   const coordenacaoController = new CoordenacaoController(coordenacaoRepo, userRepo);
   const locationController = new LocationController(locationRepo);
   const cellTypeController = new CellTypeController(prisma);
+  const kidsController = new KidsController(
+    kidsRepo,
+    checkInChildrenUseCase,
+    checkOutChildUseCase,
+    createKidsAlertUseCase,
+    kidsQrService,
+    pickupCodeService,
+  );
   const notificationController = new NotificationController(
     createNotificationUseCase,
     updateNotificationUseCase,
@@ -274,6 +319,8 @@ export function createContainer(): Container {
     coordenacaoController,
     locationController,
     notificationController,
+    kidsController,
+    requireRoomAccess,
     churchController,
     planController,
     billingController,

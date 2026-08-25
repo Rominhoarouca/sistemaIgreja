@@ -1,4 +1,13 @@
-export type UserRole = 'SUPERADMIN' | 'ADMIN' | 'LIDER' | 'SUPERVISOR' | 'COORDENADOR';
+export type UserRole =
+  | 'SUPERADMIN'
+  | 'ADMIN'
+  | 'LIDER'
+  | 'SUPERVISOR'
+  | 'COORDENADOR'
+  // Kids: professor da salinha e responsável pela criança. Não fazem parte da
+  // equipe de liderança — `requireStaff` continua barrando os dois.
+  | 'KIDS'
+  | 'RESPONSAVEL';
 
 export interface User {
   readonly id: string;
@@ -26,7 +35,8 @@ export interface UserWithPassword extends User {
 
 export interface Child {
   readonly id: string;
-  readonly userId: string;
+  /** Null para criança cadastrada na salinha, sem responsável com conta. */
+  readonly userId: string | null;
   readonly name: string;
   readonly birthDate: Date | null;
   readonly createdAt: Date;

@@ -69,8 +69,19 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Para selecionar foto do perfil</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Para tirar foto do perfil</string>
+	<string>Para tirar foto do perfil e ler o QR Code de entrega e retirada das crianças</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Para salvar foto do perfil</string>
+	<!-- iOS 14+ exige permissão explícita para falar com aparelhos da rede
+	     local — é onde a API roda durante o desenvolvimento. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Para conectar ao servidor da igreja na rede local</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Só a rede local escapa do HTTPS obrigatório: a API de produção
+		     continua tendo de usar TLS. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

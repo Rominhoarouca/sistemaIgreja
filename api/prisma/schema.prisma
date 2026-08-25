@@ -17,6 +17,10 @@ enum UserRole {
   LIDER
   SUPERVISOR
   COORDENADOR
+  // Kids: professor da salinha. Opera apenas as salas em que está vinculado.
+  KIDS
+  // Kids: pai/responsável. Escopo mínimo — vê só os próprios filhos.
+  RESPONSAVEL
 }
 
 enum VisitorStatus {
@@ -79,6 +83,73 @@ enum BillingCycle {
   YEARLY
 }
 
+// ── Kids ─────────────────────────────────────────────────────────────────────
+enum KidsSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum KidsCheckinStatus {
+  CHECKED_IN
+  CHECKED_OUT
+  NO_SHOW
+}
+
+/// MANUAL = liberação sem QR nem senha, exige justificativa.
+enum KidsCheckMethod {
+  QR
+  CODE
+  MANUAL
+}
+
+enum KidsNoteKind {
+  INDIVIDUAL
+  CLASS
+}
+
+/// Níveis 1, 2 e 3 do alerta ao responsável.
+enum KidsAlertLevel {
+  INFO
+  URGENT
+  EMERGENCY
+}
+
+enum KidsAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum KidsChannel {
+  PUSH
+  WHATSAPP
+  SMS
+  CALL
+  CRITICAL_PUSH
+}
+
+enum KidsDeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum KidsTeacherRole {
+  TITULAR
+  AUXILIAR
+}
+
+enum GuardianRelation {
+  PAI
+  MAE
+  AVO
+  TIO
+  RESPONSAVEL_LEGAL
+  OUTRO
+}
+
 // ── SaaS: Church (tenant) ────────────────────────────────────────────────────
 model Church {
   id        String   @id @default(uuid())
@@ -108,6 +179,15 @@ model Church {
   materials          Material[]
   children           Child[]
   notifications      Notification[]
+  kidsRooms          KidsRoom[]
+  kidsRoomTeachers   KidsRoomTeacher[]
+  kidsSessions       KidsSession[]
+  kidsGuardians      KidsGuardian[]
+  kidsCheckins       KidsCheckin[]
+  kidsNotes          KidsNote[]
+  kidsAlerts         KidsAlert[]
+  kidsAlertDeliveries KidsAlertDelivery[]
+  deviceTokens       DeviceToken[]
 
   @@map("churches")
 }
@@ -187,6 +267,13 @@ model User {
   cellMeetings        CellMeeting[]      @relation("CreatedMeetings")
   notificationsCreated  Notification[]           @relation("NotificationCreatedBy")
   notificationsReceived NotificationRecipient[]  @relation("NotificationRecipients")
+  kidsRoomsTaught       KidsRoomTeacher[]        @relation("KidsTeacher")
+  kidsSessionsOpened    KidsSession[]            @relation("KidsSessionOpened")
+  kidsGuardianOf        KidsGuardian[]           @relation("KidsGuardian")
+  kidsCheckinsMade      KidsCheckin[]            @relation("KidsCheckinBy")
+  kidsNotesWritten      KidsNote[]               @relation("KidsNoteAuthor")
+  kidsAlertsCreated     KidsAlert[]              @relation("KidsAlertCreatedBy")
+  devices               DeviceToken[]            @relation("UserDevices")
 
   @@unique([churchId, email])
   @@index([churchId])
@@ -213,19 +300,313 @@ model Coordenacao {
   @@map("coordenacoes")
 }
 
+/// Criança. Nasceu como "filho declarado no perfil do usuário" e virou também a
+/// ficha do módulo Kids — por isso `userId` é opcional: criança cadastrada no
+/// balcão pela professora não tem responsável com conta no app.
+///
+/// `cellMemberId`/`visitorId` são a ponte opcional com a suíte (células). Em
+/// igreja que assina só o Kids, ficam nulos e nenhuma query do módulo os usa.
 model Child {
-  id        String    @id @default(uuid())
-  churchId  String?   @map("church_id")
-  userId    String    @map("user_id")
-  name      String
-  birthDate DateTime? @map("birth_date")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id               String    @id @default(uuid())
+  churchId         String?   @map("church_id")
+  userId           String?   @map("user_id")
+  cellMemberId     String?   @map("cell_member_id")
+  visitorId        String?   @map("visitor_id")
+  name             String
+  birthDate        DateTime? @map("birth_date")
+  gender           Gender?
+  photoKey         String?   @map("photo_key")
+  // Dados sensíveis (LGPD art. 5º, II) — nunca vão para push, WhatsApp ou export.
+  allergies        String?   @db.Text
+  medications      String?   @db.Text
+  disabilities     String?   @db.Text
+  medicalNotes     String?   @map("medical_notes") @db.Text
+  authorizedPickup String?   @map("authorized_pickup") @db.Text
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  church Church? @relation(fields: [churchId], references: [id])
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church     Church?        @relation(fields: [churchId], references: [id])
+  user       User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cellMember CellMember?    @relation(fields: [cellMemberId], references: [id], onDelete: SetNull)
+  visitor    Visitor?       @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  guardians  KidsGuardian[]
+  checkins   KidsCheckin[]
+  notes      KidsNote[]
+  alerts     KidsAlert[]
 
   @@index([churchId])
+  @@index([userId])
+  @@index([churchId, name])
   @@map("children")
+}
+
+// ── Kids: salas e professores ────────────────────────────────────────────────
+model KidsRoom {
+  id           String   @id @default(uuid())
+  churchId     String?  @map("church_id")
+  name         String
+  description  String?
+  capacity     Int
+  // Faixa etária em meses: berçário precisa distinguir 6 de 18 meses.
+  minAgeMonths Int?     @map("min_age_months")
+  maxAgeMonths Int?     @map("max_age_months")
+  color        String   @default("#3F51B5")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  church   Church?           @relation(fields: [churchId], references: [id])
+  teachers KidsRoomTeacher[]
+  sessions KidsSession[]
+
+  @@index([churchId])
+  @@map("kids_rooms")
+}
+
+model KidsRoomTeacher {
+  id        String          @id @default(uuid())
+  churchId  String?         @map("church_id")
+  roomId    String          @map("room_id")
+  userId    String          @map("user_id")
+  role      KidsTeacherRole @default(AUXILIAR)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  church Church?  @relation(fields: [churchId], references: [id])
+  room   KidsRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user   User     @relation("KidsTeacher", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([churchId])
+  @@index([userId])
+  @@map("kids_room_teachers")
+}
+
+// ── Kids: sessão (a aula de um culto) ────────────────────────────────────────
+model KidsSession {
+  id               String            @id @default(uuid())
+  churchId         String?           @map("church_id")
+  roomId           String            @map("room_id")
+  serviceDate      DateTime          @map("service_date") @db.Date
+  serviceName      String            @default("Culto") @map("service_name")
+  status           KidsSessionStatus @default(OPEN)
+  openedById       String            @map("opened_by_id")
+  openedAt         DateTime          @default(now()) @map("opened_at")
+  closedById       String?           @map("closed_by_id")
+  closedAt         DateTime?         @map("closed_at")
+  lesson           String?
+  capacityOverride Int?              @map("capacity_override")
+
+  church   Church?       @relation(fields: [churchId], references: [id])
+  room     KidsRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  openedBy User          @relation("KidsSessionOpened", fields: [openedById], references: [id])
+  checkins KidsCheckin[]
+  notes    KidsNote[]
+  alerts   KidsAlert[]
+
+  // Impede duas sessões concorrentes da mesma sala no mesmo culto — acontece
+  // quando dois professores abrem a sala ao mesmo tempo.
+  @@unique([roomId, serviceDate, serviceName])
+  @@index([churchId])
+  @@index([roomId, serviceDate])
+  @@map("kids_sessions")
+}
+
+// ── Kids: responsáveis ───────────────────────────────────────────────────────
+model KidsGuardian {
+  id          String           @id @default(uuid())
+  churchId    String?          @map("church_id")
+  childId     String           @map("child_id")
+  userId      String?          @map("user_id")
+  name        String
+  /// E.164 sem formatação: +5511999999999.
+  phone       String
+  hasWhatsapp Boolean          @default(true) @map("has_whatsapp")
+  relation    GuardianRelation @default(RESPONSAVEL_LEGAL)
+  isPrimary   Boolean          @default(false) @map("is_primary")
+  canPickup   Boolean          @default(true) @map("can_pickup")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  church          Church?       @relation(fields: [churchId], references: [id])
+  child           Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+  user            User?         @relation("KidsGuardian", fields: [userId], references: [id], onDelete: SetNull)
+  checkinsGiven   KidsCheckin[] @relation("KidsCheckinGuardian")
+  checkoutsTaken  KidsCheckin[] @relation("KidsCheckoutGuardian")
+  alertDeliveries KidsAlertDelivery[]
+
+  @@index([churchId])
+  @@index([childId])
+  @@index([userId])
+  @@index([churchId, phone])
+  @@map("kids_guardians")
+}
+
+// ── Kids: check-in / check-out ───────────────────────────────────────────────
+model KidsCheckin {
+  id        String            @id @default(uuid())
+  churchId  String?           @map("church_id")
+  sessionId String            @map("session_id")
+  childId   String            @map("child_id")
+  status    KidsCheckinStatus @default(CHECKED_IN)
+  /// Sequencial legível dentro da sessão ("K-014") — vai na etiqueta.
+  badgeCode String            @map("badge_code")
+
+  checkinAt         DateTime        @default(now()) @map("checkin_at")
+  checkinById       String          @map("checkin_by_id")
+  checkinMethod     KidsCheckMethod @map("checkin_method")
+  checkinGuardianId String?         @map("checkin_guardian_id")
+
+  // Senha de retirada de quem não usa o app. Só o hash é persistido; os dois
+  // últimos dígitos ficam em claro para conferência visual no balcão.
+  pickupCodeHash    String?   @map("pickup_code_hash")
+  pickupCodeLast2   String?   @map("pickup_code_last2")
+  pickupAttempts    Int       @default(0) @map("pickup_attempts")
+  pickupLockedUntil DateTime? @map("pickup_locked_until")
+
+  checkoutAt           DateTime?        @map("checkout_at")
+  checkoutById         String?          @map("checkout_by_id")
+  checkoutMethod       KidsCheckMethod? @map("checkout_method")
+  checkoutGuardianId   String?          @map("checkout_guardian_id")
+  checkoutGuardianName String?          @map("checkout_guardian_name")
+  checkoutReason       String?          @map("checkout_reason")
+
+  church           Church?       @relation(fields: [churchId], references: [id])
+  session          KidsSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  child            Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+  checkinBy        User          @relation("KidsCheckinBy", fields: [checkinById], references: [id])
+  checkinGuardian  KidsGuardian? @relation("KidsCheckinGuardian", fields: [checkinGuardianId], references: [id])
+  checkoutGuardian KidsGuardian? @relation("KidsCheckoutGuardian", fields: [checkoutGuardianId], references: [id])
+  notes            KidsNote[]
+  alerts           KidsAlert[]
+
+  @@unique([sessionId, childId])
+  @@unique([sessionId, badgeCode])
+  @@index([churchId])
+  @@index([status])
+  // Base do cálculo de crianças ativas no mês (métrica de cobrança).
+  @@index([churchId, checkinAt])
+  @@map("kids_checkins")
+}
+
+// ── Kids: anotações ──────────────────────────────────────────────────────────
+model KidsNote {
+  id        String       @id @default(uuid())
+  churchId  String?      @map("church_id")
+  sessionId String       @map("session_id")
+  kind      KidsNoteKind
+  /// Null quando `kind = CLASS` (anotação geral da aula).
+  childId   String?      @map("child_id")
+  checkinId String?      @map("checkin_id")
+  body      String       @db.Text
+  /// O professor decide se a observação vai para o responsável ou fica interna.
+  visibleToGuardian Boolean @default(true) @map("visible_to_guardian")
+  authorId  String       @map("author_id")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  church  Church?      @relation(fields: [churchId], references: [id])
+  session KidsSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  child   Child?       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  checkin KidsCheckin? @relation(fields: [checkinId], references: [id], onDelete: Cascade)
+  author  User         @relation("KidsNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([churchId])
+  @@index([sessionId, kind])
+  @@index([childId])
+  @@map("kids_notes")
+}
+
+// ── Kids: alertas ────────────────────────────────────────────────────────────
+model KidsAlert {
+  id          String          @id @default(uuid())
+  churchId    String?         @map("church_id")
+  sessionId   String          @map("session_id")
+  childId     String          @map("child_id")
+  checkinId   String?         @map("checkin_id")
+  level       KidsAlertLevel
+  status      KidsAlertStatus @default(OPEN)
+  message     String          @db.Text
+  createdById String          @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  acknowledgedAt           DateTime? @map("acknowledged_at")
+  acknowledgedByGuardianId String?   @map("acknowledged_by_guardian_id")
+  resolvedAt               DateTime? @map("resolved_at")
+  resolvedById             String?   @map("resolved_by_id")
+
+  church     Church?             @relation(fields: [churchId], references: [id])
+  session    KidsSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  child      Child               @relation(fields: [childId], references: [id], onDelete: Cascade)
+  checkin    KidsCheckin?        @relation(fields: [checkinId], references: [id], onDelete: SetNull)
+  createdBy  User                @relation("KidsAlertCreatedBy", fields: [createdById], references: [id])
+  deliveries KidsAlertDelivery[]
+
+  @@index([churchId])
+  @@index([sessionId, status])
+  @@index([childId])
+  @@map("kids_alerts")
+}
+
+/// Uma tentativa de entrega por canal. É o rastro de que a igreja tentou avisar
+/// — o que importa juridicamente quando algo dá errado.
+model KidsAlertDelivery {
+  id                String             @id @default(uuid())
+  churchId          String?            @map("church_id")
+  alertId           String             @map("alert_id")
+  guardianId        String?            @map("guardian_id")
+  userId            String?            @map("user_id")
+  channel           KidsChannel
+  status            KidsDeliveryStatus @default(QUEUED)
+  providerMessageId String?            @map("provider_message_id")
+  error             String?            @db.Text
+  attempts          Int                @default(0)
+  queuedAt          DateTime           @default(now()) @map("queued_at")
+  sentAt            DateTime?          @map("sent_at")
+  deliveredAt       DateTime?          @map("delivered_at")
+  readAt            DateTime?          @map("read_at")
+
+  church   Church?       @relation(fields: [churchId], references: [id])
+  alert    KidsAlert     @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  guardian KidsGuardian? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+
+  @@index([churchId])
+  @@index([alertId])
+  @@index([status])
+  @@index([churchId, channel, queuedAt])
+  @@map("kids_alert_deliveries")
+}
+
+// ── Kids: infra de push e antifraude do QR ───────────────────────────────────
+model DeviceToken {
+  id            String   @id @default(uuid())
+  churchId      String?  @map("church_id")
+  userId        String   @map("user_id")
+  token         String   @unique
+  platform      String
+  appVersion    String?  @map("app_version")
+  criticalOptIn Boolean  @default(false) @map("critical_opt_in")
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  church Church? @relation(fields: [churchId], references: [id])
+  user   User    @relation("UserDevices", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+/// Nonce do QR do responsável: impede que um print do código seja reusado
+/// dentro da janela de validade.
+model KidsQrNonce {
+  jti       String   @id
+  userId    String   @map("user_id")
+  usedAt    DateTime @default(now()) @map("used_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("kids_qr_nonces")
 }
 
 model RefreshToken {
@@ -369,6 +750,7 @@ model Visitor {
   referrals        Visitor[]          @relation("Referrals")
   attendances      Attendance[]
   spiritualHistory SpiritualHistory[]
+  children         Child[]
 
   @@index([churchId])
   @@index([leaderId])
@@ -403,6 +785,7 @@ model CellMember {
   leader        User?        @relation(fields: [leaderId], references: [id])
   sourceVisitor Visitor?     @relation("VisitorConvertedMember", fields: [sourceVisitorId], references: [id])
   attendances   Attendance[] @relation("MemberAttendances")
+  children      Child[]
 
   @@index([churchId])
   @@index([cellId])

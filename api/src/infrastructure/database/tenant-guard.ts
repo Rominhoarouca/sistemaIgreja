@@ -55,6 +55,15 @@ const TENANT_MODELS = new Set<Prisma.ModelName>([
   'SpiritualHistory',
   'Material',
   'Notification',
+  'KidsRoom',
+  'KidsRoomTeacher',
+  'KidsSession',
+  'KidsGuardian',
+  'KidsCheckin',
+  'KidsNote',
+  'KidsAlert',
+  'KidsAlertDelivery',
+  'DeviceToken',
 ]);
 
 /**

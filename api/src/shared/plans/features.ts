@@ -10,6 +10,7 @@ export const FEATURES = {
   MAP_GEOLOCATION: 'map_geolocation',
   ADVANCED_DASHBOARD: 'advanced_dashboard',
   WHATSAPP: 'whatsapp',
+  KIDS: 'kids',
 } as const;
 
 export type FeatureKey = (typeof FEATURES)[keyof typeof FEATURES];
@@ -56,6 +57,12 @@ export const FEATURE_CATALOG: FeatureCatalogItem[] = [
     key: FEATURES.WHATSAPP,
     label: 'WhatsApp',
     description: 'Envio de mensagens e campanhas via WhatsApp.',
+  },
+  {
+    key: FEATURES.KIDS,
+    label: 'Kids (salinha infantil)',
+    description:
+      'Check-in/check-out de crianças por QR ou senha, anotações da aula e alertas aos responsáveis.',
   },
 ];
 
