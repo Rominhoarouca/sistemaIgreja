@@ -37,6 +37,10 @@ const createMeetingSchema = z.object({
   ministrante: optionalText(150),
 });
 
+const attendeeHistoryQuerySchema = z.object({
+  kind: z.enum(['MEMBER', 'VISITOR']).default('MEMBER'),
+});
+
 export class AttendanceController {
   constructor(
     private readonly registerUseCase: RegisterAttendanceUseCase,
@@ -82,6 +86,14 @@ export class AttendanceController {
     const { cellId } = req.params as { cellId: string };
     const attendees = await this.attendanceRepo.findAttendeesByCellId(cellId);
     res.json({ attendees });
+  };
+
+  /** Histórico de encontros de uma pessoa — alimenta o calendário de frequência. */
+  findAttendeeHistory = async (req: Request, res: Response): Promise<void> => {
+    const { cellId, personId } = req.params as { cellId: string; personId: string };
+    const { kind } = attendeeHistoryQuerySchema.parse(req.query);
+    const history = await this.attendanceRepo.findAttendeeHistory(cellId, personId, kind);
+    res.json({ history });
   };
 
   uploadMeetingPhoto = async (req: Request, res: Response): Promise<void> => {

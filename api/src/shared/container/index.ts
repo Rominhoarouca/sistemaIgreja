@@ -42,6 +42,7 @@ import { PrismaSpiritualHistoryRepository } from '@infrastructure/database/repos
 import { PrismaMaterialRepository } from '@infrastructure/database/repositories/PrismaMaterialRepository';
 import { PrismaCoordenacaoRepository } from '@infrastructure/database/repositories/PrismaCoordenacaoRepository';
 import { PrismaLocationRepository } from '@infrastructure/database/repositories/PrismaLocationRepository';
+import { PrismaNotificationRepository } from '@infrastructure/database/repositories/PrismaNotificationRepository';
 
 // Storage
 import { MinioService } from '@infrastructure/storage/MinioService';
@@ -59,6 +60,8 @@ import { AddSpiritualEventUseCase } from '@application/usecases/spiritual-histor
 import { GetDashboardStatsUseCase } from '@application/usecases/dashboard/GetDashboardStatsUseCase';
 import { GetDemographicsUseCase } from '@application/usecases/dashboard/GetDemographicsUseCase';
 import { UploadMaterialUseCase } from '@application/usecases/material/UploadMaterialUseCase';
+import { CreateNotificationUseCase } from '@application/usecases/notification/CreateNotificationUseCase';
+import { UpdateNotificationUseCase } from '@application/usecases/notification/UpdateNotificationUseCase';
 
 // Controllers
 import { AuthController } from '@infrastructure/http/controllers/AuthController';
@@ -72,6 +75,7 @@ import { UserController } from '@infrastructure/http/controllers/UserController'
 import { CoordenacaoController } from '@infrastructure/http/controllers/CoordenacaoController';
 import { LocationController } from '@infrastructure/http/controllers/LocationController';
 import { CellTypeController } from '@infrastructure/http/controllers/CellTypeController';
+import { NotificationController } from '@infrastructure/http/controllers/NotificationController';
 
 // User use cases
 import { GetProfileUseCase } from '@application/usecases/user/GetProfileUseCase';
@@ -90,6 +94,7 @@ export interface Container {
   userController: UserController;
   coordenacaoController: CoordenacaoController;
   locationController: LocationController;
+  notificationController: NotificationController;
   churchController: ChurchController;
   planController: PlanController;
   billingController: BillingController;
@@ -119,6 +124,7 @@ export function createContainer(): Container {
   const materialRepo = new PrismaMaterialRepository(prisma);
   const coordenacaoRepo = new PrismaCoordenacaoRepository(prisma);
   const locationRepo = new PrismaLocationRepository(prisma);
+  const notificationRepo = new PrismaNotificationRepository(prisma);
   const churchRepo = new PrismaChurchRepository(prisma);
   const planRepo = new PrismaPlanRepository(prisma);
   const subscriptionRepo = new PrismaSubscriptionRepository(prisma);
@@ -163,6 +169,10 @@ export function createContainer(): Container {
   // Material use cases
   const uploadMaterialUseCase = new UploadMaterialUseCase(materialRepo, minioService);
 
+  // Notification use cases
+  const createNotificationUseCase = new CreateNotificationUseCase(notificationRepo, minioService);
+  const updateNotificationUseCase = new UpdateNotificationUseCase(notificationRepo, minioService);
+
   // User use cases
   const getProfileUseCase = new GetProfileUseCase(userRepo, minioService);
   const updateProfileUseCase = new UpdateProfileUseCase(userRepo, minioService);
@@ -196,6 +206,13 @@ export function createContainer(): Container {
   const coordenacaoController = new CoordenacaoController(coordenacaoRepo, userRepo);
   const locationController = new LocationController(locationRepo);
   const cellTypeController = new CellTypeController(prisma);
+  const notificationController = new NotificationController(
+    createNotificationUseCase,
+    updateNotificationUseCase,
+    notificationRepo,
+    minioService,
+    prisma,
+  );
 
   // SaaS use cases
   const updateChurchUseCase = new UpdateChurchUseCase(churchRepo);
@@ -256,6 +273,7 @@ export function createContainer(): Container {
     userController,
     coordenacaoController,
     locationController,
+    notificationController,
     churchController,
     planController,
     billingController,

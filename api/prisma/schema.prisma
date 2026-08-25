@@ -107,6 +107,7 @@ model Church {
   spiritualHistories SpiritualHistory[]
   materials          Material[]
   children           Child[]
+  notifications      Notification[]
 
   @@map("churches")
 }
@@ -184,6 +185,8 @@ model User {
   children            Child[]
   cellMembers         CellMember[]
   cellMeetings        CellMeeting[]      @relation("CreatedMeetings")
+  notificationsCreated  Notification[]           @relation("NotificationCreatedBy")
+  notificationsReceived NotificationRecipient[]  @relation("NotificationRecipients")
 
   @@unique([churchId, email])
   @@index([churchId])
@@ -499,4 +502,38 @@ model Material {
   @@index([cellId])
   @@index([uploadedById])
   @@map("materials")
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+model Notification {
+  id          String   @id @default(uuid())
+  churchId    String?  @map("church_id")
+  title       String
+  body        String   @db.Text
+  imageKey    String?  @map("image_key")
+  youtubeUrl  String?  @map("youtube_url")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  church     Church?                  @relation(fields: [churchId], references: [id])
+  createdBy  User                     @relation("NotificationCreatedBy", fields: [createdById], references: [id])
+  recipients NotificationRecipient[]
+
+  @@index([churchId])
+  @@map("notifications")
+}
+
+model NotificationRecipient {
+  id             String    @id @default(uuid())
+  notificationId String    @map("notification_id")
+  userId         String    @map("user_id")
+  readAt         DateTime? @map("read_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User          @relation("NotificationRecipients", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, readAt])
+  @@map("notification_recipients")
 }

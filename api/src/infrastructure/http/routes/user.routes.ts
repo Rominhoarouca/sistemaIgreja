@@ -17,6 +17,7 @@ export function userRoutes(controller: UserController): Router {
   router.get('/leaders', requireSupervisorOrAdmin, controller.findLeaders);
   router.get('/supervisors', requireAdmin, controller.findSupervisors);
   router.get('/coordinadores', requireAdmin, controller.findCoordinadores);
+  router.get('/search', requireAdmin, controller.searchUsers);
   router.get('/my-leaders', requireStaff, controller.getMyLeaders);
   router.get('/my-supervisors', requireStaff, controller.getMySupervisors);
   router.post('/create', requireAdmin, controller.createUser);

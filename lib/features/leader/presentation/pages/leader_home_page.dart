@@ -8,12 +8,14 @@ import 'package:geocoding/geocoding.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../widgets/attendance_calendar_dialog.dart';
 import '../widgets/attendee_widgets.dart';
-import '../../../../shared/widgets/address_selector.dart';
+import '../../../../shared/widgets/cep_address_fields.dart';
+import '../../../dashboard/presentation/widgets/demographic_fields.dart';
 import 'leader_dashboard_view.dart';
+import '../../../../injection/injection.dart';
 
 /// Show a snackbar above any modal sheet by using the root navigator's context.
 void _showTopSnackBar(
@@ -96,7 +98,7 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
 
   Future<void> _loadCells() async {
     try {
-      final dio = DioClient(AuthStorage()).dio;
+      final dio = getIt<DioClient>().dio;
       final resp = await dio.get('/cells/my-cell');
       final cellsRaw =
           (resp.data as Map<String, dynamic>)['cells'] as List? ?? [];
@@ -115,7 +117,7 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
 
   Future<void> _loadCoordInfo() async {
     try {
-      final dio = DioClient(AuthStorage()).dio;
+      final dio = getIt<DioClient>().dio;
       final resp = await dio.get('/users/me');
       final user =
           (resp.data as Map<String, dynamic>)['user'] as Map<String, dynamic>?;
@@ -353,7 +355,7 @@ class _AttendeesTabState extends State<_AttendeesTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 
@@ -609,7 +611,16 @@ class _AttendeesTabState extends State<_AttendeesTab> {
         )
       else
         for (final attendee in filtered) ...[
-          AttendeeCard(attendee: attendee, onTap: () => _openDetails(attendee)),
+          AttendeeCard(
+            attendee: attendee,
+            onTap: () => _openDetails(attendee),
+            onFrequencyTap: () => showAttendanceCalendarDialog(
+              context: context,
+              dio: _dio,
+              cellId: widget.cellId,
+              attendee: attendee,
+            ),
+          ),
           const SizedBox(height: AppSpacing.sm),
         ],
     ];
@@ -681,15 +692,21 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  String? _bairroId;
+  CepAddressValue _addressValue = const CepAddressValue(
+    address: '',
+    numero: '',
+    complemento: null,
+    bairroId: null,
+  );
+  String? _gender;
+  DateTime? _birthDate;
+  String? _maritalStatus;
   bool _saving = false;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
-    _addressCtrl.dispose();
     super.dispose();
   }
 
@@ -702,9 +719,16 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
         data: {
           'name': _nameCtrl.text.trim(),
           'phone': _phoneCtrl.text.trim(),
-          if (_addressCtrl.text.trim().isNotEmpty)
-            'address': _addressCtrl.text.trim(),
-          if (_bairroId != null) 'bairroId': _bairroId,
+          if (_addressValue.address.isNotEmpty)
+            'address': _addressValue.address,
+          if (_addressValue.numero.isNotEmpty) 'numero': _addressValue.numero,
+          if (_addressValue.complemento != null)
+            'complemento': _addressValue.complemento,
+          if (_addressValue.bairroId != null)
+            'bairroId': _addressValue.bairroId,
+          if (_gender != null) 'gender': _gender,
+          if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
+          if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
           if (widget.cellId != null) 'cellId': widget.cellId,
         },
       );
@@ -786,19 +810,19 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
                       : null,
                 ),
                 const SizedBox(height: AppSpacing.base),
-                TextFormField(
-                  controller: _addressCtrl,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Endereço (opcional)',
-                    prefixIcon: Icon(Icons.location_on_outlined),
-                  ),
+                CepAddressFields(
+                  dio: widget.dio,
+                  onChanged: (v) => setState(() => _addressValue = v),
                 ),
                 const SizedBox(height: AppSpacing.base),
-                AddressSelector(
-                  dio: widget.dio,
-                  isRequired: false,
-                  onChanged: (id) => setState(() => _bairroId = id),
+                DemographicFields(
+                  gender: _gender,
+                  birthDate: _birthDate,
+                  maritalStatus: _maritalStatus,
+                  onGenderChanged: (v) => setState(() => _gender = v),
+                  onBirthDateChanged: (v) => setState(() => _birthDate = v),
+                  onMaritalStatusChanged: (v) =>
+                      setState(() => _maritalStatus = v),
                 ),
                 const SizedBox(height: AppSpacing.xl),
                 AppButton(
@@ -1551,8 +1575,15 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  String? _bairroId;
+  CepAddressValue _addressValue = const CepAddressValue(
+    address: '',
+    numero: '',
+    complemento: null,
+    bairroId: null,
+  );
+  String? _gender;
+  DateTime? _birthDate;
+  String? _maritalStatus;
   bool _saving = false;
 
   @override
@@ -1560,7 +1591,6 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
-    _addressCtrl.dispose();
     super.dispose();
   }
 
@@ -1575,9 +1605,14 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
           'phone': _phoneCtrl.text.trim(),
           if (_emailCtrl.text.trim().isNotEmpty)
             'email': _emailCtrl.text.trim(),
-          if (_addressCtrl.text.trim().isNotEmpty)
-            'address': _addressCtrl.text.trim(),
-          if (_bairroId != null) 'bairroId': _bairroId,
+          // CellMember só tem um campo `address` — número/complemento entram
+          // concatenados, diferente de Visitor (que tem colunas próprias).
+          if (!_addressValue.isEmpty) 'address': _addressValue.combined,
+          if (_addressValue.bairroId != null)
+            'bairroId': _addressValue.bairroId,
+          if (_gender != null) 'gender': _gender,
+          if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
+          if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
         },
       );
       if (!mounted) return;
@@ -1643,15 +1678,18 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: AppSpacing.sm),
-            AppTextField(
-              label: 'Endereço (opcional)',
-              controller: _addressCtrl,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            AddressSelector(
+            CepAddressFields(
               dio: widget.dio,
-              isRequired: false,
-              onChanged: (id) => setState(() => _bairroId = id),
+              onChanged: (v) => setState(() => _addressValue = v),
+            ),
+            const SizedBox(height: AppSpacing.base),
+            DemographicFields(
+              gender: _gender,
+              birthDate: _birthDate,
+              maritalStatus: _maritalStatus,
+              onGenderChanged: (v) => setState(() => _gender = v),
+              onBirthDateChanged: (v) => setState(() => _birthDate = v),
+              onMaritalStatusChanged: (v) => setState(() => _maritalStatus = v),
             ),
             const SizedBox(height: AppSpacing.base),
             AppButton(
@@ -1688,7 +1726,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 
@@ -1868,7 +1906,7 @@ class _MeetingSummaryCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
-                  'Encontro de ${formatDateBr(summary.meetingDate.toLocal())}',
+                  'Encontro de ${formatDateBr(summary.meetingDate)}',
                   style: AppTypography.titleSmall,
                 ),
               ),
@@ -2641,10 +2679,8 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
     }
   }
 
-  String _formatMeetingDate() {
-    final d = DateTime.parse(widget.meetingDateIso).toLocal();
-    return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-  }
+  String _formatMeetingDate() =>
+      formatDateBr(parseMeetingDate(widget.meetingDateIso));
 
   @override
   Widget build(BuildContext context) {
@@ -3025,7 +3061,7 @@ class _MaterialsTabState extends State<_MaterialsTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadMaterials();
   }
 
@@ -3271,7 +3307,7 @@ class _SpiritualHistoryTabState extends State<_SpiritualHistoryTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

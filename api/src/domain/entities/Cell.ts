@@ -12,6 +12,12 @@ export interface Cell {
   readonly name: string;
   readonly leaderId: string;
   readonly leaderName?: string;
+  // Derivados de leader → supervisor → coordenação. Null quando o líder não
+  // tem supervisor, ou o supervisor não tem coordenação.
+  readonly leaderSupervisorId?: string | null;
+  readonly supervisorName?: string | null;
+  readonly coordenacaoName?: string | null;
+  readonly coordenacaoColor?: string | null;
   readonly cellTypeId: string | null;
   readonly cellTypeName?: string | null;
   readonly address: string;

@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../injection/injection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data model
@@ -42,7 +42,7 @@ class _AdminCellTypesPageState extends State<AdminCellTypesPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadCellTypes();
   }
 

@@ -59,7 +59,29 @@ export interface CellAttendee {
   readonly presentCount: number;
   /** presentCount / meetingsCount em %, 1 casa decimal. 0 quando sem registros. */
   readonly attendanceRate: number;
+  /** Último encontro em que esteve presente. `null` se nunca veio. */
+  readonly lastPresentDate: Date | null;
+  /**
+   * Faltas seguidas mais recentes — encontros com presença registrada depois da
+   * última vez que veio. É o que identifica quem parou de frequentar; a taxa
+   * sozinha demora a cair para quem tinha histórico bom.
+   */
+  readonly absentStreak: number;
   readonly createdAt: Date;
+}
+
+/**
+ * Um encontro da célula visto pela ótica de uma pessoa: ela esteve presente,
+ * faltou, ou nem chegou a ter presença registrada naquele dia.
+ *
+ * Alimenta o calendário de frequência individual.
+ */
+export interface AttendeeMeetingHistory {
+  readonly meetingDate: Date;
+  /** `null` quando não há registro de presença dessa pessoa no encontro. */
+  readonly isPresent: boolean | null;
+  readonly lesson: string | null;
+  readonly ministrante: string | null;
 }
 
 export interface IAttendanceRepository {
@@ -70,6 +92,11 @@ export interface IAttendanceRepository {
   getAttendanceRateByCell(): Promise<CellAttendanceSummary[]>;
   findMeetingsByCellId(cellId: string): Promise<MeetingSummary[]>;
   findAttendeesByCellId(cellId: string): Promise<CellAttendee[]>;
+  findAttendeeHistory(
+    cellId: string,
+    personId: string,
+    kind: 'MEMBER' | 'VISITOR',
+  ): Promise<AttendeeMeetingHistory[]>;
   createMeeting(
     cellId: string,
     meetingDate: Date,

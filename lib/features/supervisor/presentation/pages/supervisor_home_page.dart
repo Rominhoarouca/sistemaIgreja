@@ -4,12 +4,12 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/address_selector.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
 import 'supervisor_dashboard_tab.dart';
+import '../../../../injection/injection.dart';
 
 /// Supervisor Panel — coordinates multiple leaders and their cells.
 class SupervisorHomePage extends StatefulWidget {
@@ -150,7 +150,7 @@ class SupervisedLeadersTabState extends State<SupervisedLeadersTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 
@@ -658,7 +658,7 @@ class SupervisedCellsTabState extends State<SupervisedCellsTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

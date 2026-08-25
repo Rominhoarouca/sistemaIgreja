@@ -22,6 +22,8 @@ class CellAttendee {
     required this.presentCount,
     required this.attendanceRate,
     required this.createdAt,
+    this.lastPresentDate,
+    this.absentStreak = 0,
   });
 
   factory CellAttendee.fromJson(Map<String, dynamic> json) => CellAttendee(
@@ -41,6 +43,10 @@ class CellAttendee {
     meetingsCount: (json['meetingsCount'] as num?)?.toInt() ?? 0,
     presentCount: (json['presentCount'] as num?)?.toInt() ?? 0,
     attendanceRate: (json['attendanceRate'] as num?)?.toDouble() ?? 0,
+    lastPresentDate: json['lastPresentDate'] == null
+        ? null
+        : parseMeetingDate(json['lastPresentDate'] as String?),
+    absentStreak: (json['absentStreak'] as num?)?.toInt() ?? 0,
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
   );
@@ -67,7 +73,25 @@ class CellAttendee {
   final double attendanceRate;
   final DateTime createdAt;
 
+  /// Último encontro em que esteve presente — `null` se nunca veio.
+  final DateTime? lastPresentDate;
+
+  /// Faltas seguidas mais recentes. Ver `absentStreak` no repositório da API.
+  final int absentStreak;
+
   bool get isMember => kind == 'MEMBER';
+
+  /// Parou de frequentar: faltou nos últimos [kInactiveAbsentStreak] encontros
+  /// em que a presença dela foi registrada. Duas faltas seguidas ainda é vida
+  /// normal (viagem, trabalho); três já é o líder ir atrás.
+  bool get isInactive => absentStreak >= kInactiveAbsentStreak;
+
+  /// Aniversário no mês informado (1–12). Compara em UTC porque `birth_date`
+  /// chega como meia-noite UTC — ver [parseMeetingDate].
+  bool birthdayInMonth(int month) => birthDate?.toUtc().month == month;
+
+  /// Dia do aniversário, em UTC pelo mesmo motivo de [birthdayInMonth].
+  int? get birthDay => birthDate?.toUtc().day;
 
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
@@ -75,6 +99,9 @@ class CellAttendee {
     return parts.map((p) => p[0].toUpperCase()).take(2).join();
   }
 }
+
+/// Faltas seguidas a partir das quais alguém entra na lista de ausentes.
+const kInactiveAbsentStreak = 3;
 
 /// Filtro da lista de frequentadores.
 enum AttendeeFilter {
@@ -107,9 +134,7 @@ class CellMeetingSummary {
 
   factory CellMeetingSummary.fromJson(Map<String, dynamic> json) =>
       CellMeetingSummary(
-        meetingDate:
-            DateTime.tryParse(json['meetingDate'] as String? ?? '') ??
-            DateTime.now(),
+        meetingDate: parseMeetingDate(json['meetingDate'] as String?),
         present: (json['present'] as num?)?.toInt() ?? 0,
         membersPresent: (json['membersPresent'] as num?)?.toInt() ?? 0,
         visitorsPresent: (json['visitorsPresent'] as num?)?.toInt() ?? 0,
@@ -127,6 +152,23 @@ class CellMeetingSummary {
   final bool isRecorded;
 }
 
+/// Data de encontro vinda da API.
+///
+/// `meeting_date` é `date` no Postgres, então chega como meia-noite **UTC**
+/// ("2026-07-06T00:00:00.000Z"). Converter com `toLocal()` em fuso negativo
+/// joga o dia para trás (05/07 21:00). O certo é ler os componentes em UTC e
+/// montar a data local equivalente — o que também dá uma chave estável para
+/// comparar dias no calendário.
+DateTime parseMeetingDate(String? iso) {
+  final parsed = DateTime.tryParse(iso ?? '');
+  if (parsed == null) {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+  final utc = parsed.toUtc();
+  return DateTime(utc.year, utc.month, utc.day);
+}
+
 /// pt-BR: 91.4 → "91,4%".
 String formatPercentBr(double value) =>
     '${value.toStringAsFixed(1).replaceAll('.', ',')}%';
@@ -137,6 +179,24 @@ String formatDateBr(DateTime date) {
   final m = date.month.toString().padLeft(2, '0');
   return '$d/$m/${date.year}';
 }
+
+const _monthNamesBr = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
+
+/// Nome do mês em pt-BR (1 = Janeiro).
+String monthNameBr(int month) => _monthNamesBr[month - 1];
 
 /// dd/MM — aniversário não precisa do ano.
 String formatDayMonthBr(DateTime date) {
@@ -185,10 +245,19 @@ enum AttendanceStage {
 /// Card de um frequentador: identificação + contato resumido + frequência.
 /// O restante das informações abre ao toque.
 class AttendeeCard extends StatelessWidget {
-  const AttendeeCard({super.key, required this.attendee, required this.onTap});
+  const AttendeeCard({
+    super.key,
+    required this.attendee,
+    required this.onTap,
+    this.onFrequencyTap,
+  });
 
   final CellAttendee attendee;
   final VoidCallback onTap;
+
+  /// Toque na faixa de frequência — abre o calendário de presenças. Quando
+  /// `null` a faixa continua sendo só leitura e o toque cai no card inteiro.
+  final VoidCallback? onFrequencyTap;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +301,11 @@ class AttendeeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          _FrequencyStrip(attendee: attendee, isDark: isDark),
+          _FrequencyStrip(
+            attendee: attendee,
+            isDark: isDark,
+            onTap: onFrequencyTap,
+          ),
         ],
       ),
     );
@@ -335,10 +408,15 @@ class _KindBadge extends StatelessWidget {
 /// por exemplo) fica em 2,1:1 sobre fundo claro e seria ilegível como texto. A
 /// cor vive na barra e no ponto ao lado do nome.
 class _FrequencyStrip extends StatelessWidget {
-  const _FrequencyStrip({required this.attendee, required this.isDark});
+  const _FrequencyStrip({
+    required this.attendee,
+    required this.isDark,
+    this.onTap,
+  });
 
   final CellAttendee attendee;
   final bool isDark;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -351,7 +429,7 @@ class _FrequencyStrip extends StatelessWidget {
         stage?.color(isDark: isDark) ??
         (isDark ? AppColors.mutedDark : AppColors.grey400);
 
-    return Container(
+    final strip = Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
@@ -398,6 +476,16 @@ class _FrequencyStrip extends StatelessWidget {
                   style: AppTypography.bodySmall.copyWith(color: mutedColor),
                 ),
               ],
+              // O calendário é a única pista de que a faixa abre outra coisa —
+              // sem ele o toque duplo (card x faixa) fica invisível.
+              if (onTap != null) ...[
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                  Icons.calendar_month_outlined,
+                  size: 16,
+                  color: isDark ? AppColors.linkDark : AppColors.primary,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -419,6 +507,18 @@ class _FrequencyStrip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return strip;
+
+    return Semantics(
+      button: true,
+      label: 'Ver calendário de frequência de ${attendee.name}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        child: strip,
       ),
     );
   }
@@ -510,7 +610,7 @@ class _MeetingTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  formatDateBr(meeting.meetingDate.toLocal()),
+                  formatDateBr(meeting.meetingDate),
                   style: AppTypography.labelLarge.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

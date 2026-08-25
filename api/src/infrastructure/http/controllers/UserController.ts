@@ -50,6 +50,12 @@ export class UserController {
     res.json({ supervisors: coordinadores });
   };
 
+  searchUsers = async (req: Request, res: Response): Promise<void> => {
+    const { q } = z.object({ q: z.string().min(1) }).parse(req.query);
+    const users = await this.userRepo.searchUsers(q);
+    res.json({ users });
+  };
+
   getMyLeaders = async (req: Request, res: Response): Promise<void> => {
     const leaders =
       req.userRole === 'COORDENADOR'

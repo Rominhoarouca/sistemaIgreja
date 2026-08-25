@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
+import '../../../../injection/injection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -107,7 +107,7 @@ class _AdminSupervisorsPageState extends State<AdminSupervisorsPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

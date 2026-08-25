@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'design_system/design_system.dart';
@@ -100,6 +102,12 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
               themeMode: ThemeController.instance.mode,
               routerConfig: _router,
               scaffoldMessengerKey: scaffoldMessengerKey,
+              localizationsDelegates: const [
+                DefaultCupertinoLocalizations.delegate,
+                DefaultMaterialLocalizations.delegate,
+                DefaultWidgetsLocalizations.delegate,
+                FlutterQuillLocalizations.delegate,
+              ],
             );
           },
         ),

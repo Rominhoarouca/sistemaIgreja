@@ -1,7 +1,16 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/utils/app_snackbar.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import 'admin_create_notification_page.dart';
+import 'admin_notifications_list_page.dart';
+import 'notification_detail_page.dart';
+import '../../../../injection/injection.dart';
 
-/// Notifications page — lists app notifications for the logged-in user.
+/// Notifications page — lists the current user's notifications (title only).
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
 
@@ -10,107 +19,184 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  static final _notifications = [
-    _NotificationItem(
-      icon: Icons.person_add_outlined,
-      color: AppColors.primary,
-      title: 'Novo visitante encaminhado',
-      body: 'Maria Fernandes foi encaminhada para sua célula.',
-      time: 'há 5 min',
-      isRead: false,
-    ),
-    _NotificationItem(
-      icon: Icons.check_circle_outline,
-      color: AppColors.success,
-      title: 'Visitante integrado',
-      body: 'Paulo Santos foi marcado como integrado.',
-      time: 'há 2 horas',
-      isRead: false,
-    ),
-    _NotificationItem(
-      icon: Icons.event_available_outlined,
-      color: AppColors.accent,
-      title: 'Reunião de célula hoje',
-      body: 'Lembrete: encontro da Célula Esperança às 19h.',
-      time: 'há 3 horas',
-      isRead: true,
-    ),
-    _NotificationItem(
-      icon: Icons.file_download_outlined,
-      color: AppColors.secondary,
-      title: 'Novo material disponível',
-      body: 'Lição 4: Servindo com Propósito foi adicionada.',
-      time: 'ontem',
-      isRead: true,
-    ),
-    _NotificationItem(
-      icon: Icons.trending_up_outlined,
-      color: AppColors.info,
-      title: 'Relatório semanal',
-      body: 'O relatório da semana está disponível para visualização.',
-      time: '2 dias atrás',
-      isRead: true,
-    ),
-  ];
+  late final Dio _dio;
+  bool _isLoading = true;
+  String? _error;
+  List<_NotificationItem> _notifications = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = getIt<DioClient>().dio;
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final resp = await _dio.get('/notifications');
+      final list = (resp.data['notifications'] as List? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(_NotificationItem.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _notifications = list;
+        _isLoading = false;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = extractDioErrorMessage(e, fallback: 'Erro ao carregar notificações');
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    final unread = _notifications.where((n) => !n.isRead).toList();
+    if (unread.isEmpty) return;
+    setState(() {
+      for (final n in unread) {
+        n.isRead = true;
+      }
+    });
+    try {
+      await _dio.patch('/notifications/read-all');
+    } on DioException catch (e) {
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao marcar notificações como lidas'),
+      );
+    }
+  }
+
+  Future<void> _openNotification(_NotificationItem item) async {
+    setState(() => item.isRead = true);
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => NotificationDetailPage(id: item.id)),
+    );
+  }
+
+  Future<void> _openCreateNotification() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AdminCreateNotificationPage()),
+    );
+    if (created == true) _load();
+  }
+
+  Future<void> _openManageNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdminNotificationsListPage()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
+    final isAdmin = context.select<AuthBloc, bool>((bloc) {
+      final state = bloc.state;
+      return state is AuthAuthenticated && state.user.isAdmin;
+    });
 
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         title: const Text('Notificações'),
         actions: [
+          if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.manage_accounts_outlined),
+              tooltip: 'Notificações enviadas',
+              onPressed: _openManageNotifications,
+            ),
           if (unreadCount > 0)
             TextButton(
-              onPressed: () => setState(() {
-                for (final n in _notifications) {
-                  n.isRead = true;
-                }
-              }),
-              child: Text(
-                'Marcar todas como lidas',
-                style: AppTypography.labelMedium,
-              ),
+              onPressed: _markAllRead,
+              child: Text('Marcar todas como lidas', style: AppTypography.labelMedium),
             ),
         ],
       ),
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _notifications.isEmpty
-          ? _EmptyState()
-          : ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              itemCount: _notifications.length,
-              separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
-              itemBuilder: (context, i) {
-                final n = _notifications[i];
-                return _NotificationTile(
-                  item: n,
-                  onTap: () => setState(() => n.isRead = true),
-                );
-              },
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _error!,
+                    style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.base),
+                  AppButton(
+                    label: 'Tentar novamente',
+                    variant: AppButtonVariant.outline,
+                    isFullWidth: false,
+                    onPressed: _load,
+                  ),
+                ],
+              ),
+            )
+          : _notifications.isEmpty
+          ? const _EmptyState()
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                itemCount: _notifications.length,
+                separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
+                itemBuilder: (context, i) {
+                  final n = _notifications[i];
+                  return _NotificationTile(item: n, onTap: () => _openNotification(n));
+                },
+              ),
             ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _openCreateNotification,
+              icon: const Icon(Icons.add_alert_outlined),
+              label: const Text('Nova notificação'),
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+            )
+          : null,
     );
   }
 }
 
 class _NotificationItem {
-  final IconData icon;
-  final Color color;
+  final String id;
   final String title;
-  final String body;
-  final String time;
   bool isRead;
+  final DateTime createdAt;
 
   _NotificationItem({
-    required this.icon,
-    required this.color,
+    required this.id,
     required this.title,
-    required this.body,
-    required this.time,
     required this.isRead,
+    required this.createdAt,
   });
+
+  factory _NotificationItem.fromJson(Map<String, dynamic> json) => _NotificationItem(
+    id: json['id'] as String,
+    title: json['title'] as String,
+    isRead: json['isRead'] as bool? ?? false,
+    createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+  );
+}
+
+String _relativeTime(DateTime dateTime) {
+  final diff = DateTime.now().difference(dateTime);
+  if (diff.inMinutes < 1) return 'agora mesmo';
+  if (diff.inMinutes < 60) return 'há ${diff.inMinutes} min';
+  if (diff.inHours < 24) return 'há ${diff.inHours}h';
+  if (diff.inDays < 7) return 'há ${diff.inDays} dias';
+  return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
 }
 
 class _NotificationTile extends StatelessWidget {
@@ -124,9 +210,7 @@ class _NotificationTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: item.isRead
-            ? null
-            : AppColors.primarySurface.withValues(alpha: 0.4),
+        color: item.isRead ? null : AppColors.primarySurface.withValues(alpha: 0.4),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.pagePaddingH,
           vertical: AppSpacing.md,
@@ -137,10 +221,10 @@ class _NotificationTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(item.icon, color: item.color, size: 22),
+              child: const Icon(Icons.campaign_outlined, color: AppColors.primary, size: 22),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -153,9 +237,7 @@ class _NotificationTile extends StatelessWidget {
                         child: Text(
                           item.title,
                           style: AppTypography.titleSmall.copyWith(
-                            fontWeight: item.isRead
-                                ? FontWeight.w500
-                                : FontWeight.w700,
+                            fontWeight: item.isRead ? FontWeight.w500 : FontWeight.w700,
                           ),
                         ),
                       ),
@@ -170,19 +252,10 @@ class _NotificationTile extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.xs2),
-                  Text(
-                    item.body,
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    item.time,
-                    style: AppTypography.labelSmall.copyWith(
-                      color: AppColors.grey400,
-                    ),
+                    _relativeTime(item.createdAt),
+                    style: AppTypography.labelSmall.copyWith(color: AppColors.grey400),
                   ),
                 ],
               ),
@@ -195,23 +268,19 @@ class _NotificationTile extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.notifications_off_outlined,
-            size: 64,
-            color: AppColors.grey300,
-          ),
+          const Icon(Icons.notifications_off_outlined, size: 64, color: AppColors.grey300),
           const SizedBox(height: AppSpacing.base),
           Text(
             'Nenhuma notificação',
-            style: AppTypography.titleMedium.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTypography.titleMedium.copyWith(color: AppColors.textSecondary),
           ),
         ],
       ),

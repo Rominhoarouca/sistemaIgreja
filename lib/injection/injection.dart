@@ -1,6 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 import '../core/network/auth_storage.dart';
 import '../core/network/dio_client.dart';
+import '../design_system/theme/theme_controller.dart';
 import '../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../features/auth/data/repositories/auth_repository_impl.dart';
 import '../features/auth/domain/repositories/auth_repository.dart';
@@ -18,6 +20,19 @@ Future<void> setupInjection() async {
 
   final dioClient = DioClient(authStorage);
   getIt.registerSingleton<DioClient>(dioClient);
+
+  // Dio único do app: todo consumidor (datasources, páginas legadas em
+  // migração) resolve este singleton — nunca constrói DioClient próprio.
+  getIt.registerLazySingleton<Dio>(() => dioClient.dio);
+
+  // Controllers globais pré-existentes (ChangeNotifier singletons): entram no
+  // DI apontando para o MESMO objeto de `.instance`, para os call sites
+  // migrarem gradualmente. `.instance` será privatizado na fase final do
+  // refactor de Clean Architecture.
+  getIt.registerSingleton<ThemeController>(ThemeController.instance);
+  getIt.registerSingleton<ChurchContextController>(
+    ChurchContextController.instance,
+  );
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   getIt.registerSingleton<AuthRemoteDatasource>(

@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
+import '../../../../injection/injection.dart';
 
 /// Admin Materials page — load/upload/delete/view materials via API + MinIO.
 class AdminMaterialsPage extends StatefulWidget {
@@ -98,7 +98,7 @@ class _AdminMaterialsPageState extends State<AdminMaterialsPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

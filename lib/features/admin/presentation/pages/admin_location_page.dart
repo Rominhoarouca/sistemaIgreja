@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../injection/injection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -107,7 +107,7 @@ class _CidadesTabState extends State<_CidadesTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadEstados();
   }
 
@@ -409,7 +409,7 @@ class _BairrosTabState extends State<_BairrosTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadEstados();
   }
 

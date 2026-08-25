@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
+import '../../../../core/errors/error_mapper.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../domain/entities/user_entity.dart';
@@ -31,10 +32,11 @@ class AuthRepositoryImpl implements AuthRepository {
       await _storage.saveUserProfile(response.user.toJsonString());
       return Right(response.user);
     } catch (e) {
+      // 401 no login não é sessão expirada — é credencial errada.
       if (e is DioException && e.response?.statusCode == 401) {
         return const Left(AuthFailure('E-mail ou senha inválidos.'));
       }
-      return Left(_mapError(e));
+      return Left(ErrorMapper.map(e));
     }
   }
 
@@ -57,7 +59,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await _storage.saveUserProfile(response.user.toJsonString());
       return Right(response.user);
     } catch (e) {
-      return Left(_mapError(e));
+      return Left(ErrorMapper.map(e));
     }
   }
 
@@ -76,7 +78,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await _storage.saveUserProfile(user.toJsonString());
       return Right(user);
     } catch (e) {
-      return Left(_mapError(e));
+      return Left(ErrorMapper.map(e));
     }
   }
 
@@ -109,29 +111,4 @@ class AuthRepositoryImpl implements AuthRepository {
     );
   }
 
-  Failure _mapError(Object error) {
-    if (error is DioException) {
-      final statusCode = error.response?.statusCode;
-      if (statusCode == 401) return const AuthFailure();
-      if (statusCode == 409) {
-        final message = error.response?.data is Map<String, dynamic>
-            ? (error.response!.data['message'] as String? ??
-                  'E-mail já cadastrado.')
-            : 'E-mail já cadastrado.';
-        return ValidationFailure(message);
-      }
-      if (statusCode != null && statusCode >= 500) {
-        return const ServerFailure();
-      }
-      final message = error.response?.data is Map<String, dynamic>
-          ? (error.response!.data['message'] as String? ?? 'Erro no servidor.')
-          : 'Erro no servidor.';
-      return ServerFailure(message);
-    }
-    if (error.toString().contains('SocketException') ||
-        error.toString().contains('HandshakeException')) {
-      return const NetworkFailure();
-    }
-    return const ServerFailure();
-  }
 }

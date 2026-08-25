@@ -1,11 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/stat_detail_page.dart';
 import '../../../dashboard/presentation/widgets/integration_line_chart.dart';
+import '../../../../injection/injection.dart';
 
 /// Contato alcançável pelo supervisor via WhatsApp: líder supervisionado ou
 /// visitante/membro de uma célula desses líderes.
@@ -72,7 +72,7 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

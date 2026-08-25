@@ -105,10 +105,7 @@ class DemographicFields extends StatelessWidget {
           isExpanded: true,
           decoration: const InputDecoration(
             hintText: 'Não informado',
-            prefixIcon: Icon(
-              Icons.favorite_outline,
-              size: AppSpacing.iconSm,
-            ),
+            prefixIcon: Icon(Icons.favorite_outline, size: AppSpacing.iconSm),
           ),
           items: [
             for (final option in kMaritalOptions)

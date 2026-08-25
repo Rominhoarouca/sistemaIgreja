@@ -8,6 +8,12 @@ import '../../design_system/design_system.dart';
 final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 /// Extrai mensagem de erro de forma segura de uma DioException
+///
+/// LEGADO (refactor Clean Architecture): UI não deve tocar DioException.
+/// Novo código usa ErrorMapper.map no RepositoryImpl e consome
+/// failure.message. Esta função morre na Fase 9, quando os call sites
+/// remanescentes tiverem migrado. Não anotada @Deprecated de propósito:
+/// 105 avisos no analyze afogariam problemas reais durante a migração.
 String extractDioErrorMessage(
   DioException e, {
   String fallback = 'Erro ao processar requisição',

@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type {
+  AttendeeMeetingHistory,
   CellAttendee,
   IAttendanceRepository,
   MeetingDetails,
@@ -228,6 +229,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         is_baptized: boolean | null;
         meetings: bigint;
         present: bigint;
+        last_present_date: Date | null;
+        absent_streak: bigint;
         created_at: Date;
       }>
     >`
@@ -236,11 +239,31 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
           member_id,
           visitor_id,
           COUNT(*)::bigint                                      AS meetings,
-          SUM(CASE WHEN is_present THEN 1 ELSE 0 END)::bigint   AS present
+          SUM(CASE WHEN is_present THEN 1 ELSE 0 END)::bigint   AS present,
+          MAX(meeting_date) FILTER (WHERE is_present)           AS last_present_date
         FROM attendances
         WHERE cell_id = ${cellId}
           AND (${churchId}::text IS NULL OR church_id = ${churchId})
         GROUP BY member_id, visitor_id
+      ),
+      -- Faltas seguidas contadas de trás para frente: tudo o que veio depois do
+      -- último encontro em que a pessoa esteve presente (ou tudo, se nunca
+      -- esteve). É esse número que separa "faltou uma vez" de "sumiu".
+      streaks AS (
+        SELECT
+          s.member_id,
+          s.visitor_id,
+          (
+            SELECT COUNT(*)::bigint
+            FROM attendances a
+            WHERE a.cell_id = ${cellId}
+              AND (${churchId}::text IS NULL OR a.church_id = ${churchId})
+              AND a.member_id IS NOT DISTINCT FROM s.member_id
+              AND a.visitor_id IS NOT DISTINCT FROM s.visitor_id
+              AND NOT a.is_present
+              AND (s.last_present_date IS NULL OR a.meeting_date > s.last_present_date)
+          ) AS absent_streak
+        FROM person_stats s
       )
       SELECT
         'MEMBER'                    AS kind,
@@ -258,9 +281,12 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         NULL::boolean               AS is_baptized,
         COALESCE(s.meetings, 0)     AS meetings,
         COALESCE(s.present, 0)      AS present,
+        s.last_present_date,
+        COALESCE(st.absent_streak, 0) AS absent_streak,
         cm.created_at
       FROM cell_members cm
       LEFT JOIN person_stats s ON s.member_id = cm.id
+      LEFT JOIN streaks st      ON st.member_id = cm.id
       LEFT JOIN bairros b       ON b.id = cm.bairro_id
       LEFT JOIN cidades ci      ON ci.id = b.cidade_id
       WHERE cm.cell_id = ${cellId}
@@ -284,9 +310,12 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         v.is_baptized,
         COALESCE(s2.meetings, 0)    AS meetings,
         COALESCE(s2.present, 0)     AS present,
+        s2.last_present_date,
+        COALESCE(st2.absent_streak, 0) AS absent_streak,
         v.created_at
       FROM visitors v
       LEFT JOIN person_stats s2 ON s2.visitor_id = v.id
+      LEFT JOIN streaks st2      ON st2.visitor_id = v.id
       LEFT JOIN bairros b2       ON b2.id = v.bairro_id
       LEFT JOIN cidades ci2      ON ci2.id = b2.cidade_id
       WHERE v.cell_id = ${cellId}
@@ -321,9 +350,78 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
           meetingsCount === 0
             ? 0
             : Math.round((presentCount / meetingsCount) * 1000) / 10,
+        lastPresentDate: r.last_present_date,
+        absentStreak: Number(r.absent_streak),
         createdAt: r.created_at,
       };
     });
+  }
+
+  /**
+   * Todos os encontros da célula com a situação de uma pessoa em cada um.
+   *
+   * Percorre a mesma união de `findMeetingsByCellId` (encontros criados pelo
+   * líder + datas que só existem como presença lançada), mas sem o limite de
+   * 20: o calendário navega por qualquer mês do histórico. Encontro sem
+   * registro daquela pessoa volta com `isPresent: null` — é diferente de falta.
+   */
+  async findAttendeeHistory(
+    cellId: string,
+    personId: string,
+    kind: 'MEMBER' | 'VISITOR',
+  ): Promise<AttendeeMeetingHistory[]> {
+    const churchId = getEffectiveChurchId() ?? null;
+    const memberId = kind === 'MEMBER' ? personId : null;
+    const visitorId = kind === 'VISITOR' ? personId : null;
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        meeting_date: Date;
+        is_present: boolean | null;
+        lesson: string | null;
+        ministrante: string | null;
+      }>
+    >`
+      WITH meeting_dates AS (
+        SELECT m.meeting_date, m.lesson, m.ministrante
+        FROM cell_meetings m
+        WHERE m.cell_id = ${cellId}
+          AND (${churchId}::text IS NULL OR m.church_id = ${churchId})
+
+        UNION ALL
+
+        SELECT DISTINCT a2.meeting_date, NULL::text AS lesson, NULL::text AS ministrante
+        FROM attendances a2
+        WHERE a2.cell_id = ${cellId}
+          AND (${churchId}::text IS NULL OR a2.church_id = ${churchId})
+          AND NOT EXISTS (
+            SELECT 1 FROM cell_meetings cm
+            WHERE cm.cell_id = a2.cell_id AND cm.meeting_date = a2.meeting_date
+          )
+      )
+      SELECT
+        d.meeting_date,
+        p.is_present,
+        d.lesson,
+        d.ministrante
+      FROM meeting_dates d
+      LEFT JOIN attendances p
+        ON p.cell_id = ${cellId}
+       AND p.meeting_date = d.meeting_date
+       AND (${churchId}::text IS NULL OR p.church_id = ${churchId})
+       AND (
+         (${memberId}::text IS NOT NULL AND p.member_id = ${memberId}::text)
+         OR (${visitorId}::text IS NOT NULL AND p.visitor_id = ${visitorId}::text)
+       )
+      ORDER BY d.meeting_date DESC
+    `;
+
+    return rows.map((r) => ({
+      meetingDate: r.meeting_date,
+      isPresent: r.is_present,
+      lesson: r.lesson,
+      ministrante: r.ministrante,
+    }));
   }
 
   async createMeeting(

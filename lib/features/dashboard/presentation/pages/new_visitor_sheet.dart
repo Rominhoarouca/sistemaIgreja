@@ -2,12 +2,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../utils/snackbar_helper.dart';
+import '../../../../shared/widgets/cep_address_fields.dart';
 import '../widgets/demographic_fields.dart';
 
 /// SRP: responsável apenas pelo formulário de novo visitante.
 class NewVisitorSheet extends StatefulWidget {
-  const NewVisitorSheet({super.key, required this.dio});
+  const NewVisitorSheet({super.key, required this.dio, this.cellId});
   final Dio dio;
+
+  /// Quando aberto a partir de uma célula, já vincula o visitante a ela.
+  final String? cellId;
 
   @override
   State<NewVisitorSheet> createState() => _NewVisitorSheetState();
@@ -17,9 +21,12 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _addressCtrl = TextEditingController();
-  final _neighborhoodCtrl = TextEditingController();
-  final _cityCtrl = TextEditingController();
+  CepAddressValue _addressValue = const CepAddressValue(
+    address: '',
+    numero: '',
+    complemento: null,
+    bairroId: null,
+  );
   String? _gender;
   DateTime? _birthDate;
   String? _maritalStatus;
@@ -30,9 +37,6 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _emailCtrl.dispose();
-    _addressCtrl.dispose();
-    _neighborhoodCtrl.dispose();
-    _cityCtrl.dispose();
     super.dispose();
   }
 
@@ -56,14 +60,17 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
           'phone': phone,
           if (_emailCtrl.text.trim().isNotEmpty)
             'email': _emailCtrl.text.trim(),
-          if (_addressCtrl.text.trim().isNotEmpty)
-            'address': _addressCtrl.text.trim(),
-          if (_neighborhoodCtrl.text.trim().isNotEmpty)
-            'neighborhood': _neighborhoodCtrl.text.trim(),
-          if (_cityCtrl.text.trim().isNotEmpty) 'city': _cityCtrl.text.trim(),
+          if (_addressValue.address.isNotEmpty)
+            'address': _addressValue.address,
+          if (_addressValue.numero.isNotEmpty) 'numero': _addressValue.numero,
+          if (_addressValue.complemento != null)
+            'complemento': _addressValue.complemento,
+          if (_addressValue.bairroId != null)
+            'bairroId': _addressValue.bairroId,
           if (_gender != null) 'gender': _gender,
           if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
           if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
+          if (widget.cellId != null) 'cellId': widget.cellId,
         },
       );
       if (!mounted) return;
@@ -129,28 +136,9 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _addressCtrl,
-                label: 'Endereço',
-                hint: 'Rua, número',
-                prefixIcon: Icons.location_on_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _neighborhoodCtrl,
-                label: 'Bairro',
-                hint: 'Bairro',
-                prefixIcon: Icons.map_outlined,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSpacing.base),
-              AppTextField(
-                controller: _cityCtrl,
-                label: 'Cidade',
-                hint: 'São Paulo',
-                prefixIcon: Icons.location_city_outlined,
-                textInputAction: TextInputAction.done,
+              CepAddressFields(
+                dio: widget.dio,
+                onChanged: (v) => setState(() => _addressValue = v),
               ),
               const SizedBox(height: AppSpacing.base),
               DemographicFields(

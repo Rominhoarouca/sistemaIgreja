@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
@@ -177,7 +178,16 @@ class _AuthInterceptor extends Interceptor {
   final Dio _dio;
   final AuthStorage _storage;
   final DioClient _client;
-  bool _isRefreshing = false;
+
+  // Requisições concorrentes que expiram ao mesmo tempo (comum em telas que
+  // disparam vários GETs em paralelo, ex. Future.wait) todas caem em 401
+  // quase juntas. Antes, só a PRIMEIRA disparava o refresh — as demais viam
+  // `_isRefreshing == true` e desistiam direto com o 401 original, sem
+  // reter. Resultado: algumas ações falhavam silenciosamente até dar F5
+  // (que recomeça do zero e só dispara 1 request por vez). Agora todo 401
+  // concorrente espera o MESMO refresh em andamento (Completer compartilhado)
+  // e cada um tenta de novo com o token novo assim que ele sai.
+  Completer<String?>? _refreshCompleter;
 
   _AuthInterceptor(this._dio, this._storage, this._client);
 
@@ -205,48 +215,73 @@ class _AuthInterceptor extends Interceptor {
         err.requestOptions.path.contains('/auth/refresh') ||
         err.requestOptions.path.contains('/auth/register');
 
-    if (!isUnauthorized || isAuthEndpoint || _isRefreshing) {
+    if (!isUnauthorized || isAuthEndpoint) {
       handler.next(err);
       return;
     }
 
-    _isRefreshing = true;
+    final newAccess = await _refreshAccessToken();
+    if (newAccess == null) {
+      handler.next(err);
+      return;
+    }
+
     try {
-      final refreshToken = await _storage.getRefreshToken();
-      if (refreshToken == null) {
-        _triggerLogout();
-        handler.next(err);
-        return;
-      }
-
-      final refreshResponse = await _dio.post(
-        '/auth/refresh',
-        data: {'refreshToken': refreshToken},
-        options: Options(
-          headers: {
-            'Authorization': null, // remove token for refresh call
-            'Content-Type': 'application/json',
-          },
-          extra: {'skipAuth': true},
-        ),
-      );
-
-      final newAccess = refreshResponse.data['accessToken'] as String;
-      final newRefresh = refreshResponse.data['refreshToken'] as String;
-      await _storage.saveTokens(access: newAccess, refresh: newRefresh);
-
       // Retry the original request with the new token.
       final retryOpts = err.requestOptions
         ..headers['Authorization'] = 'Bearer $newAccess';
       final retryResponse = await _dio.fetch(retryOpts);
       handler.resolve(retryResponse);
     } catch (_) {
-      await _storage.clear();
-      _triggerLogout();
       handler.next(err);
-    } finally {
-      _isRefreshing = false;
     }
+  }
+
+  /// Garante uma única chamada a `/auth/refresh` em voo por vez — chamadas
+  /// concorrentes aguardam o mesmo [Completer] em vez de disparar cada uma
+  /// o seu próprio refresh (o que invalidaria o refresh token das outras).
+  Future<String?> _refreshAccessToken() {
+    final inFlight = _refreshCompleter;
+    if (inFlight != null) return inFlight.future;
+
+    final completer = Completer<String?>();
+    _refreshCompleter = completer;
+
+    Future<void>(() async {
+      try {
+        final refreshToken = await _storage.getRefreshToken();
+        if (refreshToken == null) {
+          _triggerLogout();
+          completer.complete(null);
+          return;
+        }
+
+        final refreshResponse = await _dio.post(
+          '/auth/refresh',
+          data: {'refreshToken': refreshToken},
+          options: Options(
+            headers: {
+              'Authorization': null, // remove token for refresh call
+              'Content-Type': 'application/json',
+            },
+            extra: {'skipAuth': true},
+          ),
+        );
+
+        final newAccess = refreshResponse.data['accessToken'] as String;
+        final newRefresh = refreshResponse.data['refreshToken'] as String;
+        await _storage.saveTokens(access: newAccess, refresh: newRefresh);
+        completer.complete(newAccess);
+      } catch (_) {
+        await _storage.clear();
+        _triggerLogout();
+        completer.complete(null);
+      } finally {
+        _refreshCompleter = null;
+      }
+    });
+
+    return completer.future;
   }
 
   void _triggerLogout() {

@@ -20,6 +20,11 @@ const createSchema = z.object({
   phone: z.string().min(8),
   email: z.string().email().optional(),
   address: z.string().optional(),
+  // Antes ausentes aqui: o Zod descartava esses campos em silêncio no
+  // POST /visitors usado pelos formulários de líder/admin (self-register já
+  // os tinha). Visitor já tem as colunas — só faltava aceitar no schema.
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
   bairroId: z.string().uuid().optional(),
   originChurch: z.string().optional(),
   birthDate: birthDateSchema.optional(),

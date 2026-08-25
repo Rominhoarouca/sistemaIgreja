@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../injection/injection.dart';
 
 /// Nearby Cells page — RF02 / RF03
 /// Shows list of nearby cell groups with distance
@@ -26,7 +26,7 @@ class _NearbyCellsPageState extends State<NearbyCellsPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadCells();
   }
 

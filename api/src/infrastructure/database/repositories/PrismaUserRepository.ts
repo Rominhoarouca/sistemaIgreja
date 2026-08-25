@@ -113,6 +113,20 @@ export class PrismaUserRepository implements IUserRepository {
     return coordinadores.map(({ password: _p, ...rest }) => ({ ...rest }));
   }
 
+  async searchUsers(query: string): Promise<User[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: 20,
+    });
+    return users.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
   async findLeadersBySupervisorId(supervisorId: string): Promise<User[]> {
     const leaders = await this.prisma.user.findMany({
       where: { role: 'LIDER', supervisorId },

@@ -12,7 +12,13 @@
 # precisam servir os mesmos .gz/.br que scripts/precompress_web.sh gera.
 FROM alpine:3.22 AS runner
 
-RUN apk add --no-cache nginx nginx-mod-http-brotli \
+# `brotli` (o binário, não só o módulo do nginx) é usado pelo entrypoint.sh
+# para recomprimir um arquivo quando a substituição do placeholder de
+# API_BASE_URL roda em runtime. Sem ele, `set -e` mata o entrypoint no meio e
+# o nginx nunca chega a subir — faltou aqui antes e não dava pra perceber
+# porque o bug do grep (--include incompatível com BusyBox) impedia esse
+# caminho de código de ser alcançado.
+RUN apk add --no-cache nginx nginx-mod-http-brotli brotli \
     && rm -f /etc/nginx/http.d/default.conf \
     && mkdir -p /usr/share/nginx/html
 

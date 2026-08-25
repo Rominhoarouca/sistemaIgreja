@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
 import '../../../../shared/widgets/address_selector.dart';
 import '../widgets/coordenacao_form_sheet.dart';
+import '../../../../injection/injection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -132,7 +132,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

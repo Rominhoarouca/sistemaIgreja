@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
+import '../../../../injection/injection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data Models
@@ -125,7 +125,7 @@ class _AdminLeadersPageState extends State<AdminLeadersPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

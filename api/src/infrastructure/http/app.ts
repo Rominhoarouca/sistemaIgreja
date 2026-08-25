@@ -12,6 +12,7 @@ import { spiritualHistoryRoutes } from './routes/spiritual-history.routes';
 import { dashboardRoutes } from './routes/dashboard.routes';
 import { materialRoutes } from './routes/material.routes';
 import { userRoutes } from './routes/user.routes';
+import { notificationRoutes } from './routes/notification.routes';
 import { coordenacaoRoutes } from './routes/coordenacao.routes';
 import { locationRoutes } from './routes/location.routes';
 import { cellTypeRoutes } from './routes/cell-type.routes';
@@ -115,6 +116,7 @@ export function createApp(container: Container): Application {
   app.use(`${v1}/users`, userRoutes(container.userController));
   app.use(`${v1}/location`, locationRoutes(container.locationController));
   app.use(`${v1}/cell-types`, cellTypeRoutes(container.cellTypeController));
+  app.use(`${v1}/notifications`, notificationRoutes(container.notificationController));
 
   // Recursos com gating por plano (authMiddleware → requireFeature → rotas).
   app.use(

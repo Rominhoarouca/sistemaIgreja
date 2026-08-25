@@ -1,12 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
 import '../../../supervisor/presentation/pages/supervisor_home_page.dart';
 import 'coordinator_dashboard_tab.dart';
+import '../../../../injection/injection.dart';
 
 /// Painel do Coordenador — coordena supervisores, seus líderes e células.
 /// Abas: Início (dashboard) · Supervisores · Líderes · Células.
@@ -145,7 +145,7 @@ class _SupervisorsTabState extends State<_SupervisorsTab> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

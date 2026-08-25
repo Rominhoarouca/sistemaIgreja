@@ -19,7 +19,11 @@ class MoreMenuTab extends StatelessWidget {
   const MoreMenuTab({super.key});
 
   static const _people = [
-    _MoreItem(Icons.record_voice_over_outlined, 'Líderes', AppRoutes.adminLeaders),
+    _MoreItem(
+      Icons.record_voice_over_outlined,
+      'Líderes',
+      AppRoutes.adminLeaders,
+    ),
     _MoreItem(
       Icons.supervisor_account_outlined,
       'Supervisores',
@@ -32,10 +36,19 @@ class MoreMenuTab extends StatelessWidget {
       AppRoutes.adminUsersRegister,
       subtitle: 'Líder, supervisor ou coordenador',
     ),
+    _MoreItem(
+      Icons.qr_code_2_outlined,
+      'QR Code de cadastro',
+      AppRoutes.adminQrCode,
+    ),
   ];
 
   static const _system = [
-    _MoreItem(Icons.category_outlined, 'Tipos de Célula', AppRoutes.adminCellTypes),
+    _MoreItem(
+      Icons.category_outlined,
+      'Tipos de Célula',
+      AppRoutes.adminCellTypes,
+    ),
     _MoreItem(Icons.folder_open_rounded, 'Materiais', AppRoutes.adminMaterials),
     _MoreItem(Icons.chat_outlined, 'WhatsApp', AppRoutes.adminWhatsapp),
     _MoreItem(
@@ -68,9 +81,7 @@ class MoreMenuTab extends StatelessWidget {
             children: [
               SwitchListTile(
                 secondary: Icon(
-                  isDark
-                      ? Icons.dark_mode_outlined
-                      : Icons.light_mode_outlined,
+                  isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
                 ),
                 title: Text('Modo escuro', style: AppTypography.bodyLarge),
                 value: ThemeController.instance.isDark(context),
@@ -92,7 +103,10 @@ class MoreMenuTab extends StatelessWidget {
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.logout_rounded, color: AppColors.error),
+                leading: const Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.error,
+                ),
                 title: Text(
                   'Sair',
                   style: AppTypography.bodyLarge.copyWith(

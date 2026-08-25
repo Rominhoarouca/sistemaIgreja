@@ -13,6 +13,24 @@ type BairroRow = {
   };
 } | null;
 
+// leader → supervisor → coordenação: cadeia usada pra mostrar em qual
+// coordenação/supervisor a célula está, sem herdar isso direto na Cell (só o
+// líder é dono da célula; supervisor/coordenação são transitivos por ele).
+const leaderInclude = {
+  leader: {
+    select: {
+      name: true,
+      supervisor: {
+        select: {
+          id: true,
+          name: true,
+          coordenacao: { select: { name: true, color: true } },
+        },
+      },
+    },
+  },
+} as const;
+
 const bairroInclude = {
   bairro: {
     select: {
@@ -38,14 +56,14 @@ export class PrismaCellRepository implements ICellRepository {
   async findById(id: string): Promise<Cell | null> {
     const row = await this.prisma.cell.findUnique({
       where: { id },
-      include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
+      include: { ...leaderInclude, _count: { select: { members: true } }, ...bairroInclude },
     });
     return row ? this.mapRow(row) : null;
   }
 
   async findAll(): Promise<Cell[]> {
     const rows = await this.prisma.cell.findMany({
-      include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
+      include: { ...leaderInclude, _count: { select: { members: true } }, ...bairroInclude },
       orderBy: { name: 'asc' },
     });
     return rows.map((r) => this.mapRow(r));
@@ -61,6 +79,7 @@ export class PrismaCellRepository implements ICellRepository {
         id: string;
         name: string;
         leader_id: string;
+        leader_name: string | null;
         address: string;
         bairro_id: string | null;
         day_of_week: string;
@@ -78,6 +97,7 @@ export class PrismaCellRepository implements ICellRepository {
         c.id,
         c.name,
         c.leader_id,
+        u.name AS leader_name,
         c.address,
         c.bairro_id,
         c.day_of_week,
@@ -99,9 +119,10 @@ export class PrismaCellRepository implements ICellRepository {
         ) AS distance_km
       FROM cells c
       LEFT JOIN cell_members m ON m.cell_id = c.id
+      LEFT JOIN users u ON u.id = c.leader_id
       WHERE c.latitude IS NOT NULL AND c.longitude IS NOT NULL
         AND (${churchId}::text IS NULL OR c.church_id = ${churchId})
-      GROUP BY c.id
+      GROUP BY c.id, u.name
       HAVING (
         6371 * acos(
           cos(radians(${latitude})) *
@@ -135,6 +156,7 @@ export class PrismaCellRepository implements ICellRepository {
         id: r.id,
         name: r.name,
         leaderId: r.leader_id,
+        ...(r.leader_name != null && { leaderName: r.leader_name }),
         cellTypeId: null,
         cellTypeName: null,
         address: r.address,
@@ -169,7 +191,7 @@ export class PrismaCellRepository implements ICellRepository {
         latitude: data.latitude ?? null,
         longitude: data.longitude ?? null,
       },
-      include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
+      include: { ...leaderInclude, _count: { select: { members: true } }, ...bairroInclude },
     });
     return this.mapRow(row);
   }
@@ -189,7 +211,7 @@ export class PrismaCellRepository implements ICellRepository {
         ...(data.latitude !== undefined && { latitude: data.latitude }),
         ...(data.longitude !== undefined && { longitude: data.longitude }),
       },
-      include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
+      include: { ...leaderInclude, _count: { select: { members: true } }, ...bairroInclude },
     });
     return this.mapRow(row);
   }
@@ -205,7 +227,7 @@ export class PrismaCellRepository implements ICellRepository {
   async findByLeaderId(leaderId: string): Promise<Cell[]> {
     const rows = await this.prisma.cell.findMany({
       where: { leaderId },
-      include: { leader: { select: { name: true } }, _count: { select: { members: true } }, ...bairroInclude },
+      include: { ...leaderInclude, _count: { select: { members: true } }, ...bairroInclude },
       orderBy: { name: 'asc' },
     });
     return rows.map((r) => this.mapRow(r));
@@ -215,7 +237,14 @@ export class PrismaCellRepository implements ICellRepository {
     id: string;
     name: string;
     leaderId: string;
-    leader?: { name: string } | null;
+    leader?: {
+      name: string;
+      supervisor?: {
+        id: string;
+        name: string;
+        coordenacao?: { name: string; color: string } | null;
+      } | null;
+    } | null;
     cellTypeId?: string | null;
     cellType?: { id: string; name: string } | null;
     address: string;
@@ -236,6 +265,10 @@ export class PrismaCellRepository implements ICellRepository {
       name: row.name,
       leaderId: row.leaderId,
       ...(row.leader?.name !== undefined && { leaderName: row.leader.name }),
+      leaderSupervisorId: row.leader?.supervisor?.id ?? null,
+      supervisorName: row.leader?.supervisor?.name ?? null,
+      coordenacaoName: row.leader?.supervisor?.coordenacao?.name ?? null,
+      coordenacaoColor: row.leader?.supervisor?.coordenacao?.color ?? null,
       cellTypeId: row.cellTypeId ?? null,
       ...(row.cellType?.name !== undefined && { cellTypeName: row.cellType.name }),
       address: row.address,

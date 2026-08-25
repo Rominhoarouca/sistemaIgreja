@@ -273,6 +273,15 @@ GoRouter createRouter(AuthBloc authBloc) {
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: ChurchAdminPage()),
           ),
+
+          // ── Notifications (rota compartilhada — sidebar só some pra
+          // quem não é admin, ver AdminScaffold) ─────────────────────────
+          GoRoute(
+            path: '/notifications',
+            name: 'notifications',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: NotificationsPage()),
+          ),
         ],
       ),
 
@@ -290,14 +299,6 @@ GoRouter createRouter(AuthBloc authBloc) {
         name: 'change-password',
         pageBuilder: (context, state) =>
             const MaterialPage(child: ChangePasswordPage()),
-      ),
-
-      // ── Notifications ─────────────────────────────────────────────────
-      GoRoute(
-        path: '/notifications',
-        name: 'notifications',
-        pageBuilder: (context, state) =>
-            const MaterialPage(child: NotificationsPage()),
       ),
 
       // ── About ─────────────────────────────────────────────────────────

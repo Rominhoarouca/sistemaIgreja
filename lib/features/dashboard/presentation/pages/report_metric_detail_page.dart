@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../injection/injection.dart';
 
 /// Métrica clicada na tela de Relatórios ou no Dashboard.
 enum ReportMetric {
@@ -66,7 +66,7 @@ class _ReportMetricDetailPageState extends State<ReportMetricDetailPage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 
@@ -92,7 +92,8 @@ class _ReportMetricDetailPageState extends State<ReportMetricDetailPage> {
         case ReportMetric.forwardedVisitors:
           await _loadVisitorsByStatus(
             statuses: {'em_acompanhamento', 'integrado'},
-            subtitle: 'Visitantes encaminhados (em acompanhamento e integrados)',
+            subtitle:
+                'Visitantes encaminhados (em acompanhamento e integrados)',
           );
         case ReportMetric.integratedVisitors:
           await _loadVisitorsByStatus(

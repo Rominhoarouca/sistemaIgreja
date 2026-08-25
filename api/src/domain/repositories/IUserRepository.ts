@@ -37,6 +37,7 @@ export interface IUserRepository {
   listLeaders(): Promise<User[]>;
   listSupervisors(): Promise<User[]>;
   listCoordinadores(): Promise<User[]>;
+  searchUsers(query: string): Promise<User[]>;
   findLeadersBySupervisorId(supervisorId: string): Promise<User[]>;
   findSupervisorsByCoordinatorId(coordinatorId: string): Promise<User[]>;
   findLeadersByCoordinatorId(coordinatorId: string): Promise<User[]>;

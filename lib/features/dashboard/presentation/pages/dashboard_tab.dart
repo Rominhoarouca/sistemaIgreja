@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../data/services/dashboard_service.dart';
@@ -12,6 +11,7 @@ import 'chart_detail_page.dart';
 import 'admin_dashboard_sheets.dart';
 import 'report_metric_detail_page.dart';
 import '../widgets/visitor_widgets.dart';
+import '../../../../injection/injection.dart';
 
 /// SRP: responsável apenas por exibir a aba de overview do dashboard.
 /// DIP: depende de IDashboardService, não de Dio diretamente.
@@ -36,7 +36,7 @@ class _DashboardTabState extends State<DashboardTab> {
   @override
   void initState() {
     super.initState();
-    _dashboardService = DashboardService(DioClient(AuthStorage()).dio);
+    _dashboardService = DashboardService(getIt<DioClient>().dio);
     _loadData();
   }
 
@@ -46,7 +46,7 @@ class _DashboardTabState extends State<DashboardTab> {
       _error = null;
     });
     try {
-      final dio = DioClient(AuthStorage()).dio;
+      final dio = getIt<DioClient>().dio;
       final results = await Future.wait([
         _dashboardService.getStats(),
         _dashboardService.getMonthlyStats(),
@@ -365,7 +365,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   prefixIcon: Icons.add_circle_outline,
                   onPressed: () => _showSheet(
                     context,
-                    NewCellSheet(dio: DioClient(AuthStorage()).dio),
+                    NewCellSheet(dio: getIt<DioClient>().dio),
                   ),
                 ),
               ),
@@ -377,7 +377,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   prefixIcon: Icons.person_add_outlined,
                   onPressed: () => _showSheet(
                     context,
-                    NewLeaderSheet(dio: DioClient(AuthStorage()).dio),
+                    NewLeaderSheet(dio: getIt<DioClient>().dio),
                   ),
                 ),
               ),

@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../saas/domain/church_context.dart';
 import '../../../saas/presentation/church_context_controller.dart';
 import '../../../saas/presentation/widgets/feature_locked_dialog.dart';
+import '../../../../injection/injection.dart';
 
 /// Item de navegação da sidebar.
 class _SidebarItem {
@@ -134,7 +134,7 @@ class _AdminSidebarState extends State<AdminSidebar> {
 
   Future<void> _loadVisitorBadge() async {
     try {
-      final dio = DioClient(AuthStorage()).dio;
+      final dio = getIt<DioClient>().dio;
       final resp = await dio.get('/visitors');
       final data = ((resp.data as Map<String, dynamic>)['data'] as List)
           .cast<Map<String, dynamic>>();

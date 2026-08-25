@@ -12,7 +12,9 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../shared/utils/app_snackbar.dart';
 import '../bloc/auth_bloc.dart';
+import '../../../../injection/injection.dart';
 
 /// Profile page — view and edit user profile, including photo, contact info,
 /// birth date, and list of children.
@@ -24,7 +26,7 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final _authStorage = AuthStorage();
+  final _authStorage = getIt<AuthStorage>();
   late final Dio _dio;
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
@@ -47,7 +49,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(_authStorage).dio;
+    _dio = getIt<DioClient>().dio;
     _loadProfile();
   }
 
@@ -107,14 +109,8 @@ class _ProfilePageState extends State<ProfilePage> {
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _loadingProfile = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao carregar perfil',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao carregar perfil'),
       );
     }
   }
@@ -383,23 +379,12 @@ class _ProfilePageState extends State<ProfilePage> {
       await _loadProfile();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Perfil atualizado com sucesso!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      AppSnackbar.success('Perfil atualizado com sucesso!');
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.response?.data?['error']?['message'] as String? ??
-                'Erro ao atualizar perfil',
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao atualizar perfil'),
       );
     }
   }
@@ -475,10 +460,7 @@ class _ProfilePageState extends State<ProfilePage> {
               else
                 TextButton(
                   onPressed: () => setState(() => _editing = false),
-                  child: const Text(
-                    'Cancelar',
-                    style: TextStyle(color: AppColors.white),
-                  ),
+                  child: Text('Cancelar', style: AppTypography.labelMedium),
                 ),
             ],
           ),
@@ -555,9 +537,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                     Icons.photo_camera_outlined,
                                     color: AppColors.white,
                                   ),
-                                  label: const Text(
+                                  label: Text(
                                     'Alterar foto',
-                                    style: TextStyle(color: AppColors.white),
+                                    style: AppTypography.buttonLabel.copyWith(
+                                      color: AppColors.white,
+                                    ),
                                   ),
                                 )
                               else ...[

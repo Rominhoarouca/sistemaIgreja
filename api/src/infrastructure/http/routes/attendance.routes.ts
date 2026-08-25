@@ -14,6 +14,7 @@ export function attendanceRoutes(controller: AttendanceController): Router {
   router.post('/', controller.register);
   router.get('/cell/:cellId', controller.findByCellAndDate);
   router.get('/cell/:cellId/attendees', controller.findAttendeesByCell);
+  router.get('/cell/:cellId/attendees/:personId/history', controller.findAttendeeHistory);
   router.get('/cell/:cellId/meetings', controller.findMeetingsByCell);
   router.post('/cell/:cellId/meetings', controller.createMeeting);
   router.post('/cell/:cellId/meetings/:meetingDate/photo', upload.single('photo'), controller.uploadMeetingPhoto);

@@ -188,7 +188,10 @@ class _SectionHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Informações demográficas', style: AppTypography.titleMedium),
+              Text(
+                'Informações demográficas',
+                style: AppTypography.titleMedium,
+              ),
               const SizedBox(height: AppSpacing.xs2),
               Text(
                 total == 1

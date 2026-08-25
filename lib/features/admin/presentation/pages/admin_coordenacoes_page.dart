@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../injection/injection.dart';
 
 /// Shows a toast above any modal/sheet using the Overlay system.
 void _showOverlayToast(
@@ -192,7 +192,7 @@ class _AdminCoordenacoes extends State<AdminCoordenacoes> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 

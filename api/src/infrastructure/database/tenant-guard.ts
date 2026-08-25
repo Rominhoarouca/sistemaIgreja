@@ -54,6 +54,7 @@ const TENANT_MODELS = new Set<Prisma.ModelName>([
   'Attendance',
   'SpiritualHistory',
   'Material',
+  'Notification',
 ]);
 
 /**

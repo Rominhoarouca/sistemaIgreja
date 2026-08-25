@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../../core/network/auth_storage.dart';
 import '../../core/network/dio_client.dart';
 import '../../design_system/design_system.dart';
+import '../../injection/injection.dart';
 
 /// Abre o sheet de redefinição de senha de outro usuário.
 /// O backend valida o escopo do solicitante (admin → todos; supervisor →
@@ -51,7 +51,7 @@ class _ResetPasswordSheetState extends State<ResetPasswordSheet> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     try {
-      final dio = DioClient(AuthStorage()).dio;
+      final dio = getIt<DioClient>().dio;
       await dio.patch(
         '/users/${widget.userId}/password',
         data: {'newPassword': _passwordCtrl.text},

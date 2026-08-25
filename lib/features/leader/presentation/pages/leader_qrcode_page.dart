@@ -2,11 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/qr_code_card.dart';
 import '../../../saas/presentation/church_context_controller.dart';
+import '../../../../injection/injection.dart';
 
 /// QR Code de cadastro por célula, para o líder.
 ///
@@ -44,7 +44,7 @@ class _LeaderQrCodePageState extends State<LeaderQrCodePage> {
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _load();
   }
 

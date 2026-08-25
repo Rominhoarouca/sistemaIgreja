@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../../injection/injection.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -119,7 +119,7 @@ class _AdminWhatsappPageState extends State<AdminWhatsappPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
   }
 
   @override

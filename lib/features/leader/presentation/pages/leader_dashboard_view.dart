@@ -2,10 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/network/auth_storage.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/stat_detail_page.dart';
+import '../../../../injection/injection.dart';
+import '../widgets/attendance_calendar_dialog.dart';
+import '../widgets/attendee_widgets.dart';
 
 /// Destinos de navegação do perfil Líder — Início + abas da célula.
 /// Índices 1..4 correspondem às abas 0..3 da gestão de célula.
@@ -96,6 +98,20 @@ class _Contact {
       .join();
 }
 
+/// Frequentador com a célula de onde ele veio — o dashboard junta as células
+/// todas, então o nome sozinho não diz onde a pessoa está.
+class _AttendeeRef {
+  const _AttendeeRef({
+    required this.attendee,
+    required this.cellId,
+    required this.cellName,
+  });
+
+  final CellAttendee attendee;
+  final String cellId;
+  final String cellName;
+}
+
 /// Home do perfil Líder — dashboard agregado das células em que ele está
 /// alocado: KPIs, células, visitantes recentes e envio de WhatsApp restrito
 /// a esse contexto.
@@ -133,11 +149,12 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
   final Map<String, int> _memberCount = {};
   final Map<String, int> _visitorCount = {};
   List<_Contact> _contacts = [];
+  List<_AttendeeRef> _attendees = [];
 
   @override
   void initState() {
     super.initState();
-    _dio = DioClient(AuthStorage()).dio;
+    _dio = getIt<DioClient>().dio;
     _loadData();
   }
 
@@ -148,11 +165,15 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
     });
     try {
       final contacts = <_Contact>[];
+      final attendees = <_AttendeeRef>[];
       await Future.wait(
         widget.cells.map((cell) async {
           final results = await Future.wait([
             _dio.get('/visitors', queryParameters: {'cellId': cell.id}),
             _dio.get('/cells/${cell.id}/members'),
+            // Traz aniversário e frequência individual na mesma resposta — é a
+            // fonte das seções "Aniversariantes" e "Precisam de atenção".
+            _dio.get('/attendance/cell/${cell.id}/attendees'),
           ]);
           final visitors =
               ((results[0].data as Map<String, dynamic>)['data'] as List? ?? [])
@@ -161,6 +182,20 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
               ((results[1].data as Map<String, dynamic>)['members'] as List? ??
                       [])
                   .cast<Map<String, dynamic>>();
+          final cellAttendees =
+              ((results[2].data as Map<String, dynamic>)['attendees']
+                          as List? ??
+                      [])
+                  .cast<Map<String, dynamic>>();
+          for (final a in cellAttendees) {
+            attendees.add(
+              _AttendeeRef(
+                attendee: CellAttendee.fromJson(a),
+                cellId: cell.id,
+                cellName: cell.name,
+              ),
+            );
+          }
           _visitorCount[cell.id] = visitors.length;
           _memberCount[cell.id] = members.length;
           for (final v in visitors) {
@@ -194,6 +229,7 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
       if (!mounted) return;
       setState(() {
         _contacts = contacts;
+        _attendees = attendees;
         _loading = false;
       });
     } catch (_) {
@@ -215,6 +251,29 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
 
   int get _integratedCount =>
       _visitors.where((c) => (c.status ?? '') == 'integrado').length;
+
+  /// Aniversariantes do mês corrente, do dia 1 para o 31.
+  List<_AttendeeRef> get _birthdaysThisMonth {
+    final month = DateTime.now().month;
+    return _attendees.where((r) => r.attendee.birthdayInMonth(month)).toList()
+      ..sort((a, b) {
+        final byDay = (a.attendee.birthDay ?? 0).compareTo(
+          b.attendee.birthDay ?? 0,
+        );
+        return byDay != 0 ? byDay : a.attendee.name.compareTo(b.attendee.name);
+      });
+  }
+
+  /// Quem parou de vir, do caso mais grave para o menos grave.
+  List<_AttendeeRef> get _inactives =>
+      _attendees.where((r) => r.attendee.isInactive).toList()..sort((a, b) {
+        final byStreak = b.attendee.absentStreak.compareTo(
+          a.attendee.absentStreak,
+        );
+        return byStreak != 0
+            ? byStreak
+            : a.attendee.name.compareTo(b.attendee.name);
+      });
 
   void _openWhatsappSheet() {
     showModalBottomSheet<void>(
@@ -327,6 +386,64 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
           .toList(),
     );
   }
+
+  void _openBirthdaysDetail() {
+    final list = _birthdaysThisMonth;
+    _openStatDetail(
+      title: 'Aniversariantes de ${monthNameBr(DateTime.now().month)}',
+      icon: Icons.cake_outlined,
+      headerValue: '${list.length}',
+      subtitle: 'Membros e visitantes das suas células',
+      columns: const ['Dia', 'Nome', 'Telefone', 'Célula'],
+      rows: list
+          .map(
+            (r) => [
+              formatDayMonthBr(r.attendee.birthDate!.toUtc()),
+              r.attendee.name,
+              (r.attendee.phone ?? '').isEmpty ? '—' : r.attendee.phone!,
+              r.cellName,
+            ],
+          )
+          .toList(),
+    );
+  }
+
+  void _openInactivesDetail() {
+    final list = _inactives;
+    _openStatDetail(
+      title: 'Precisam de atenção',
+      icon: Icons.person_off_outlined,
+      headerValue: '${list.length}',
+      subtitle: 'Faltaram nos últimos $kInactiveAbsentStreak encontros ou mais',
+      columns: const [
+        'Nome',
+        'Faltas seguidas',
+        'Última presença',
+        'Frequência',
+        'Célula',
+      ],
+      rows: list
+          .map(
+            (r) => [
+              r.attendee.name,
+              '${r.attendee.absentStreak}',
+              r.attendee.lastPresentDate == null
+                  ? 'Nunca veio'
+                  : formatDateBr(r.attendee.lastPresentDate!),
+              formatPercentBr(r.attendee.attendanceRate),
+              r.cellName,
+            ],
+          )
+          .toList(),
+    );
+  }
+
+  void _openAttendeeCalendar(_AttendeeRef ref) => showAttendanceCalendarDialog(
+    context: context,
+    dio: _dio,
+    cellId: ref.cellId,
+    attendee: ref.attendee,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -456,6 +573,8 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
     final totalMembers = _memberCount.values.fold(0, (a, b) => a + b);
     final totalVisitors = _visitorCount.values.fold(0, (a, b) => a + b);
     final integrated = _integratedCount;
+    final birthdays = _birthdaysThisMonth;
+    final inactives = _inactives;
     final isDesktop = MediaQuery.sizeOf(context).width >= 1024;
 
     return RefreshIndicator(
@@ -502,6 +621,23 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
                     ? '${(integrated / totalVisitors * 100).round()}%'
                     : null,
                 onTap: _openIntegratedDetail,
+              ),
+              StatCard(
+                label: 'Aniversariantes do mês',
+                value: '${birthdays.length}',
+                icon: Icons.cake_outlined,
+                onTap: _openBirthdaysDetail,
+              ),
+              StatCard(
+                label: 'Ausentes',
+                value: '${inactives.length}',
+                icon: Icons.person_off_outlined,
+                // Pill vermelha: aqui número alto é problema, não conquista.
+                subtitle: inactives.isEmpty
+                    ? null
+                    : '$kInactiveAbsentStreak+ faltas',
+                deltaPositive: false,
+                onTap: _openInactivesDetail,
               ),
             ]),
           ),
@@ -624,6 +760,60 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
           ),
           const SizedBox(height: AppSpacing.base),
 
+          // ── Aniversariantes do mês ───────────────────────────────────
+          AppSectionHeader(
+            title: 'Aniversariantes de ${monthNameBr(DateTime.now().month)}',
+            actionLabel: birthdays.length > _kSectionPreview
+                ? 'Ver todos'
+                : null,
+            onAction: _openBirthdaysDetail,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (birthdays.isEmpty)
+            AppCard(
+              child: Text(
+                'Ninguém faz aniversário neste mês.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ...birthdays
+                .take(_kSectionPreview)
+                .map((r) => _BirthdayTile(entry: r, theme: theme)),
+          const SizedBox(height: AppSpacing.base),
+
+          // ── Ausentes ─────────────────────────────────────────────────
+          AppSectionHeader(
+            title: 'Precisam de atenção',
+            actionLabel: inactives.length > _kSectionPreview
+                ? 'Ver todos'
+                : null,
+            onAction: _openInactivesDetail,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (inactives.isEmpty)
+            AppCard(
+              child: Text(
+                'Ninguém acumulou $kInactiveAbsentStreak faltas seguidas.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ...inactives
+                .take(_kSectionPreview)
+                .map(
+                  (r) => _InactiveTile(
+                    entry: r,
+                    theme: theme,
+                    onTap: () => _openAttendeeCalendar(r),
+                  ),
+                ),
+          const SizedBox(height: AppSpacing.base),
+
           // ── Visitantes recentes ──────────────────────────────────────
           AppSectionHeader(title: 'Visitantes recentes'),
           const SizedBox(height: AppSpacing.sm),
@@ -669,6 +859,152 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
             ),
           const SizedBox(height: AppSpacing.xl2),
         ],
+      ),
+    );
+  }
+}
+
+/// Quantas linhas cada seção mostra antes do "Ver todos".
+const _kSectionPreview = 5;
+
+/// Linha de aniversariante: dia em destaque, nome, célula e "Hoje" quando é o
+/// dia — que é a única informação acionável imediata da lista.
+class _BirthdayTile extends StatelessWidget {
+  const _BirthdayTile({required this.entry, required this.theme});
+
+  final _AttendeeRef entry;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = theme.brightness == Brightness.dark;
+    final birthDate = entry.attendee.birthDate!.toUtc();
+    final now = DateTime.now();
+    final isToday = birthDate.day == now.day && birthDate.month == now.month;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              child: Text(
+                '${birthDate.day}'.padLeft(2, '0'),
+                style: AppTypography.titleSmall.copyWith(
+                  color: isDark ? AppColors.linkDark : AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.attendee.name,
+                    style: AppTypography.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      entry.cellName,
+                      entry.attendee.isMember ? 'Membro' : 'Visitante',
+                    ].join(' · '),
+                    style: AppTypography.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (isToday)
+              const AppBadge(
+                label: 'Hoje',
+                variant: AppBadgeVariant.success,
+                size: AppBadgeSize.sm,
+              )
+            else
+              Text(
+                formatDayMonthBr(birthDate),
+                style: AppTypography.labelMedium.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Linha de quem parou de vir: quantas faltas seguidas e desde quando. O toque
+/// abre o calendário de frequência da pessoa.
+class _InactiveTile extends StatelessWidget {
+  const _InactiveTile({
+    required this.entry,
+    required this.theme,
+    required this.onTap,
+  });
+
+  final _AttendeeRef entry;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final attendee = entry.attendee;
+    final lastPresent = attendee.lastPresentDate;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            AppAvatar(initials: attendee.initials),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    attendee.name,
+                    style: AppTypography.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    lastPresent == null
+                        ? '${entry.cellName} · nunca esteve presente'
+                        : '${entry.cellName} · desde ${formatDateBr(lastPresent)}',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            AppBadge(
+              label: '${attendee.absentStreak} faltas',
+              variant: AppBadgeVariant.error,
+              size: AppBadgeSize.sm,
+            ),
+          ],
+        ),
       ),
     );
   }
