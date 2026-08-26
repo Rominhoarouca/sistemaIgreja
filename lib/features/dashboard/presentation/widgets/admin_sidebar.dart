@@ -116,11 +116,19 @@ class _AdminSidebarState extends State<AdminSidebar> {
   /// igreja ainda não enviou uma logo própria ou o download falha.
   Widget _brandLogo() {
     final logoUrl = ChurchContextController.instance.church?.logoUrl;
-    const fallback = Image(
-      image: AssetImage('assets/images/logo.png'),
+    // `errorBuilder` obrigatório: quando o asset falha, o ErrorWidget padrão
+    // entra sem restrição de tamanho e estoura a largura da sidebar — foi o
+    // que aconteceu na web com o nome de arquivo errado.
+    final fallback = Image(
+      image: const AssetImage('assets/images/logo.png'),
       width: 36,
       height: 36,
       fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const SizedBox(
+        width: 36,
+        height: 36,
+        child: Icon(Icons.church_outlined, size: 24),
+      ),
     );
     if (logoUrl == null || logoUrl.isEmpty) return fallback;
     return CachedNetworkImage(

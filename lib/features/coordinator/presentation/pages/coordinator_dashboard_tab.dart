@@ -6,6 +6,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/stat_detail_page.dart';
 import '../../../dashboard/presentation/widgets/integration_line_chart.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Contato alcançável pelo coordenador via WhatsApp: supervisor ou líder da
 /// sua coordenação, ou visitante/membro das células desses líderes.
@@ -439,7 +440,7 @@ class _CoordinatorDashboardTabState extends State<CoordinatorDashboardTab> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isDesktop ? 4 : 2,
+              crossAxisCount: AppBreakpoints.kpiColumns(context, itemCount: 4),
               crossAxisSpacing: AppSpacing.base,
               mainAxisSpacing: AppSpacing.base,
               mainAxisExtent: 148,
@@ -567,7 +568,7 @@ class _CoordinatorDashboardTabState extends State<CoordinatorDashboardTab> {
                             Text(s.name, style: AppTypography.titleSmall),
                             const SizedBox(height: 2),
                             Text(
-                              '${s.leaderCount} líder(es) · ${s.cellCount} célula(s) · ${s.memberCount} membros',
+                              '${plural(s.leaderCount, 'líder', 'líderes')} · ${plural(s.cellCount, 'célula')} · ${plural(s.memberCount, 'membro')}',
                               style: AppTypography.bodySmall.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -980,7 +981,7 @@ class _CoordinatorWhatsappSheetState extends State<_CoordinatorWhatsappSheet> {
                     label: Text(
                       _sending
                           ? 'Enviando ($_sentCount/${_selected.length})…'
-                          : 'Enviar para ${_selected.length} contato(s)',
+                          : 'Enviar para ${plural(_selected.length, 'contato')}',
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.whatsapp,

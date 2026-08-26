@@ -6,6 +6,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/stat_detail_page.dart';
 import '../../../dashboard/presentation/widgets/integration_line_chart.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Contato alcançável pelo supervisor via WhatsApp: líder supervisionado ou
 /// visitante/membro de uma célula desses líderes.
@@ -406,7 +407,7 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isDesktop ? 4 : 2,
+              crossAxisCount: AppBreakpoints.kpiColumns(context, itemCount: 4),
               crossAxisSpacing: AppSpacing.base,
               mainAxisSpacing: AppSpacing.base,
               mainAxisExtent: 148,
@@ -524,7 +525,7 @@ class _SupervisorDashboardTabState extends State<SupervisorDashboardTab> {
                           Text(l.name, style: AppTypography.titleSmall),
                           const SizedBox(height: 2),
                           Text(
-                            '${l.cellCount} célula(s) · ${l.memberCount} membros',
+                            '${plural(l.cellCount, 'célula')} · ${plural(l.memberCount, 'membro')}',
                             style: AppTypography.bodySmall.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -925,7 +926,7 @@ class _SupervisorWhatsappSheetState extends State<_SupervisorWhatsappSheet> {
                     label: Text(
                       _sending
                           ? 'Enviando ($_sentCount/${_selected.length})…'
-                          : 'Enviar para ${_selected.length} contato(s)',
+                          : 'Enviar para ${plural(_selected.length, 'contato')}',
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.whatsapp,

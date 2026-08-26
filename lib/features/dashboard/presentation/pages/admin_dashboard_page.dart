@@ -270,6 +270,14 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
             'Erro ao carregar visitantes';
         _isLoading = false;
       });
+    } catch (e) {
+      // Sem este catch, um payload fora do formato esperado escapava como
+      // TypeError: a tela ficava sem lista, sem erro e sem spinner.
+      if (!mounted) return;
+      setState(() {
+        _error = 'Erro ao carregar visitantes: $e';
+        _isLoading = false;
+      });
     }
   }
 
@@ -445,7 +453,15 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
                         children: [
                           // Bairro filter
                           Container(
-                            constraints: const BoxConstraints(minWidth: 140),
+                            // Largura máxima obrigatória: dentro de um scroll
+                            // horizontal a largura é infinita, e o
+                            // `isExpanded: true` do DropdownButton usa Expanded
+                            // — que estoura com constraint sem limite e derruba
+                            // a árvore inteira da aba.
+                            constraints: const BoxConstraints(
+                              minWidth: 140,
+                              maxWidth: 220,
+                            ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                             ),
@@ -482,7 +498,10 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
 
                           // Faixa etária filter
                           Container(
-                            constraints: const BoxConstraints(minWidth: 130),
+                            constraints: const BoxConstraints(
+                              minWidth: 130,
+                              maxWidth: 220,
+                            ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                             ),
@@ -519,7 +538,10 @@ class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
 
                           // Estado civil filter
                           Container(
-                            constraints: const BoxConstraints(minWidth: 150),
+                            constraints: const BoxConstraints(
+                              minWidth: 150,
+                              maxWidth: 220,
+                            ),
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                             ),

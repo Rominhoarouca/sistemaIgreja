@@ -7,6 +7,7 @@ import '../../../../shared/widgets/reset_password_sheet.dart';
 import '../../../supervisor/presentation/pages/supervisor_home_page.dart';
 import 'coordinator_dashboard_tab.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Painel do Coordenador — coordena supervisores, seus líderes e células.
 /// Abas: Início (dashboard) · Supervisores · Líderes · Células.
@@ -309,7 +310,11 @@ class _SupervisorsTabState extends State<_SupervisorsTab> {
                             ),
                           ),
                           AppBadge(
-                            label: '${leaderNames.length} líder(es)',
+                            label: plural(
+                              leaderNames.length,
+                              'líder',
+                              'líderes',
+                            ),
                             variant: AppBadgeVariant.primary,
                             size: AppBadgeSize.sm,
                           ),

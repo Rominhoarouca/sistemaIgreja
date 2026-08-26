@@ -1,0 +1,6 @@
+{
+  "$comment": "App Distribution é acionado pelo scripts/distribute.sh; este arquivo apenas fixa o projeto padrão do CLI.",
+  "projects": {
+    "default": "multiplicado-a36cf"
+  }
+}

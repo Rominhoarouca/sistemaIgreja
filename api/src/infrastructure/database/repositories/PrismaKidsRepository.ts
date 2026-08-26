@@ -54,7 +54,9 @@ const noteInclude = {
 } satisfies Prisma.KidsNoteInclude;
 
 const alertInclude = {
-  session: { select: { room: { select: { name: true } } } },
+  session: {
+    select: { status: true, serviceDate: true, room: { select: { name: true } } },
+  },
   child: {
     select: {
       name: true,
@@ -442,6 +444,28 @@ export class PrismaKidsRepository implements IKidsRepository {
     const child = await this.findChildById(childId);
     if (!child) throw new Error('Criança não encontrada');
     return child;
+  }
+
+  async linkGuardiansByPhone(phone: string, userId: string): Promise<number> {
+    // Compara pelos últimos 11 dígitos: sobrevive a diferenças de DDI/máscara
+    // entre o telefone digitado no balcão e o digitado no cadastro da conta.
+    const target = phone.replace(/\D/g, '').slice(-11);
+    if (target.length < 8) return 0;
+
+    const candidates = await this.prisma.kidsGuardian.findMany({
+      where: { userId: null },
+      select: { id: true, phone: true },
+    });
+    const matchIds = candidates
+      .filter((g) => g.phone.replace(/\D/g, '').slice(-11) === target)
+      .map((g) => g.id);
+    if (matchIds.length === 0) return 0;
+
+    const result = await this.prisma.kidsGuardian.updateMany({
+      where: { id: { in: matchIds } },
+      data: { userId },
+    });
+    return result.count;
   }
 
   // ── Check-in / check-out ──────────────────────────────────────────────────
@@ -987,6 +1011,8 @@ export class PrismaKidsRepository implements IKidsRepository {
       id: row.id,
       sessionId: row.sessionId,
       roomName: row.session.room.name,
+      sessionStatus: row.session.status,
+      serviceDate: row.session.serviceDate,
       childId: row.childId,
       childName: row.child.name,
       checkinId: row.checkinId,

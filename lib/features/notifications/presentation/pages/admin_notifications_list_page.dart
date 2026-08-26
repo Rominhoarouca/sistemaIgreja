@@ -5,6 +5,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
 import 'notification_detail_page.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Admin-only screen listing every notification created for the church
 /// (not just the ones addressed to the current admin), with preview and
@@ -13,10 +14,12 @@ class AdminNotificationsListPage extends StatefulWidget {
   const AdminNotificationsListPage({super.key});
 
   @override
-  State<AdminNotificationsListPage> createState() => _AdminNotificationsListPageState();
+  State<AdminNotificationsListPage> createState() =>
+      _AdminNotificationsListPageState();
 }
 
-class _AdminNotificationsListPageState extends State<AdminNotificationsListPage> {
+class _AdminNotificationsListPageState
+    extends State<AdminNotificationsListPage> {
   late final Dio _dio;
   bool _isLoading = true;
   String? _error;
@@ -48,7 +51,10 @@ class _AdminNotificationsListPageState extends State<AdminNotificationsListPage>
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = extractDioErrorMessage(e, fallback: 'Erro ao carregar notificações');
+        _error = extractDioErrorMessage(
+          e,
+          fallback: 'Erro ao carregar notificações',
+        );
         _isLoading = false;
       });
     }
@@ -77,7 +83,9 @@ class _AdminNotificationsListPageState extends State<AdminNotificationsListPage>
                 children: [
                   Text(
                     _error!,
-                    style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.error,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.base),
@@ -94,7 +102,9 @@ class _AdminNotificationsListPageState extends State<AdminNotificationsListPage>
           ? Center(
               child: Text(
                 'Nenhuma notificação enviada ainda',
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             )
           : RefreshIndicator(
@@ -102,10 +112,14 @@ class _AdminNotificationsListPageState extends State<AdminNotificationsListPage>
               child: ListView.separated(
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 itemCount: _notifications.length,
-                separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, indent: 72),
                 itemBuilder: (context, i) {
                   final n = _notifications[i];
-                  return _AdminNotificationTile(item: n, onTap: () => _openNotification(n));
+                  return _AdminNotificationTile(
+                    item: n,
+                    onTap: () => _openNotification(n),
+                  );
                 },
               ),
             ),
@@ -126,12 +140,13 @@ class _AdminNotificationItem {
     required this.recipientCount,
   });
 
-  factory _AdminNotificationItem.fromJson(Map<String, dynamic> json) => _AdminNotificationItem(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
-    recipientCount: json['recipientCount'] as int? ?? 0,
-  );
+  factory _AdminNotificationItem.fromJson(Map<String, dynamic> json) =>
+      _AdminNotificationItem(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+        recipientCount: json['recipientCount'] as int? ?? 0,
+      );
 }
 
 class _AdminNotificationTile extends StatelessWidget {
@@ -162,7 +177,11 @@ class _AdminNotificationTile extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.campaign_outlined, color: AppColors.primary, size: 22),
+              child: const Icon(
+                Icons.campaign_outlined,
+                color: AppColors.primary,
+                size: 22,
+              ),
             ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
@@ -172,8 +191,10 @@ class _AdminNotificationTile extends StatelessWidget {
                   Text(item.title, style: AppTypography.titleSmall),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    '$dateStr · ${item.recipientCount} destinatário(s)',
-                    style: AppTypography.labelSmall.copyWith(color: AppColors.grey400),
+                    '$dateStr · ${plural(item.recipientCount, 'destinatário')}',
+                    style: AppTypography.labelSmall.copyWith(
+                      color: AppColors.grey400,
+                    ),
                   ),
                 ],
               ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:sistema_igreja/design_system/design_system.dart';
+import 'package:multiplicado/design_system/design_system.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

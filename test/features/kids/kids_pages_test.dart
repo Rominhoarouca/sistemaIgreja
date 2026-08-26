@@ -6,10 +6,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
-import 'package:sistema_igreja/features/kids/presentation/pages/guardian_home_page.dart';
-import 'package:sistema_igreja/features/kids/presentation/pages/kids_home_page.dart';
-import 'package:sistema_igreja/features/kids/presentation/pages/kids_rooms_admin_page.dart';
-import 'package:sistema_igreja/features/kids/presentation/pages/kids_session_page.dart';
+import 'package:multiplicado/features/kids/presentation/pages/guardian_home_page.dart';
+import 'package:multiplicado/features/kids/presentation/pages/kids_home_page.dart';
+import 'package:multiplicado/features/kids/presentation/pages/kids_rooms_admin_page.dart';
+import 'package:multiplicado/features/kids/presentation/pages/kids_session_page.dart';
 
 /// Renderiza as telas do Kids contra um backend falso alimentado pelas mesmas
 /// fixtures reais dos testes de contrato.

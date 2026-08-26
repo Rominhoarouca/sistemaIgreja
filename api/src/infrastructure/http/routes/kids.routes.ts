@@ -70,10 +70,13 @@ export function kidsRoutes(
   // ── Crianças ──────────────────────────────────────────────────────────────
   router.get('/children/search', requireKidsStaff, controller.searchChildren);
   router.post('/children/quick', requireKidsStaff, controller.quickRegisterChild);
+  // Responsável cadastra o próprio filho (createOwnChild valida o papel).
+  router.post('/children', controller.createOwnChild);
   // Sem `requireKidsStaff`: o responsável também abre a ficha do próprio filho.
   // O controller decide o que cada papel enxerga (`assertChildVisible`).
   router.get('/children/:id', controller.getChild);
   router.patch('/children/:id', controller.updateChild);
+  router.delete('/children/:id', controller.deleteChild);
   router.post('/children/:id/guardians', controller.addGuardian);
   router.get('/children/:id/history', controller.childHistory);
   router.get('/children/:id/notes', controller.childNotes);

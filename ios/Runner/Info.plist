@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sistema Igreja</string>
+	<string>Multiplicado</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>sistema_igreja</string>
+	<string>Multiplicado</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -76,6 +76,13 @@
 	     local — é onde a API roda durante o desenvolvimento. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Para conectar ao servidor da igreja na rede local</string>
+	<!-- remote-notification: push silencioso (content-available) acorda o app
+	     para o handler de background do FCM. Sem isso ele só roda quando o
+	     usuário toca na notificação. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<!-- Só a rede local escapa do HTTPS obrigatório: a API de produção

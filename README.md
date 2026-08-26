@@ -41,6 +41,17 @@ Conteudo incluido no book:
 ```bash
 flutter pub get
 flutter run
+
+ flutter build ios --release --dart-define=API_BASE_URL=http://192.168.3.4:3999/v1 2>&1 | tail -12
+
+=== desinstalando debug ===
+ xcrun devicectl device uninstall app --device 00008150-00181D562605401C com.sistemaigreja.sistemaIgreja 2>&1 | tail -2;
+
+=== instalando release ===
+  xcrun devicectl device install app --device 00008150-00181D562605401C build/ios/iphoneos/Runner.app 2>&1 | tail -8
+
+Running in the background (↓ to manage)
+  (xcrun devicectl device process launch --console --device 00008150-00181D562605401C com.sistemaigreja.sistemaIgreja 2>&1 | head -25)
 ```
 
 ### API

@@ -11,6 +11,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Admin-only screen to compose and send a notification, targeting a
 /// specific user and/or role-based groups.
@@ -18,10 +19,12 @@ class AdminCreateNotificationPage extends StatefulWidget {
   const AdminCreateNotificationPage({super.key});
 
   @override
-  State<AdminCreateNotificationPage> createState() => _AdminCreateNotificationPageState();
+  State<AdminCreateNotificationPage> createState() =>
+      _AdminCreateNotificationPageState();
 }
 
-class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPage> {
+class _AdminCreateNotificationPageState
+    extends State<AdminCreateNotificationPage> {
   late final Dio _dio;
   final _titleCtrl = TextEditingController();
   final _youtubeCtrl = TextEditingController();
@@ -99,11 +102,16 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
       ]);
       final cellTypes = ((results[0].data['cellTypes'] as List?) ?? [])
           .cast<Map<String, dynamic>>()
-          .map((j) => _CellType(id: j['id'] as String, name: j['name'] as String))
+          .map(
+            (j) => _CellType(id: j['id'] as String, name: j['name'] as String),
+          )
           .toList();
       final coordenacoes = ((results[1].data['coordenacoes'] as List?) ?? [])
           .cast<Map<String, dynamic>>()
-          .map((j) => _Coordenacao(id: j['id'] as String, name: j['name'] as String))
+          .map(
+            (j) =>
+                _Coordenacao(id: j['id'] as String, name: j['name'] as String),
+          )
           .toList();
       if (!mounted) return;
       setState(() {
@@ -115,7 +123,10 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
       if (!mounted) return;
       setState(() => _isLoadingOptions = false);
       AppSnackbar.error(
-        extractDioErrorMessage(e, fallback: 'Erro ao carregar opções de público-alvo'),
+        extractDioErrorMessage(
+          e,
+          fallback: 'Erro ao carregar opções de público-alvo',
+        ),
       );
     }
   }
@@ -140,15 +151,27 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
       return;
     }
     setState(() => _isSearchingUsers = true);
-    _searchDebounce = Timer(const Duration(milliseconds: 400), () => _searchUsers(query.trim()));
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 400),
+      () => _searchUsers(query.trim()),
+    );
   }
 
   Future<void> _searchUsers(String query) async {
     try {
-      final resp = await _dio.get('/users/search', queryParameters: {'q': query});
+      final resp = await _dio.get(
+        '/users/search',
+        queryParameters: {'q': query},
+      );
       final results = ((resp.data['users'] as List?) ?? [])
           .cast<Map<String, dynamic>>()
-          .map((j) => _UserOption(id: j['id'] as String, name: j['name'] as String, email: j['email'] as String))
+          .map(
+            (j) => _UserOption(
+              id: j['id'] as String,
+              name: j['name'] as String,
+              email: j['email'] as String,
+            ),
+          )
           .where((u) => !_selectedUsers.any((s) => s.id == u.id))
           .toList();
       if (!mounted) return;
@@ -175,7 +198,10 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
   }
 
   Future<void> _pickImage() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
@@ -206,16 +232,21 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
 
   Future<void> _send() async {
     final youtubeUrl = _youtubeCtrl.text.trim();
-    if (youtubeUrl.isNotEmpty && YoutubePlayerController.convertUrlToId(youtubeUrl) == null) {
+    if (youtubeUrl.isNotEmpty &&
+        YoutubePlayerController.convertUrlToId(youtubeUrl) == null) {
       AppSnackbar.error('Link do YouTube inválido');
       return;
     }
 
     final groups = <Map<String, dynamic>>[
       for (final g in _selectedGroups) {'type': g},
-      if (_selectedCellTypeId != null) {'type': 'CELL_TYPE', 'cellTypeId': _selectedCellTypeId},
+      if (_selectedCellTypeId != null)
+        {'type': 'CELL_TYPE', 'cellTypeId': _selectedCellTypeId},
       if (_selectedCoordenacaoId != null)
-        {'type': 'COORDENACAO_LEADERS', 'coordenacaoId': _selectedCoordenacaoId},
+        {
+          'type': 'COORDENACAO_LEADERS',
+          'coordenacaoId': _selectedCoordenacaoId,
+        },
     ];
     final userIds = _selectedUsers.map((u) => u.id).toList();
     final bodyDelta = jsonEncode(_quillController.document.toDelta().toJson());
@@ -229,7 +260,10 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
               if (youtubeUrl.isNotEmpty) 'youtubeUrl': youtubeUrl,
               'userIds': jsonEncode(userIds),
               'groups': jsonEncode(groups),
-              'image': MultipartFile.fromBytes(_imageBytes!, filename: _pickedImage!.name),
+              'image': MultipartFile.fromBytes(
+                _imageBytes!,
+                filename: _pickedImage!.name,
+              ),
             })
           : {
               'title': _titleCtrl.text.trim(),
@@ -242,12 +276,16 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
       final resp = await _dio.post('/notifications', data: data);
       final recipientCount = resp.data['recipientCount'] as int? ?? 0;
       if (!mounted) return;
-      AppSnackbar.success('Notificação enviada para $recipientCount pessoa(s)');
+      AppSnackbar.success(
+        'Notificação enviada para ${plural(recipientCount, 'pessoa')}',
+      );
       Navigator.of(context).pop(true);
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() => _isSending = false);
-      AppSnackbar.error(extractDioErrorMessage(e, fallback: 'Erro ao enviar notificação'));
+      AppSnackbar.error(
+        extractDioErrorMessage(e, fallback: 'Erro ao enviar notificação'),
+      );
     }
   }
 
@@ -304,9 +342,15 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
                         isDense: true,
                       ),
                       items: [
-                        const DropdownMenuItem(value: null, child: Text('Nenhum')),
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Nenhum'),
+                        ),
                         ..._cellTypes.map(
-                          (t) => DropdownMenuItem(value: t.id, child: Text(t.name)),
+                          (t) => DropdownMenuItem(
+                            value: t.id,
+                            child: Text(t.name),
+                          ),
                         ),
                       ],
                       onChanged: (v) => setState(() => _selectedCellTypeId = v),
@@ -322,12 +366,19 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
                         isDense: true,
                       ),
                       items: [
-                        const DropdownMenuItem(value: null, child: Text('Nenhuma')),
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Nenhuma'),
+                        ),
                         ..._coordenacoes.map(
-                          (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
+                          (c) => DropdownMenuItem(
+                            value: c.id,
+                            child: Text(c.name),
+                          ),
                         ),
                       ],
-                      onChanged: (v) => setState(() => _selectedCoordenacaoId = v),
+                      onChanged: (v) =>
+                          setState(() => _selectedCoordenacaoId = v),
                     ),
                     const SizedBox(height: AppSpacing.base),
                   ],
@@ -379,7 +430,12 @@ class _AdminCreateNotificationPageState extends State<AdminCreateNotificationPag
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-            child: Image.memory(_imageBytes!, height: 160, width: double.infinity, fit: BoxFit.cover),
+            child: Image.memory(
+              _imageBytes!,
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
           ),
           Positioned(
             top: AppSpacing.xs,

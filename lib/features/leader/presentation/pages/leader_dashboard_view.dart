@@ -8,6 +8,7 @@ import '../../../../shared/widgets/stat_detail_page.dart';
 import '../../../../injection/injection.dart';
 import '../widgets/attendance_calendar_dialog.dart';
 import '../widgets/attendee_widgets.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Destinos de navegação do perfil Líder — Início + abas da célula.
 /// Índices 1..4 correspondem às abas 0..3 da gestão de célula.
@@ -20,7 +21,9 @@ const kLeaderNavDestinations = [
   NavigationDestination(
     icon: Icon(Icons.groups_outlined),
     selectedIcon: Icon(Icons.groups),
-    label: 'Frequentadores',
+    // "Frequentadores" não cabe num quinto da largura e quebrava como
+    // "Frequentador" / "es", empurrando os vizinhos.
+    label: 'Pessoas',
   ),
   NavigationDestination(
     icon: Icon(Icons.check_circle_outline),
@@ -589,7 +592,7 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isDesktop ? 4 : 2,
+              crossAxisCount: AppBreakpoints.kpiColumns(context, itemCount: 6),
               crossAxisSpacing: AppSpacing.base,
               mainAxisSpacing: AppSpacing.base,
               mainAxisExtent: 148,
@@ -654,7 +657,10 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
                   child: FilledButton.icon(
                     onPressed: _contacts.isEmpty ? null : _openWhatsappSheet,
                     icon: const Icon(Icons.chat_outlined, size: 18),
-                    label: const Text('Enviar WhatsApp'),
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Enviar WhatsApp', maxLines: 1),
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.whatsapp,
                       foregroundColor: AppColors.white,
@@ -677,7 +683,13 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
                         ? null
                         : () => widget.onOpenCell(widget.cells.first, tab: 1),
                     icon: const Icon(Icons.check_circle_outline, size: 18),
-                    label: const Text('Registrar presença'),
+                    // Metade da largura da tela não comporta o rótulo em uma
+                    // linha; sem o FittedBox ele quebrava e a altura fixa do
+                    // botão cortava a segunda linha.
+                    label: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Registrar presença', maxLines: 1),
+                    ),
                   ),
                 ),
               ),
@@ -1339,7 +1351,7 @@ class _LeaderWhatsappSheetState extends State<_LeaderWhatsappSheet> {
                     label: Text(
                       _sending
                           ? 'Enviando ($_sentCount/${_selected.length})…'
-                          : 'Enviar para ${_selected.length} contato(s)',
+                          : 'Enviar para ${plural(_selected.length, 'contato')}',
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.whatsapp,

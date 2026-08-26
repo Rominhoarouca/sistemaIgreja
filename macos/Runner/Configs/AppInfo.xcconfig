@@ -5,10 +5,10 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-PRODUCT_NAME = sistema_igreja
+PRODUCT_NAME = Multiplicado
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.sistemaigreja.sistemaIgreja
+PRODUCT_BUNDLE_IDENTIFIER = br.com.multiplicado
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.sistemaigreja. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 Multiplicado. All rights reserved.

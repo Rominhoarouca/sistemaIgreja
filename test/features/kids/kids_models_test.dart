@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sistema_igreja/features/kids/data/kids_models.dart';
+import 'package:multiplicado/features/kids/data/kids_models.dart';
 
 /// Testes de contrato: as fixtures são respostas **reais** de `/v1/kids/*`,
 /// capturadas do backend. Se um campo mudar de nome ou de tipo na API, um

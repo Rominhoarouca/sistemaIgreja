@@ -13,3 +13,4 @@ export 'components/inputs/app_text_field.dart';
 export 'components/badges/app_badge.dart';
 export 'components/feedback/app_feedback.dart';
 export 'components/layout/app_layout.dart';
+export 'layout/app_breakpoints.dart';

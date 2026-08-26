@@ -81,7 +81,10 @@ class _SuperAdminPageState extends State<SuperAdminPage>
           controller: _tabController,
           tabs: const [
             Tab(text: 'Igrejas', icon: Icon(Icons.church_outlined)),
-            Tab(text: 'Uso do Sistema', icon: Icon(Icons.insert_chart_outlined_rounded)),
+            Tab(
+              text: 'Uso do Sistema',
+              icon: Icon(Icons.insert_chart_outlined_rounded),
+            ),
           ],
         ),
         actions: [
@@ -163,7 +166,8 @@ class _SuperAdminPageState extends State<SuperAdminPage>
     final churches = (usage['churches'] as List<dynamic>)
         .cast<Map<String, dynamic>>();
     final isDesktop = MediaQuery.sizeOf(context).width >= 1024;
-    final totalLeaders = (leaders['lider'] as int) +
+    final totalLeaders =
+        (leaders['lider'] as int) +
         (leaders['supervisor'] as int) +
         (leaders['coordenador'] as int);
 
@@ -178,7 +182,7 @@ class _SuperAdminPageState extends State<SuperAdminPage>
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: isDesktop ? 4 : 2,
+            crossAxisCount: AppBreakpoints.kpiColumns(context, itemCount: 7),
             crossAxisSpacing: AppSpacing.base,
             mainAxisSpacing: AppSpacing.base,
             mainAxisExtent: 148,
@@ -243,6 +247,20 @@ class _SuperAdminPageState extends State<SuperAdminPage>
 
   // ── Igrejas (gestão) ────────────────────────────────────────────────────────
 
+  /// O backend devolve o enum cru (`TRIALING`, `MANUAL`…). Sem tradução ele
+  /// aparecia em inglês e em caixa alta no meio de badges em português.
+  static String _subscriptionStatusLabel(String raw) =>
+      switch (raw.toUpperCase()) {
+        'TRIALING' => 'Em teste',
+        'ACTIVE' => 'Ativa',
+        'PAST_DUE' => 'Em atraso',
+        'CANCELED' || 'CANCELLED' => 'Cancelada',
+        'MANUAL' => 'Manual',
+        'INCOMPLETE' => 'Incompleta',
+        'UNPAID' => 'Não paga',
+        _ => raw,
+      };
+
   Widget _churchTile(Map<String, dynamic> c) {
     final plan = c['plan'] as Map<String, dynamic>?;
     final status = c['subscriptionStatus'] as String?;
@@ -285,7 +303,7 @@ class _SuperAdminPageState extends State<SuperAdminPage>
                     if (status != null) ...[
                       const SizedBox(width: AppSpacing.xs),
                       AppBadge(
-                        label: status,
+                        label: _subscriptionStatusLabel(status),
                         variant: AppBadgeVariant.neutral,
                         size: AppBadgeSize.sm,
                       ),
@@ -338,7 +356,10 @@ class _SuperAdminPageState extends State<SuperAdminPage>
     final id = c['id'] as String;
     if (action == 'toggle') {
       try {
-        await _ds.setChurchActive(churchId: id, isActive: !(c['isActive'] as bool? ?? true));
+        await _ds.setChurchActive(
+          churchId: id,
+          isActive: !(c['isActive'] as bool? ?? true),
+        );
         await _load();
       } catch (e) {
         _snack('Erro: $e');
@@ -358,25 +379,37 @@ class _SuperAdminPageState extends State<SuperAdminPage>
           builder: (ctx, setLocal) => Column(
             mainAxisSize: MainAxisSize.min,
             children: _tiers
-                .map((t) => InkWell(
-                      onTap: () => setLocal(() => tier = t),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(children: [
-                          Icon(tier == t
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off),
+                .map(
+                  (t) => InkWell(
+                    onTap: () => setLocal(() => tier = t),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            tier == t
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                          ),
                           const SizedBox(width: 12),
                           Text(t),
-                        ]),
+                        ],
                       ),
-                    ))
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, tier), child: const Text('Aplicar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, tier),
+            child: const Text('Aplicar'),
+          ),
         ],
       ),
     );
@@ -424,8 +457,14 @@ class _SuperAdminPageState extends State<SuperAdminPage>
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Criar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Criar'),
+          ),
         ],
       ),
     );
@@ -445,7 +484,11 @@ class _SuperAdminPageState extends State<SuperAdminPage>
     }
   }
 
-  Widget _dlgField(TextEditingController c, String label, {bool obscure = false}) {
+  Widget _dlgField(
+    TextEditingController c,
+    String label, {
+    bool obscure = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextField(
@@ -470,7 +513,9 @@ class _ChurchesUsagePage extends StatelessWidget {
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.background,
       appBar: AppBar(title: Text('Igrejas (${churches.length})')),
       body: churches.isEmpty
-          ? const Center(child: AppEmptyState(title: 'Nenhuma igreja cadastrada.'))
+          ? const Center(
+              child: AppEmptyState(title: 'Nenhuma igreja cadastrada.'),
+            )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
               itemCount: churches.length,
@@ -538,8 +583,16 @@ Widget _churchUsageCard(Map<String, dynamic> c) {
           spacing: AppSpacing.xl,
           runSpacing: AppSpacing.md,
           children: [
-            _usageMetric(Icons.groups_outlined, 'Membros', '${c['membersCount']}'),
-            _usageMetric(Icons.groups_2_outlined, 'Células', '${c['cellsCount']}'),
+            _usageMetric(
+              Icons.groups_outlined,
+              'Membros',
+              '${c['membersCount']}',
+            ),
+            _usageMetric(
+              Icons.groups_2_outlined,
+              'Células',
+              '${c['cellsCount']}',
+            ),
             _usageMetric(
               Icons.people_alt_outlined,
               'Visitantes',
@@ -592,7 +645,9 @@ Widget _usageMetric(IconData icon, String label, String value) {
           const SizedBox(width: AppSpacing.xs),
           Text(
             value,
-            style: AppTypography.labelLarge.copyWith(fontWeight: FontWeight.w700),
+            style: AppTypography.labelLarge.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(width: AppSpacing.xs2),
           Text(

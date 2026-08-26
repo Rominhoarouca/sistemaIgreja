@@ -50,6 +50,14 @@ class MoreMenuTab extends StatelessWidget {
       AppRoutes.adminCellTypes,
     ),
     _MoreItem(Icons.folder_open_rounded, 'Materiais', AppRoutes.adminMaterials),
+    // Salas do ministério infantil: a rota já existia e a sidebar do desktop
+    // já a listava, mas no mobile não havia como chegar nela.
+    _MoreItem(
+      Icons.child_care_outlined,
+      'Salas do Kids',
+      AppRoutes.adminKidsRooms,
+      subtitle: 'Ministério infantil',
+    ),
     _MoreItem(Icons.chat_outlined, 'WhatsApp', AppRoutes.adminWhatsapp),
     _MoreItem(
       Icons.location_city_outlined,

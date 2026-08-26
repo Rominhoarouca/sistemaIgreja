@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Métrica clicada na tela de Relatórios ou no Dashboard.
 enum ReportMetric {
@@ -382,7 +383,7 @@ class _ReportMetricDetailPageState extends State<ReportMetricDetailPage> {
                     ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    '${_rows.length} registro(s)',
+                    plural(_rows.length, 'registro'),
                     style: AppTypography.labelSmall.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

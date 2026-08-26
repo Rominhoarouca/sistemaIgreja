@@ -13,6 +13,7 @@ import { dashboardRoutes } from './routes/dashboard.routes';
 import { materialRoutes } from './routes/material.routes';
 import { userRoutes } from './routes/user.routes';
 import { notificationRoutes } from './routes/notification.routes';
+import { deviceRoutes } from './routes/device.routes';
 import { kidsRoutes } from './routes/kids.routes';
 import { coordenacaoRoutes } from './routes/coordenacao.routes';
 import { locationRoutes } from './routes/location.routes';
@@ -118,6 +119,7 @@ export function createApp(container: Container): Application {
   app.use(`${v1}/location`, locationRoutes(container.locationController));
   app.use(`${v1}/cell-types`, cellTypeRoutes(container.cellTypeController));
   app.use(`${v1}/notifications`, notificationRoutes(container.notificationController));
+  app.use(`${v1}/devices`, deviceRoutes(container.deviceController));
 
   // Recursos com gating por plano (authMiddleware → requireFeature → rotas).
   app.use(

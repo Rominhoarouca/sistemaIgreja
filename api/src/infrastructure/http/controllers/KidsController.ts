@@ -294,18 +294,56 @@ export class KidsController {
     res.status(201).json({ child });
   };
 
+  /**
+   * Cadastro do próprio filho pelo responsável. Mesma validação do balcão,
+   * mas o primeiro guardian é sempre o próprio usuário logado — o pai não
+   * pode cadastrar um filho vinculado a outra conta.
+   */
+  createOwnChild = async (req: Request, res: Response): Promise<void> => {
+    if (req.userRole !== 'RESPONSAVEL') {
+      throw AppError.forbidden('Só o responsável cadastra o próprio filho por aqui');
+    }
+    const body = quickChildSchema.parse(req.body);
+    const guardians = body.guardians.map((g, index) =>
+      index === 0 ? { ...g, userId: req.userId, isPrimary: true } : g,
+    );
+    const child = await this.kidsRepo.createChildWithGuardians({
+      name: body.name,
+      birthDate: body.birthDate ?? null,
+      gender: body.gender ?? null,
+      allergies: body.allergies ?? null,
+      medications: body.medications ?? null,
+      disabilities: body.disabilities ?? null,
+      medicalNotes: body.medicalNotes ?? null,
+      authorizedPickup: body.authorizedPickup ?? null,
+      guardians,
+    });
+    res.status(201).json({ child });
+  };
+
   getChild = async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params as { id: string };
     const child = await this.kidsRepo.findChildById(id);
     if (!child) throw AppError.notFound('Criança não encontrada');
     await this.assertChildVisible(req, id);
-    res.json({ child });
+    // `openCheckin` junto: a ficha mostra "na sala"/"em casa" e sem isso o
+    // app exibia sempre "em casa", mesmo com a criança na salinha.
+    const openCheckin = await this.kidsRepo.findOpenCheckinByChild(id);
+    res.json({ child: { ...child, openCheckin } });
   };
 
   updateChild = async (req: Request, res: Response): Promise<void> => {
     const { id } = req.params as { id: string };
     await this.assertChildVisible(req, id);
-    const body = quickChildSchema.partial().omit({ guardians: true }).parse(req.body);
+    const body = quickChildSchema
+      .partial()
+      .omit({ guardians: true })
+      .extend({ isActive: z.boolean().optional() })
+      .parse(req.body);
+    // Só ADMIN reativa; o responsável só pode desativar o próprio filho.
+    if (body.isActive === true && req.userRole !== 'ADMIN' && req.userRole !== 'SUPERADMIN') {
+      throw AppError.forbidden('Só administradores podem reativar uma criança');
+    }
     const child = await this.kidsRepo.updateChild(id, {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.birthDate !== undefined ? { birthDate: body.birthDate ?? null } : {}),
@@ -317,8 +355,23 @@ export class KidsController {
       ...(body.authorizedPickup !== undefined
         ? { authorizedPickup: body.authorizedPickup }
         : {}),
+      ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
     });
     res.json({ child });
+  };
+
+  /**
+   * Exclusão (soft delete) do cadastro da criança. Só o dono (responsável) ou
+   * ADMIN — o professor da sala não decide isso.
+   */
+  deleteChild = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params as { id: string };
+    if (req.userRole === 'KIDS') {
+      throw AppError.forbidden('Fale com a administração para excluir uma criança');
+    }
+    await this.assertChildVisible(req, id);
+    await this.kidsRepo.updateChild(id, { isActive: false });
+    res.status(204).send();
   };
 
   addGuardian = async (req: Request, res: Response): Promise<void> => {
@@ -551,7 +604,13 @@ export class KidsController {
   };
 
   myAlerts = async (req: Request, res: Response): Promise<void> => {
-    const alerts = await this.kidsRepo.listAlertsForGuardianUser(req.userId);
+    // A home precisa de poucos; a tela de histórico pede mais. O teto evita
+    // que um `limit` grande na query vire uma varredura da tabela.
+    const requested = Number(req.query.limit);
+    const limit = Number.isFinite(requested)
+      ? Math.min(Math.max(Math.trunc(requested), 1), 200)
+      : 30;
+    const alerts = await this.kidsRepo.listAlertsForGuardianUser(req.userId, limit);
     res.json({ alerts });
   };
 

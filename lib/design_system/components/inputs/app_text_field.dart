@@ -16,6 +16,7 @@ class AppTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.onSuffixTap,
+    this.onTap,
     this.obscureText = false,
     this.keyboardType,
     this.textInputAction,
@@ -38,6 +39,11 @@ class AppTextField extends StatelessWidget {
   final IconData? prefixIcon;
   final IconData? suffixIcon;
   final VoidCallback? onSuffixTap;
+
+  /// Toque no corpo do campo. Necessário em campos `readOnly` que abrem um
+  /// seletor: sem isso só o ícone do sufixo respondia, e o texto "Toque para
+  /// escolher" era uma instrução que não funcionava.
+  final VoidCallback? onTap;
   final bool obscureText;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
@@ -83,6 +89,7 @@ class AppTextField extends StatelessWidget {
           enabled: enabled,
           autofocus: autofocus,
           focusNode: focusNode,
+          onTap: onTap,
           validator: validator,
           style: theme.textTheme.bodyMedium,
           decoration: InputDecoration(

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.sistemaigreja" "\0"
-            VALUE "FileDescription", "sistema_igreja" "\0"
+            VALUE "CompanyName", "Multiplicado" "\0"
+            VALUE "FileDescription", "Multiplicado" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "sistema_igreja" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.sistemaigreja. All rights reserved." "\0"
-            VALUE "OriginalFilename", "sistema_igreja.exe" "\0"
-            VALUE "ProductName", "sistema_igreja" "\0"
+            VALUE "InternalName", "Multiplicado" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Multiplicado. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Multiplicado.exe" "\0"
+            VALUE "ProductName", "Multiplicado" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

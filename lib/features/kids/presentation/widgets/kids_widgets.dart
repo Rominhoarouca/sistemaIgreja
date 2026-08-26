@@ -118,9 +118,13 @@ class KidsOccupancyBar extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
         ],
+        // `width: double.infinity` no trilho: sem isso o Container se
+        // dimensionava pelo filho e, com a sala vazia (widthFactor 0), a
+        // barra inteira sumia em vez de mostrar o trilho vazio.
         ClipRRect(
           borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
           child: Container(
+            width: double.infinity,
             height: 6,
             color: isDark ? AppColors.dividerDark : AppColors.grey200,
             child: FractionallySizedBox(
@@ -364,7 +368,9 @@ class KidsChildTile extends StatelessWidget {
                   if (checkin.openAlerts > 0) ...[
                     const SizedBox(height: AppSpacing.xs),
                     AppBadge(
-                      label: '${checkin.openAlerts} alerta(s)',
+                      label: checkin.openAlerts == 1
+                          ? '1 alerta'
+                          : '${checkin.openAlerts} alertas',
                       variant: AppBadgeVariant.error,
                       size: AppBadgeSize.sm,
                     ),

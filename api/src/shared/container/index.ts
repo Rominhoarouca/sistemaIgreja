@@ -70,6 +70,7 @@ import { KidsQrService } from '@application/services/KidsQrService';
 import { PickupCodeService } from '@application/services/PickupCodeService';
 import {
   InAppAlertChannel,
+  PushAlertChannel,
   KidsAlertDispatcher,
   ManualCallChannel,
   WhatsappAlertChannel,
@@ -84,6 +85,8 @@ import { SpiritualHistoryController } from '@infrastructure/http/controllers/Spi
 import { DashboardController } from '@infrastructure/http/controllers/DashboardController';
 import { MaterialController } from '@infrastructure/http/controllers/MaterialController';
 import { UserController } from '@infrastructure/http/controllers/UserController';
+import { DeviceController } from '@infrastructure/http/controllers/DeviceController';
+import { FcmSender } from '@application/services/FcmSender';
 import { CoordenacaoController } from '@infrastructure/http/controllers/CoordenacaoController';
 import { LocationController } from '@infrastructure/http/controllers/LocationController';
 import { CellTypeController } from '@infrastructure/http/controllers/CellTypeController';
@@ -106,6 +109,7 @@ export interface Container {
   dashboardController: DashboardController;
   materialController: MaterialController;
   userController: UserController;
+  deviceController: DeviceController;
   coordenacaoController: CoordenacaoController;
   locationController: LocationController;
   notificationController: NotificationController;
@@ -196,8 +200,13 @@ export function createContainer(): Container {
   // Ordem dos canais não importa: o dispatcher escolhe pelo tipo da entrega.
   // O canal in-app é o único que funciona sem credencial externa; o WhatsApp
   // registra FAILED com o motivo enquanto a Cloud API não estiver configurada.
+  const fcmSender = new FcmSender();
+  const inAppChannel = new InAppAlertChannel(prisma);
   const kidsAlertDispatcher = new KidsAlertDispatcher(kidsRepo, [
-    new InAppAlertChannel(prisma),
+    // PushAlertChannel antes: o dispatcher usa o primeiro canal que casa, e
+    // este faz in-app + FCM. O InAppAlertChannel puro fica como dependência
+    // dele, não mais como canal registrado.
+    new PushAlertChannel(prisma, inAppChannel, fcmSender),
     new WhatsappAlertChannel(),
     new ManualCallChannel(),
   ]);
@@ -239,7 +248,8 @@ export function createContainer(): Container {
     getDemographicsUseCase,
   );
   const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo, prisma);
-  const userController = new UserController(getProfileUseCase, updateProfileUseCase, userRepo);
+  const userController = new UserController(getProfileUseCase, updateProfileUseCase, userRepo, kidsRepo);
+  const deviceController = new DeviceController(prisma);
   const coordenacaoController = new CoordenacaoController(coordenacaoRepo, userRepo);
   const locationController = new LocationController(locationRepo);
   const cellTypeController = new CellTypeController(prisma);
@@ -316,6 +326,7 @@ export function createContainer(): Container {
     dashboardController,
     materialController,
     userController,
+    deviceController,
     coordenacaoController,
     locationController,
     notificationController,

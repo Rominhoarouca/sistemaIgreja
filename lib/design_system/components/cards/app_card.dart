@@ -119,37 +119,49 @@ class StatCard extends StatelessWidget {
                   size: AppSpacing.iconSm,
                 ),
               ),
+              // Flexible + ellipsis: o pill cresce com o texto ("20% integrados"
+              // é mais largo que "+12%") e, sem limite, estourava o Row.
               if (subtitle != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: deltaPositive
-                        ? (isDark
-                              ? AppColors.successDarkBg
-                              : AppColors.successLight)
-                        : (isDark
-                              ? AppColors.errorDarkBg
-                              : AppColors.errorLight),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
-                  ),
-                  child: Text(
-                    subtitle!,
-                    style: theme.textTheme.labelSmall?.copyWith(
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
                       color: deltaPositive
                           ? (isDark
-                                ? AppColors.successDarkFg
-                                : AppColors.success)
-                          : (isDark ? AppColors.errorDarkFg : AppColors.error),
-                      fontWeight: FontWeight.w600,
+                                ? AppColors.successDarkBg
+                                : AppColors.successLight)
+                          : (isDark
+                                ? AppColors.errorDarkBg
+                                : AppColors.errorLight),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusFull,
+                      ),
+                    ),
+                    child: Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: deltaPositive
+                            ? (isDark
+                                  ? AppColors.successDarkFg
+                                  : AppColors.success)
+                            : (isDark
+                                  ? AppColors.errorDarkFg
+                                  : AppColors.error),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          // Espaçamento menor para caber a segunda linha do rótulo: os grids
+          // que hospedam este card fixam a altura em `mainAxisExtent: 148`.
+          const SizedBox(height: AppSpacing.sm),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
@@ -162,12 +174,19 @@ class StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          // Duas linhas: rótulos como "Visitantes Cadastrados" e "Frequência
+          // nas Células" não cabem em uma só e vinham cortados com reticências.
+          // `Flexible` garante que, se ainda assim faltar espaço (fonte
+          // ampliada por acessibilidade), o texto seja cortado em vez de
+          // estourar o Column.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],

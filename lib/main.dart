@@ -1,10 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
+import 'core/firebase/firebase_service.dart';
 import 'design_system/design_system.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/saas/presentation/church_context_controller.dart';
@@ -17,14 +21,18 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Estratégia de URL só existe na web. Em iOS/Android a chamada lança antes do
-  // runApp — o app instala, abre e fica na tela branca, sem árvore de widgets.
-  if (kIsWeb) usePathUrlStrategy();
+  // Nada de `ensureInitialized()` aqui: o binding tem de nascer dentro do
+  // mesmo zone que chama `runApp`, senão o Flutter avisa "Zone mismatch" a
+  // cada boot e configurações por zone passam a valer de forma imprevisível.
+  // A inicialização foi para dentro do `runZonedGuarded`, logo abaixo.
 
   // Global error handling to capture initialization/runtime errors that
   // otherwise cause the app to terminate when launched from the home screen.
   FlutterError.onError = (details) {
+    // `presentError` primeiro: sem ele o erro só ia para o developer.log, que
+    // não aparece no console do `flutter run` — falhas de layout ficavam
+    // invisíveis e a tela apenas aparecia vazia, sem pista nenhuma.
+    FlutterError.presentError(details);
     developer.log(
       'FlutterError',
       error: details.exception,
@@ -44,6 +52,14 @@ Future<void> main() async {
 
   await runZonedGuarded(
     () async {
+      // Binding criado aqui dentro: mesmo zone do `runApp` lá embaixo.
+      WidgetsFlutterBinding.ensureInitialized();
+
+      // Estratégia de URL só existe na web, e depende do binding já existir.
+      // Em iOS/Android a chamada lança antes do runApp — o app instala, abre
+      // e fica na tela branca, sem árvore de widgets.
+      if (kIsWeb) usePathUrlStrategy();
+
       Object? bootError;
       StackTrace? bootStack;
 
@@ -66,7 +82,22 @@ Future<void> main() async {
       }
 
       try {
+        // Firebase antes do DI: o handler de background precisa estar
+        // registrado cedo, e uma falha aqui não impede o app de abrir.
+        FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+        await FirebaseService.instance.init().timeout(
+          const Duration(seconds: 10),
+        );
+        debugPrint('BOOT: firebase ${FirebaseService.instance.isReady ? "pronto" : "indisponível"}');
+      } catch (e) {
+        debugPrint('BOOT: firebase falhou ($e)');
+      }
+
+      try {
         await setupInjection().timeout(const Duration(seconds: 15));
+        // Só agora o Dio autenticado existe: é por ele que o token do
+        // aparelho chega ao backend.
+        FirebaseService.instance.dio = getIt<Dio>();
         debugPrint('BOOT: injeção pronta');
       } catch (e, st) {
         debugPrint('BOOT: injeção falhou ($e)');
@@ -137,7 +168,10 @@ class BootErrorApp extends StatelessWidget {
                   SelectableText(
                     // Primeiras linhas bastam para identificar a origem.
                     stackTrace!.toString().split('\n').take(12).join('\n'),
-                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                 ],
               ],
@@ -198,10 +232,25 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
         listenWhen: (prev, curr) => prev.runtimeType != curr.runtimeType,
         listener: (context, state) {
           // Carrega/limpa o contexto da igreja conforme autenticação.
+          // SUPERADMIN é cross-tenant (`churchId = null`): para ele
+          // `/church/me` responde 403 a cada login, sem nada a carregar.
           if (state is AuthAuthenticated) {
-            ChurchContextController.instance.load();
+            if (!state.user.isSuperAdmin) {
+              ChurchContextController.instance.load();
+            }
+            // Identifica o usuário no Crashlytics/Analytics: sem isso um crash
+            // vira estatística anônima e não dá para saber se atinge um perfil
+            // específico ou todo mundo.
+            FirebaseService.instance.setUser(
+              userId: state.user.id,
+              role: state.user.role.name,
+            );
+            // Agora há sessão: o aparelho pode ser registrado para push.
+            FirebaseService.instance.syncTokenIfAuthorized();
           } else if (state is AuthUnauthenticated) {
             ChurchContextController.instance.reset();
+            FirebaseService.instance.unregisterDevice();
+            FirebaseService.instance.clearUser();
           }
         },
         child: ListenableBuilder(
@@ -211,7 +260,8 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
             ChurchContextController.instance,
           ]),
           builder: (context, _) {
-            final menuColor = ChurchContextController.instance.context?.church.menuColor;
+            final menuColor =
+                ChurchContextController.instance.context?.church.menuColor;
             return MaterialApp.router(
               title: 'Sistema Igreja',
               debugShowCheckedModeBanner: false,

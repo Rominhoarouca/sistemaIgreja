@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
-import 'package:sistema_igreja/main.dart';
+import 'package:multiplicado/main.dart';
 
 /// O app não pode falhar em silêncio no boot.
 ///

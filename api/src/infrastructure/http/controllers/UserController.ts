@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import type { GetProfileUseCase } from '@application/usecases/user/GetProfileUseCase';
 import type { UpdateProfileUseCase } from '@application/usecases/user/UpdateProfileUseCase';
 import type { IUserRepository } from '@domain/repositories/IUserRepository';
+import type { IKidsRepository } from '@domain/repositories/IKidsRepository';
 import { AppError } from '@shared/errors/AppError';
 
 const childSchema = z.object({
@@ -28,6 +29,7 @@ export class UserController {
     private readonly getProfileUseCase: GetProfileUseCase,
     private readonly updateProfileUseCase: UpdateProfileUseCase,
     private readonly userRepo: IUserRepository,
+    private readonly kidsRepo: IKidsRepository,
   ) {}
 
   getProfile = async (req: Request, res: Response): Promise<void> => {
@@ -238,6 +240,13 @@ export class UserController {
     if (body.coordenacaoId) createData.coordenacaoId = body.coordenacaoId;
 
     const user = await this.userRepo.createUser(createData);
+
+    // Religa automaticamente com crianças já cadastradas no balcão com esse
+    // telefone — sem isso o pai loga e não vê o filho até alguém religar na mão.
+    if (body.role === 'RESPONSAVEL' && body.phone) {
+      await this.kidsRepo.linkGuardiansByPhone(body.phone, user.id);
+    }
+
     res.status(201).json({ user });
   };
 }

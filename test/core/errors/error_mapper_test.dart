@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sistema_igreja/core/errors/error_mapper.dart';
-import 'package:sistema_igreja/core/errors/failures.dart';
+import 'package:multiplicado/core/errors/error_mapper.dart';
+import 'package:multiplicado/core/errors/failures.dart';
 
 DioException _dioError({int? status, Object? data, String? message}) {
   final options = RequestOptions(path: '/x');

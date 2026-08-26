@@ -136,6 +136,14 @@ export interface KidsAlert {
   readonly id: string;
   readonly sessionId: string;
   readonly roomName: string;
+  /**
+   * Estado da sessão que gerou o alerta. Com a sala fechada o aviso vira
+   * histórico: não há mais o que o responsável faça a respeito, e mantê-lo na
+   * home só empurra para baixo o que ainda importa.
+   */
+  readonly sessionStatus: KidsSessionStatus;
+  /** Dia do culto — agrupa o histórico por data, não por horário do alerta. */
+  readonly serviceDate: Date;
   readonly childId: string;
   readonly childName: string;
   readonly checkinId: string | null;

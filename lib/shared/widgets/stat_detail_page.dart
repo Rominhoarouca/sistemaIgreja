@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../design_system/design_system.dart';
+import '../../shared/utils/plural.dart';
 
 /// Detalhe de um KPI clicado em um dashboard (líder, supervisor, coordenador):
 /// header com a métrica + tabela com os dados locais que compõem o número.
@@ -131,7 +132,7 @@ class StatDetailPage extends StatelessWidget {
             ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            '${rows.length} registro(s)',
+            plural(rows.length, 'registro'),
             style: AppTypography.labelSmall.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

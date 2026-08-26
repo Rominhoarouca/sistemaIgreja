@@ -214,6 +214,80 @@ class KidsRepository {
     );
   }
 
+  /// Cadastro do próprio filho pelo responsável — o backend vincula o
+  /// primeiro responsável à conta logada, independente do que for enviado.
+  Future<KidsChild> createOwnChild({
+    required String name,
+    DateTime? birthDate,
+    String? gender,
+    String? allergies,
+    String? medications,
+    String? disabilities,
+    String? authorizedPickup,
+    required String guardianName,
+    required String guardianPhone,
+    bool guardianHasWhatsapp = true,
+    String guardianRelation = 'MAE',
+  }) async {
+    final response = await _dio.post(
+      '/kids/children',
+      data: {
+        'name': name,
+        if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+        'gender': ?gender,
+        if (allergies != null && allergies.isNotEmpty) 'allergies': allergies,
+        if (medications != null && medications.isNotEmpty)
+          'medications': medications,
+        if (disabilities != null && disabilities.isNotEmpty)
+          'disabilities': disabilities,
+        if (authorizedPickup != null && authorizedPickup.isNotEmpty)
+          'authorizedPickup': authorizedPickup,
+        'guardians': [
+          {
+            'name': guardianName,
+            'phone': guardianPhone,
+            'hasWhatsapp': guardianHasWhatsapp,
+            'relation': guardianRelation,
+            'isPrimary': true,
+          },
+        ],
+      },
+    );
+    return KidsChild.fromJson(
+      (response.data as Map<String, dynamic>)['child'] as Map<String, dynamic>,
+    );
+  }
+
+  Future<KidsChild> updateChild(
+    String childId, {
+    String? name,
+    DateTime? birthDate,
+    String? gender,
+    String? allergies,
+    String? medications,
+    String? disabilities,
+    String? authorizedPickup,
+  }) async {
+    final response = await _dio.patch(
+      '/kids/children/$childId',
+      data: {
+        'name': ?name,
+        if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+        'gender': ?gender,
+        'allergies': ?allergies,
+        'medications': ?medications,
+        'disabilities': ?disabilities,
+        'authorizedPickup': ?authorizedPickup,
+      },
+    );
+    return KidsChild.fromJson(
+      (response.data as Map<String, dynamic>)['child'] as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> deleteChild(String childId) =>
+      _dio.delete('/kids/children/$childId');
+
   Future<List<KidsCheckin>> childHistory(String childId) async {
     final response = await _dio.get('/kids/children/$childId/history');
     final list =
@@ -406,8 +480,13 @@ class KidsRepository {
         .toList();
   }
 
-  Future<List<KidsAlert>> myAlerts() async {
-    final response = await _dio.get('/kids/my-alerts');
+  /// [limit] serve à tela de histórico, que precisa de mais do que a home.
+  /// O backend limita em 200.
+  Future<List<KidsAlert>> myAlerts({int? limit}) async {
+    final response = await _dio.get(
+      '/kids/my-alerts',
+      queryParameters: limit == null ? null : {'limit': limit},
+    );
     final list =
         (response.data as Map<String, dynamic>)['alerts'] as List? ?? [];
     return list

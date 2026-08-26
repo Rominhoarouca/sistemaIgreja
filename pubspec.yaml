@@ -1,8 +1,8 @@
-name: sistema_igreja
-description: "Sistema de Recepção e Integração para Igrejas - conecta visitantes a líderes de células."
+name: multiplicado
+description: "Multiplicado — recepção e integração de visitantes em células."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 0.1.10+2
 
 environment:
   sdk: ^3.11.1
@@ -71,6 +71,8 @@ dependencies:
   flutter_local_notifications: ^17.2.4
   firebase_core: ^3.8.1
   firebase_messaging: ^15.1.6
+  firebase_analytics: ^11.3.6
+  firebase_crashlytics: ^4.1.7
   qr_flutter: ^4.1.0
 
   # Rich text & video
@@ -155,18 +157,18 @@ flutter_launcher_icons:
   ios: true
   web:
     generate: true
-    image_path: "assets/images/logo App.png"
+    image_path: "assets/images/logo.png"
     background_color: "#FFFFFF"
     theme_color: "#4A6FA5"
   windows:
     generate: true
-    image_path: "assets/images/logo App.png"
+    image_path: "assets/images/logo.png"
     icon_size: 256
   macos:
     generate: true
-    image_path: "assets/images/logo App.png"
-  image_path: "assets/images/logo App.png"
+    image_path: "assets/images/logo.png"
+  image_path: "assets/images/logo.png"
   min_sdk_android: 21
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/logo App.png"
+  adaptive_icon_foreground: "assets/images/logo.png"
   remove_alpha_ios: true

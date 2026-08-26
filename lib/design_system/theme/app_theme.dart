@@ -64,36 +64,37 @@ abstract final class AppTheme {
 
       // ── Elevated Button (primário #1E3A8A, hover #16307A, Sora) ─────────
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: accent,
-          foregroundColor: AppColors.white,
-          disabledBackgroundColor: isDark
-              ? AppColors.chipDark
-              : AppColors.grey200,
-          disabledForegroundColor: isDark
-              ? AppColors.mutedDark
-              : AppColors.grey400,
-          minimumSize: const Size.fromHeight(AppSpacing.buttonHeightMd),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          ),
-          textStyle: AppTypography.buttonLabel,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xl,
-            vertical: AppSpacing.md,
-          ),
-        ).copyWith(
-          overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered) ||
-                states.contains(WidgetState.pressed)) {
-              return isDark
-                  ? AppColors.white.withValues(alpha: .08)
-                  : AppColors.primaryHover.withValues(alpha: .6);
-            }
-            return null;
-          }),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              elevation: 0,
+              backgroundColor: accent,
+              foregroundColor: AppColors.white,
+              disabledBackgroundColor: isDark
+                  ? AppColors.chipDark
+                  : AppColors.grey200,
+              disabledForegroundColor: isDark
+                  ? AppColors.mutedDark
+                  : AppColors.grey400,
+              minimumSize: const Size.fromHeight(AppSpacing.buttonHeightMd),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+              textStyle: AppTypography.buttonLabel,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.md,
+              ),
+            ).copyWith(
+              overlayColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.hovered) ||
+                    states.contains(WidgetState.pressed)) {
+                  return isDark
+                      ? AppColors.white.withValues(alpha: .08)
+                      : AppColors.primaryHover.withValues(alpha: .6);
+                }
+                return null;
+              }),
+            ),
       ),
 
       // ── Outlined Button ─────────────────────────────────────────────────
@@ -101,7 +102,9 @@ abstract final class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: isDark ? AppColors.linkDark : AppColors.primary,
           minimumSize: const Size.fromHeight(AppSpacing.buttonHeightMd),
-          side: BorderSide(color: isDark ? AppColors.primaryLight : inputBorder),
+          side: BorderSide(
+            color: isDark ? AppColors.primaryLight : inputBorder,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           ),
@@ -205,7 +208,12 @@ abstract final class AppTheme {
             ? AppColors.surfaceVariantDark
             : AppColors.grey50,
         selectedColor: isDark ? AppColors.chipDark : AppColors.chip,
-        labelStyle: AppTypography.labelMedium,
+        // Cor explícita: sem ela o rótulo herdava um cinza claro que, sobre o
+        // fundo também claro do chip não-selecionado, ficava ilegível.
+        labelStyle: AppTypography.labelMedium.copyWith(color: textColor),
+        secondaryLabelStyle: AppTypography.labelMedium.copyWith(
+          color: isDark ? AppColors.linkDark : AppColors.primary,
+        ),
         side: BorderSide(color: borderColor),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusFull),
@@ -277,27 +285,23 @@ abstract final class AppTheme {
       ),
 
       // ── Text Theme ──────────────────────────────────────────────────────
-      textTheme:
-          TextTheme(
-            displayLarge: AppTypography.displayLarge,
-            displayMedium: AppTypography.displayMedium,
-            displaySmall: AppTypography.displaySmall,
-            headlineLarge: AppTypography.headlineLarge,
-            headlineMedium: AppTypography.headlineMedium,
-            headlineSmall: AppTypography.headlineSmall,
-            titleLarge: AppTypography.titleLarge,
-            titleMedium: AppTypography.titleMedium,
-            titleSmall: AppTypography.titleSmall,
-            bodyLarge: AppTypography.bodyLarge,
-            bodyMedium: AppTypography.bodyMedium,
-            bodySmall: AppTypography.bodySmall,
-            labelLarge: AppTypography.labelLarge,
-            labelMedium: AppTypography.labelMedium,
-            labelSmall: AppTypography.labelSmall,
-          ).apply(
-            bodyColor: textColor,
-            displayColor: textColor,
-          ),
+      textTheme: TextTheme(
+        displayLarge: AppTypography.displayLarge,
+        displayMedium: AppTypography.displayMedium,
+        displaySmall: AppTypography.displaySmall,
+        headlineLarge: AppTypography.headlineLarge,
+        headlineMedium: AppTypography.headlineMedium,
+        headlineSmall: AppTypography.headlineSmall,
+        titleLarge: AppTypography.titleLarge,
+        titleMedium: AppTypography.titleMedium,
+        titleSmall: AppTypography.titleSmall,
+        bodyLarge: AppTypography.bodyLarge,
+        bodyMedium: AppTypography.bodyMedium,
+        bodySmall: AppTypography.bodySmall,
+        labelLarge: AppTypography.labelLarge,
+        labelMedium: AppTypography.labelMedium,
+        labelSmall: AppTypography.labelSmall,
+      ).apply(bodyColor: textColor, displayColor: textColor),
     );
   }
 

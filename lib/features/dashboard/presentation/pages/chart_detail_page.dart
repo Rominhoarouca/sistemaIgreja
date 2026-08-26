@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
+import '../widgets/month_label.dart';
 
 /// Data model for a single row in the chart detail table.
 class ChartDataRow {
@@ -426,7 +427,7 @@ class DetailLineChart extends StatelessWidget {
                     if (idx < 0 || idx >= months.length) {
                       return const SizedBox.shrink();
                     }
-                    final label = (months[idx]['month'] as String).substring(5);
+                    final label = monthAxisLabel(months[idx]['month']);
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
@@ -559,7 +560,7 @@ class DetailBarChart extends StatelessWidget {
                     if (idx < 0 || idx >= months.length) {
                       return const SizedBox.shrink();
                     }
-                    final label = (months[idx]['month'] as String).substring(5);
+                    final label = monthAxisLabel(months[idx]['month']);
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(

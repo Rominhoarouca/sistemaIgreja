@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import type { KidsAlert, KidsAlertLevel, KidsChannel, KidsGuardian } from '@domain/entities/Kids';
 import type { IKidsRepository, PlannedDelivery } from '@domain/repositories/IKidsRepository';
 import { logger } from '@shared/logger/logger';
+import type { FcmSender } from './FcmSender';
 
 /**
  * Um canal de entrega de alerta. Falha lançando — quem chama registra o motivo
@@ -15,9 +16,8 @@ export interface IAlertChannel {
 /**
  * Entrega in-app: grava na caixa de notificações que o app já lê hoje.
  *
- * É o canal que realmente funciona sem infra externa. Push de verdade (FCM)
- * entra como outro canal quando as credenciais existirem — o dispatcher não
- * muda, só ganha mais um `IAlertChannel`.
+ * Funciona sem infra externa e é o histórico que a tela de Notificações lê.
+ * O push nativo não substitui isto: `PushAlertChannel` faz os dois.
  */
 export class InAppAlertChannel implements IAlertChannel {
   readonly channel: KidsChannel = 'PUSH';
@@ -40,6 +40,80 @@ export class InAppAlertChannel implements IAlertChannel {
       select: { id: true },
     });
     return notification.id;
+  }
+}
+
+/**
+ * Entrega push: grava o registro in-app **e** dispara o FCM para os aparelhos
+ * do responsável.
+ *
+ * Os dois juntos de propósito. O registro in-app é o histórico que fica na
+ * tela de Notificações; o push é o que faz o celular tocar na hora. Um alerta
+ * que só existisse como push sumiria da vista assim que o pai dispensasse a
+ * notificação.
+ */
+export class PushAlertChannel implements IAlertChannel {
+  readonly channel: KidsChannel = 'PUSH';
+
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly inApp: InAppAlertChannel,
+    private readonly fcm: FcmSender,
+  ) {}
+
+  async send(alert: KidsAlert, guardian: KidsGuardian | null): Promise<string | null> {
+    const userId = guardian?.userId ?? null;
+    if (!userId) throw new Error('Responsável sem conta no app');
+
+    // Histórico primeiro: se o push falhar, o aviso ainda existe no app.
+    const notificationId = await this.inApp.send(alert, guardian);
+
+    if (!this.fcm.isEnabled) {
+      logger.warn('[kids] FCM desativado — alerta entregue só in-app');
+      return notificationId;
+    }
+
+    const devices = await this.prisma.deviceToken.findMany({
+      where: { userId },
+      select: { token: true },
+    });
+
+    if (devices.length === 0) {
+      // Não é falha: o responsável simplesmente não autorizou notificações.
+      logger.info(`[kids] responsável ${userId} sem aparelho registrado`);
+      return notificationId;
+    }
+
+    const critical = alert.level === 'EMERGENCY';
+    const { sent, invalidTokens } = await this.fcm.sendToTokens(
+      devices.map((d) => d.token),
+      {
+        title: `${alert.roomName} · ${alert.childName}`,
+        body: alert.message,
+        data: {
+          type: 'kids_alert',
+          alertId: alert.id,
+          childId: alert.childId,
+          level: alert.level,
+        },
+        critical,
+      },
+    );
+
+    // Token de app desinstalado fica no banco para sempre se ninguém limpar.
+    if (invalidTokens.length > 0) {
+      await this.prisma.deviceToken.deleteMany({
+        where: { token: { in: invalidTokens } },
+      });
+      logger.info(`[kids] ${invalidTokens.length} token(s) inválido(s) removido(s)`);
+    }
+
+    // Havia aparelho e nenhum recebeu: isso é falha de entrega de verdade.
+    if (sent === 0) {
+      throw new Error('Nenhum aparelho recebeu o push');
+    }
+
+    return notificationId;
   }
 }
 
@@ -203,8 +277,8 @@ export class KidsAlertDispatcher {
   }
 
   private matches(channel: IAlertChannel, wanted: KidsChannel): boolean {
-    // Enquanto não há push nativo, o alerta crítico cai no mesmo canal in-app —
-    // o app diferencia pelo nível do alerta.
+    // CRITICAL_PUSH usa o mesmo canal PUSH; a diferença vai no payload
+    // (prioridade e interruption-level), decidida pelo nível do alerta.
     if (wanted === 'CRITICAL_PUSH') return channel.channel === 'PUSH';
     return channel.channel === wanted;
   }

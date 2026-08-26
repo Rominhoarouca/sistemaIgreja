@@ -14,6 +14,7 @@ class VisitorAdminTile extends StatelessWidget {
     required this.status,
     required this.time,
     required this.onTap,
+    this.timeLabel = 'Cadastrado',
     this.birthDate,
     this.phone,
     this.email,
@@ -22,6 +23,11 @@ class VisitorAdminTile extends StatelessWidget {
   final String name;
   final String status;
   final String time;
+
+  /// Prefixo da linha de rodapé. Nem toda tela mostra data ali — o dashboard
+  /// exibe a célula, e "Cadastrado Sem célula" saía como frase quebrada.
+  /// String vazia imprime só [time].
+  final String timeLabel;
   final VoidCallback onTap;
   final DateTime? birthDate;
   final String? phone;
@@ -81,7 +87,7 @@ class VisitorAdminTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          _RegisteredStrip(time: time, isDark: isDark),
+          _RegisteredStrip(time: time, timeLabel: timeLabel, isDark: isDark),
         ],
       ),
     );
@@ -156,9 +162,14 @@ class _ContactLine extends StatelessWidget {
 /// Faixa inferior do card — equivalente visual à faixa de frequência do
 /// líder, mas sem métrica de presença: aqui só cabe "cadastrado há X".
 class _RegisteredStrip extends StatelessWidget {
-  const _RegisteredStrip({required this.time, required this.isDark});
+  const _RegisteredStrip({
+    required this.time,
+    required this.isDark,
+    this.timeLabel = 'Cadastrado',
+  });
 
   final String time;
+  final String timeLabel;
   final bool isDark;
 
   @override
@@ -179,7 +190,7 @@ class _RegisteredStrip extends StatelessWidget {
           Icon(Icons.access_time, size: 14, color: mutedColor),
           const SizedBox(width: AppSpacing.xs),
           Text(
-            'Cadastrado $time',
+            timeLabel.isEmpty ? time : '$timeLabel $time',
             style: AppTypography.labelMedium.copyWith(color: mutedColor),
           ),
         ],

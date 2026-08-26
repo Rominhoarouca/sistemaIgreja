@@ -31,6 +31,7 @@ class _KidsQuickRegisterPageState extends State<KidsQuickRegisterPage> {
   final _medicationsCtrl = TextEditingController();
   final _disabilitiesCtrl = TextEditingController();
   final _pickupCtrl = TextEditingController();
+  final _birthDateCtrl = TextEditingController();
 
   final _phoneMask = MaskTextInputFormatter(
     mask: '(##) #####-####',
@@ -59,6 +60,7 @@ class _KidsQuickRegisterPageState extends State<KidsQuickRegisterPage> {
     _medicationsCtrl.dispose();
     _disabilitiesCtrl.dispose();
     _pickupCtrl.dispose();
+    _birthDateCtrl.dispose();
     super.dispose();
   }
 
@@ -71,7 +73,12 @@ class _KidsQuickRegisterPageState extends State<KidsQuickRegisterPage> {
       lastDate: now,
       helpText: 'Data de nascimento',
     );
-    if (picked != null) setState(() => _birthDate = picked);
+    if (picked != null) {
+      setState(() {
+        _birthDate = picked;
+        _birthDateCtrl.text = formatDate(picked);
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -134,12 +141,12 @@ class _KidsQuickRegisterPageState extends State<KidsQuickRegisterPage> {
               children: [
                 Expanded(
                   child: AppTextField(
+                    controller: _birthDateCtrl,
                     label: 'Nascimento',
                     readOnly: true,
-                    hint: _birthDate == null
-                        ? 'Toque para escolher'
-                        : formatDate(_birthDate!),
+                    hint: 'Toque para escolher',
                     prefixIcon: Icons.cake_outlined,
+                    onTap: _pickBirthDate,
                     onSuffixTap: _pickBirthDate,
                     suffixIcon: Icons.calendar_month_outlined,
                   ),

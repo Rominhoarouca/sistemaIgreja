@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_messaging/firebase_messaging.dart' show AuthorizationStatus;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/firebase/firebase_service.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
@@ -29,6 +31,24 @@ class _NotificationsPageState extends State<NotificationsPage> {
     super.initState();
     _dio = getIt<DioClient>().dio;
     _load();
+    _ensurePushPermission();
+  }
+
+  /// Pede permissão de notificação aqui, e não no boot: esta é a tela onde o
+  /// usuário demonstra interesse em receber avisos, então o pedido tem
+  /// contexto. Pedir na primeira abertura do app costuma render recusa.
+  Future<void> _ensurePushPermission() async {
+    final status = await FirebaseService.instance.pushStatus();
+    debugPrint('FCM status atual: $status');
+    // Só pula quando já está concedida. Não dá para testar `notDetermined`:
+    // no Android o `getNotificationSettings` nunca devolve esse valor — sem
+    // permissão ele responde `denied`, e o guard antigo pulava sempre.
+    if (status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional) {
+      return;
+    }
+    final token = await FirebaseService.instance.requestPushPermission();
+    debugPrint('FCM token do aparelho: ${token ?? "(não concedido)"}');
   }
 
   Future<void> _load() async {

@@ -507,6 +507,8 @@ class KidsAlert {
   const KidsAlert({
     required this.id,
     required this.roomName,
+    required this.sessionClosed,
+    required this.serviceDate,
     required this.childId,
     required this.childName,
     required this.checkinId,
@@ -523,6 +525,13 @@ class KidsAlert {
   factory KidsAlert.fromJson(Map<String, dynamic> json) => KidsAlert(
     id: json['id'] as String,
     roomName: json['roomName'] as String? ?? '',
+    sessionClosed: (json['sessionStatus'] as String?) == 'CLOSED',
+    // `_parseDayOnly` e não `_parseDateTime`: `service_date` é `date` no banco
+    // e chega como meia-noite UTC. Convertido para o fuso local vira 21h do dia
+    // anterior, e o histórico agrupava o culto no sábado.
+    serviceDate: json['serviceDate'] == null
+        ? null
+        : _parseDayOnly(json['serviceDate'] as String?),
     childId: json['childId'] as String? ?? '',
     childName: json['childName'] as String? ?? '',
     checkinId: json['checkinId'] as String?,
@@ -540,6 +549,13 @@ class KidsAlert {
 
   final String id;
   final String roomName;
+
+  /// Sala já encerrada: o aviso é histórico, não pede mais ação do responsável.
+  final bool sessionClosed;
+
+  /// Dia do culto. Vem nulo em respostas antigas — use [day].
+  final DateTime? serviceDate;
+
   final String childId;
   final String childName;
   final String? checkinId;
@@ -555,6 +571,13 @@ class KidsAlert {
   final List<String> guardianPhones;
 
   bool get needsCall => deliveries.any((d) => d.isPendingCall);
+
+  /// Dia a que o aviso pertence, para agrupar o histórico.
+  DateTime get day => serviceDate ?? createdAt;
+
+  /// Ainda pede atenção: sala aberta e aviso não resolvido. É o que fica na
+  /// home; todo o resto vive no histórico.
+  bool get isLive => !sessionClosed && status != KidsAlertStatus.resolved;
 }
 
 /// Relatório do ministério — a igreja que assina só o Kids não tem o dashboard

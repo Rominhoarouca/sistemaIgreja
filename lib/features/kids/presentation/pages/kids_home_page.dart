@@ -1,12 +1,16 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../injection/injection.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/kids_models.dart';
 import '../../data/kids_repository.dart';
 import '../widgets/kids_widgets.dart';
+import '../../../../shared/utils/plural.dart';
 
 /// Tela inicial do ministério infantil: as salas do professor, com a sessão
 /// aberta em destaque. É a tela mais usada do módulo — abre direto no que
@@ -93,8 +97,25 @@ class _KidsHomePageState extends State<KidsHomePage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Para o professor esta é a home: não há para onde voltar. O admin chega
+    // aqui pela sidebar, com `go` — a pilha é trocada, então não existe rota
+    // para dar pop e o botão automático do AppBar não aparece. Sem isto ele
+    // fica preso na tela (a sidebar só existe no desktop).
+    final isAdmin = context.select<AuthBloc, bool>((bloc) {
+      final state = bloc.state;
+      return state is AuthAuthenticated &&
+          (state.user.isAdmin || state.user.isSuperAdmin);
+    });
+
     return Scaffold(
       appBar: AppBar(
+        leading: isAdmin
+            ? IconButton(
+                tooltip: 'Voltar ao painel',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go(AppRoutes.adminDashboard),
+              )
+            : null,
         title: const Text('Kids'),
         actions: [
           IconButton(
@@ -131,24 +152,28 @@ class _KidsHomePageState extends State<KidsHomePage> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
-        children: [
-          if (_openAlerts.isNotEmpty) ...[
-            AppSectionHeader(title: 'Alertas abertos (${_openAlerts.length})'),
+    return AppContentWidth(
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.pagePaddingH),
+          children: [
+            if (_openAlerts.isNotEmpty) ...[
+              AppSectionHeader(
+                title: 'Alertas abertos (${_openAlerts.length})',
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              for (final alert in _openAlerts.take(3))
+                _AlertSummaryCard(alert: alert, onTap: _load),
+              const SizedBox(height: AppSpacing.base),
+            ],
+            AppSectionHeader(title: 'Minhas salas'),
             const SizedBox(height: AppSpacing.sm),
-            for (final alert in _openAlerts.take(3))
-              _AlertSummaryCard(alert: alert, onTap: _load),
-            const SizedBox(height: AppSpacing.base),
+            for (final room in _rooms)
+              _RoomCard(room: room, onTap: () => _openSession(room)),
+            const SizedBox(height: AppSpacing.xl2),
           ],
-          AppSectionHeader(title: 'Minhas salas'),
-          const SizedBox(height: AppSpacing.sm),
-          for (final room in _rooms)
-            _RoomCard(room: room, onTap: () => _openSession(room)),
-          const SizedBox(height: AppSpacing.xl2),
-        ],
+        ),
       ),
     );
   }
@@ -179,12 +204,14 @@ class _RoomCard extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
+                  // Cor da sala (já existia no modelo, não era usada): dá um
+                  // segundo sinal visual para distinguir salas homônimas.
+                  color: _roomColor(room, theme).withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
                 child: Icon(
                   Icons.meeting_room_outlined,
-                  color: isDark ? AppColors.linkDark : AppColors.primary,
+                  color: _roomColor(room, theme),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -197,11 +224,20 @@ class _RoomCard extends StatelessWidget {
                     Text(
                       [
                         if (room.ageRangeLabel.isNotEmpty) room.ageRangeLabel,
-                        '${room.capacity} lugares',
+                        plural(room.capacity, 'lugar', 'lugares'),
+                        // Os professores entram como desempate: duas salas
+                        // podem ter o mesmo nome e a mesma capacidade, e sem
+                        // isso não havia como saber em qual entrar.
+                        if (room.teachers.isNotEmpty)
+                          room.teachers
+                              .map((t) => t.name.split(' ').first)
+                              .join(', '),
                       ].join(' · '),
                       style: AppTypography.bodySmall.copyWith(
                         color: mutedColor,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -235,7 +271,9 @@ class _RoomCard extends StatelessWidget {
                 ),
                 if (session.openAlerts > 0)
                   AppBadge(
-                    label: '${session.openAlerts} alerta(s)',
+                    label: session.openAlerts == 1
+                        ? '1 alerta'
+                        : '${session.openAlerts} alertas',
                     variant: AppBadgeVariant.error,
                     size: AppBadgeSize.sm,
                   ),
@@ -362,4 +400,13 @@ class _OpenSessionDialogState extends State<_OpenSessionDialog> {
       ],
     );
   }
+}
+
+/// Cor configurada da sala (`#RRGGBB`), com o primário do tema como reserva.
+Color _roomColor(KidsRoom room, ThemeData theme) {
+  final hex = room.color.replaceFirst('#', '');
+  if (hex.length != 6) return theme.colorScheme.primary;
+  final value = int.tryParse(hex, radix: 16);
+  if (value == null) return theme.colorScheme.primary;
+  return Color(0xFF000000 | value);
 }

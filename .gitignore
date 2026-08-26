@@ -44,3 +44,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Credenciais do Firebase Admin (service account).
+# Diferente das apiKey do cliente, esta chave ENVIA push em nome do projeto e
+# assina como administrador — nunca pode ser versionada.
+*firebase-adminsdk*.json
+**/serviceAccountKey.json
+api/*.json.key
+
+# UDIDs de testadores exportados do Firebase: identificam aparelhos de pessoas
+# reais e mudam a cada rodada de testes.
+udids*.txt
+# Chave da App Store Connect API — assina como App Manager na sua conta Apple.
+AuthKey_*.p8

@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
+import 'month_label.dart';
 
 /// SRP: responsável apenas por renderizar o gráfico de linha de integração.
 class IntegrationLineChart extends StatelessWidget {
@@ -65,7 +66,7 @@ class IntegrationLineChart extends StatelessWidget {
                     if (idx < 0 || idx >= months.length) {
                       return const SizedBox.shrink();
                     }
-                    final label = (months[idx]['month'] as String).substring(5);
+                    final label = monthAxisLabel(months[idx]['month']);
                     return Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(

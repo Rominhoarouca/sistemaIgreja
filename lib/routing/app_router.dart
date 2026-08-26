@@ -192,23 +192,6 @@ GoRouter createRouter(AuthBloc authBloc) {
             const NoTransitionPage(child: LeaderHomePage()),
       ),
 
-      // ── Kids — equipe do ministério infantil ──────────────────────────
-      GoRoute(
-        path: AppRoutes.kidsHome,
-        name: 'kids-home',
-        pageBuilder: (context, state) =>
-            const NoTransitionPage(child: KidsHomePage()),
-        routes: [
-          GoRoute(
-            path: 'sessions/:id',
-            name: 'kids-session',
-            pageBuilder: (context, state) => MaterialPage(
-              child: KidsSessionPage(sessionId: state.pathParameters['id']!),
-            ),
-          ),
-        ],
-      ),
-
       // ── Kids — responsável (app do pai) ───────────────────────────────
       GoRoute(
         path: AppRoutes.guardianHome,
@@ -254,6 +237,29 @@ GoRouter createRouter(AuthBloc authBloc) {
             name: 'admin-kids-rooms',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: KidsRoomsAdminPage()),
+          ),
+
+          // ── Kids — equipe do ministério infantil ──────────────────────
+          // Dentro do shell para o admin não perder a sidebar ao entrar no
+          // check-in pelo menu. O `AdminScaffold` devolve o conteúdo puro
+          // quando quem está logado não é admin, então o professor — para
+          // quem esta é a home — continua vendo só a tela.
+          GoRoute(
+            path: AppRoutes.kidsHome,
+            name: 'kids-home',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: KidsHomePage()),
+            routes: [
+              GoRoute(
+                path: 'sessions/:id',
+                name: 'kids-session',
+                pageBuilder: (context, state) => MaterialPage(
+                  child: KidsSessionPage(
+                    sessionId: state.pathParameters['id']!,
+                  ),
+                ),
+              ),
+            ],
           ),
 
           // ── Admin Materials ───────────────────────────────────────────

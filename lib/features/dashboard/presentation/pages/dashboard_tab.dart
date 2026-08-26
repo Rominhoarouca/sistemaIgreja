@@ -157,7 +157,7 @@ class _DashboardTabState extends State<DashboardTab> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: isDesktop ? 4 : 2,
+              crossAxisCount: AppBreakpoints.kpiColumns(context, itemCount: 4),
               crossAxisSpacing: AppSpacing.base,
               mainAxisSpacing: AppSpacing.base,
               mainAxisExtent: 148,
@@ -227,6 +227,7 @@ class _DashboardTabState extends State<DashboardTab> {
                 name: (v['name'] as String?) ?? '—',
                 status: (v['status'] as String?) ?? AppConstants.statusNew,
                 time: (v['cellName'] as String?) ?? 'Sem célula',
+                timeLabel: '',
                 onTap: () => widget.onSwitchTab(1),
               ),
             ),

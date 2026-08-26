@@ -110,6 +110,12 @@ export interface IKidsRepository {
     }>,
   ): Promise<KidsChild>;
   addGuardian(childId: string, guardian: GuardianInput): Promise<KidsChild>;
+  /**
+   * Religa contas de responsável criadas depois do cadastro da criança no
+   * balcão: casa por telefone (normalizado, ignora DDI/formatação) contra
+   * guardians ainda sem `userId`. Devolve quantos vínculos foram feitos.
+   */
+  linkGuardiansByPhone(phone: string, userId: string): Promise<number>;
 
   // ── Check-in / check-out ──────────────────────────────────────────────────
   listCheckinsBySession(sessionId: string): Promise<KidsCheckin[]>;

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "390130821317",
+    "project_id": "multiplicado-a36cf",
+    "storage_bucket": "multiplicado-a36cf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:390130821317:android:afdf37f8376e854a3968ac",
+        "android_client_info": {
+          "package_name": "br.com.multiplicado"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_rspDmdShfYZammSmWGPZaehMiptPWXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

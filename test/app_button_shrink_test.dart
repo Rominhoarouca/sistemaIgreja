@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sistema_igreja/design_system/components/buttons/app_button.dart';
-import 'package:sistema_igreja/design_system/theme/app_theme.dart';
+import 'package:multiplicado/design_system/components/buttons/app_button.dart';
+import 'package:multiplicado/design_system/theme/app_theme.dart';
 
 const _longLabel = 'Baixar QR Code em alta resolução';
 
