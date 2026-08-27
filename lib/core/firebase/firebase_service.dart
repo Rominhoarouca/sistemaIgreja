@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../firebase_options.dart';
 import 'local_notifications.dart';
+import 'web_notifications.dart';
 
 /// Handler de mensagem em segundo plano.
 ///
@@ -263,7 +264,24 @@ class FirebaseService {
 
       FirebaseMessaging.onMessage.listen((m) {
         debugPrint('FCM foreground: ${m.notification?.title}');
-        unawaited(LocalNotifications.instance.showFromMessage(m));
+        // Na web o desenho é outro: `flutter_local_notifications` não tem
+        // implementação lá, e com a aba em foco nem o navegador nem o service
+        // worker mostram nada por conta própria.
+        if (kIsWeb) {
+          final n = m.notification;
+          if (n != null) {
+            unawaited(
+              showWebNotification(
+                title: n.title ?? 'Multiplicado',
+                body: n.body ?? '',
+                level: m.data['level'] as String? ?? 'INFO',
+                data: m.data.map((k, v) => MapEntry(k, '$v')),
+              ),
+            );
+          }
+        } else {
+          unawaited(LocalNotifications.instance.showFromMessage(m));
+        }
         _foreground.add(m);
       });
       FirebaseMessaging.onMessageOpenedApp.listen(_opened.add);

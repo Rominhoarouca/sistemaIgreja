@@ -54,6 +54,8 @@ dependencies:
   logger: ^2.5.0
   url_launcher: ^6.3.0
   path_provider: ^2.1.4
+  # Notificação em primeiro plano na web (Notification API).
+  web: ^1.1.1
   file_picker: ^8.1.4
   open_filex: ^4.5.1
   image_cropper: ^12.2.1

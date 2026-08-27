@@ -84,7 +84,6 @@ export class PushAlertChannel implements IAlertChannel {
       return notificationId;
     }
 
-    const critical = alert.level === 'EMERGENCY';
     const { sent, invalidTokens } = await this.fcm.sendToTokens(
       devices.map((d) => d.token),
       {
@@ -95,8 +94,9 @@ export class PushAlertChannel implements IAlertChannel {
           alertId: alert.id,
           childId: alert.childId,
           level: alert.level,
+          notificationId: notificationId ?? '',
         },
-        critical,
+        level: alert.level,
       },
     );
 

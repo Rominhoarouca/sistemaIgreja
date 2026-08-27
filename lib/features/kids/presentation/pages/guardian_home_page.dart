@@ -139,25 +139,55 @@ class _GuardianHomePageState extends State<GuardianHomePage> {
         title: const Text('Meus filhos'),
         actions: [
           IconButton(
+            tooltip: 'Notificações',
+            icon: const Icon(Icons.notifications_none),
+            onPressed: () => context.push(AppRoutes.notifications),
+          ),
+          IconButton(
             tooltip: 'Histórico de avisos',
             icon: const Icon(Icons.history),
             onPressed: () => context.push(AppRoutes.guardianAlerts),
           ),
-          IconButton(
-            tooltip: 'Adicionar filho',
-            icon: const Icon(Icons.person_add_alt_outlined),
-            onPressed: _addChild,
-          ),
-          IconButton(
-            tooltip: isDark ? 'Modo claro' : 'Modo escuro',
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-            ),
-            onPressed: () => ThemeController.instance.toggle(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => context.push('/profile'),
+          // Ações menos frequentes num menu: com cinco ícones a barra não cabe
+          // em tela de celular e o título fica espremido.
+          PopupMenuButton<String>(
+            tooltip: 'Mais',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (v) => switch (v) {
+              'filho' => _addChild(),
+              'tema' => ThemeController.instance.toggle(context),
+              _ => context.push('/profile'),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'filho',
+                child: ListTile(
+                  leading: Icon(Icons.person_add_alt_outlined),
+                  title: Text('Adicionar filho'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'tema',
+                child: ListTile(
+                  leading: Icon(
+                    isDark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                  ),
+                  title: Text(isDark ? 'Modo claro' : 'Modo escuro'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'perfil',
+                child: ListTile(
+                  leading: Icon(Icons.account_circle_outlined),
+                  title: Text('Meu perfil'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
           const SizedBox(width: AppSpacing.xs),
         ],

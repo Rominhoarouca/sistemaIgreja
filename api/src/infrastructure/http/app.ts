@@ -150,6 +150,14 @@ export function createApp(container: Container): Application {
   // ── SaaS ────────────────────────────────────────────────────────────────
   // Planos públicos (landing page — sem autenticação).
   app.get(`${v1}/public/plans`, container.planController.listPublic);
+
+  // Arte das notificações push. Precisa ser pública e sem autenticação: quem
+  // baixa a imagem é o sistema operacional do aparelho, antes de o app abrir,
+  // e ele não carrega o token do usuário. São dois PNGs sem dado nenhum.
+  app.use(
+    `${v1}/public/notificacoes`,
+    express.static('public/notificacoes', { maxAge: '7d', immutable: true }),
+  );
   app.use(`${v1}/church`, churchRoutes(container.churchController));
   app.use(`${v1}/plans`, planRoutes(container.planController));
   app.use(`${v1}/billing`, billingRoutes(container.billingController));

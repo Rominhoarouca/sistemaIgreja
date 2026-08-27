@@ -19,6 +19,43 @@ export class FcmSender {
   private app: App | null = null;
   private initialized = false;
 
+  /**
+   * Canal do Android por nível de urgência.
+   *
+   * O sufixo `_v2` não é decorativo: o Android congela vibração, som e
+   * importância quando o canal é criado, e mudar isso depois exige um id novo.
+   * Estes valores precisam bater exatamente com os de
+   * `lib/core/firebase/local_notifications.dart` — um id que o app não criou
+   * faz o sistema cair no canal padrão e descartar a urgência que pedimos.
+   */
+  /**
+   * URL pública da arte do alerta, ou `null` quando não há o que mostrar.
+   *
+   * Com o app aberto quem desenha a notificação é o próprio app, e ele usa o
+   * PNG do bundle. Fechado, quem desenha é o sistema, que só conhece o que vem
+   * no payload — e só aceita URL http(s), não asset. Por isso a mesma imagem
+   * existe nos dois lugares. Sem `PUBLIC_BASE_URL` a notificação continua
+   * chegando, apenas sem a arte.
+   */
+  static artFor(level: 'INFO' | 'URGENT' | 'EMERGENCY'): string | null {
+    if (level === 'INFO') return null;
+    const base = process.env['PUBLIC_BASE_URL'];
+    if (!base) return null;
+    const arquivo = level === 'EMERGENCY' ? 'notif_emergencia' : 'notif_urgente';
+    return `${base.replace(/\/$/, '')}/v1/public/notificacoes/${arquivo}.png`;
+  }
+
+  static channelFor(level: 'INFO' | 'URGENT' | 'EMERGENCY'): string {
+    switch (level) {
+      case 'EMERGENCY':
+        return 'alertas_criticos_v2';
+      case 'URGENT':
+        return 'urgentes_v2';
+      default:
+        return 'avisos_v2';
+    }
+  }
+
   get isEnabled(): boolean {
     this.ensureInit();
     return this.app !== null;
@@ -84,12 +121,18 @@ export class FcmSender {
       body: string;
       data?: Record<string, string>;
       critical?: boolean;
+      /** Define canal, vibração e som no Android. Default: aviso comum. */
+      level?: 'INFO' | 'URGENT' | 'EMERGENCY';
     },
   ): Promise<{ sent: number; invalidTokens: string[] }> {
     this.ensureInit();
     if (!this.app || tokens.length === 0) return { sent: 0, invalidTokens: [] };
 
     const messaging = getMessaging(this.app);
+
+    // `critical` continua aceito para quem chama sem informar o nível.
+    const nivel = payload.level ?? (payload.critical ? 'EMERGENCY' : 'INFO');
+    const arte = FcmSender.artFor(nivel);
 
     const results = await Promise.allSettled(
       tokens.map((token) => {
@@ -100,21 +143,25 @@ export class FcmSender {
           android: {
             priority: 'high',
             notification: {
-              channelId: payload.critical ? 'alertas_criticos' : 'avisos',
+              channelId: FcmSender.channelFor(nivel),
               // Emergência ignora o modo silencioso do canal padrão.
-              priority: payload.critical ? 'max' : 'default',
+              priority: nivel === 'INFO' ? 'default' : 'max',
+              ...(arte ? { imageUrl: arte } : {}),
             },
           },
           apns: {
             headers: {
               'apns-priority': '10',
               // Time-sensitive fura o Resumo de Notificações e o Foco.
-              ...(payload.critical ? { 'apns-push-type': 'alert' } : {}),
+              ...(nivel !== 'INFO' ? { 'apns-push-type': 'alert' } : {}),
             },
             payload: {
               aps: {
-                sound: 'default',
-                ...(payload.critical ? { 'interruption-level': 'time-sensitive' } : {}),
+                // Som próprio só na emergência; o arquivo vem no bundle do app.
+                sound: nivel === 'EMERGENCY' ? 'alerta.wav' : 'default',
+                ...(nivel === 'EMERGENCY'
+                  ? { 'interruption-level': 'time-sensitive' }
+                  : {}),
               },
             },
           },

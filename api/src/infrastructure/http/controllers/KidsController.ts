@@ -6,6 +6,7 @@ import type { CheckOutChildUseCase } from '@application/usecases/kids/CheckOutCh
 import type { CreateAlertUseCase } from '@application/usecases/kids/CreateAlertUseCase';
 import type { KidsQrService } from '@application/services/KidsQrService';
 import type { PickupCodeService } from '@application/services/PickupCodeService';
+import type { AckNotifier } from '@application/services/AckNotifier';
 import { AppError } from '@shared/errors/AppError';
 
 const optionalText = (max: number) =>
@@ -106,6 +107,7 @@ export class KidsController {
     private readonly createAlertUseCase: CreateAlertUseCase,
     private readonly qrService: KidsQrService,
     private readonly pickupCodes: PickupCodeService,
+    private readonly ackNotifier: AckNotifier,
   ) {}
 
   // ── Salas ─────────────────────────────────────────────────────────────────
@@ -560,6 +562,20 @@ export class KidsController {
     }
 
     const updated = await this.kidsRepo.acknowledgeAlert(id, guardian?.id ?? null);
+
+    // A sala precisa saber que alguém está vindo. Falha aqui não invalida a
+    // confirmação — o responsável já fez a parte dele.
+    void this.ackNotifier
+      .responsavelACaminho({
+        alertId: updated.id,
+        sessionId: updated.sessionId,
+        createdById: updated.createdById,
+        childName: updated.childName,
+        roomName: updated.roomName,
+        guardianName: guardian?.name ?? null,
+      })
+      .catch(() => undefined);
+
     res.json({ alert: updated });
   };
 

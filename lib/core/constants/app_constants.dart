@@ -121,6 +121,9 @@ abstract final class AppRoutes {
   static const String guardianQrCode = '/meus-filhos/qrcode';
   static const String guardianAlerts = '/meus-filhos/alertas';
 
+  /// Lista de notificações recebidas — compartilhada por todos os papéis.
+  static const String notifications = '/notifications';
+
   // SaaS
   static const String signup = '/signup';
   static const String superAdmin = '/superadmin';

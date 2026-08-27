@@ -87,6 +87,7 @@ import { MaterialController } from '@infrastructure/http/controllers/MaterialCon
 import { UserController } from '@infrastructure/http/controllers/UserController';
 import { DeviceController } from '@infrastructure/http/controllers/DeviceController';
 import { FcmSender } from '@application/services/FcmSender';
+import { AckNotifier } from '@application/services/AckNotifier';
 import { CoordenacaoController } from '@infrastructure/http/controllers/CoordenacaoController';
 import { LocationController } from '@infrastructure/http/controllers/LocationController';
 import { CellTypeController } from '@infrastructure/http/controllers/CellTypeController';
@@ -253,6 +254,7 @@ export function createContainer(): Container {
   const coordenacaoController = new CoordenacaoController(coordenacaoRepo, userRepo);
   const locationController = new LocationController(locationRepo);
   const cellTypeController = new CellTypeController(prisma);
+  const ackNotifier = new AckNotifier(prisma, fcmSender);
   const kidsController = new KidsController(
     kidsRepo,
     checkInChildrenUseCase,
@@ -260,6 +262,7 @@ export function createContainer(): Container {
     createKidsAlertUseCase,
     kidsQrService,
     pickupCodeService,
+    ackNotifier,
   );
   const notificationController = new NotificationController(
     createNotificationUseCase,

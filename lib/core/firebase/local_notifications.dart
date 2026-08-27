@@ -1,13 +1,20 @@
+import 'dart:io';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../../features/kids/data/kids_models.dart';
 
 /// Exibe notificações enquanto o app está aberto.
 ///
 /// Com o app em segundo plano quem desenha a notificação é o sistema, a partir
 /// do bloco `notification` do payload FCM. Em primeiro plano isso não acontece:
 /// no Android a mensagem chega direto ao `onMessage` e nada aparece na tela.
-/// Este serviço preenche essa lacuna.
+/// Este serviço preenche essa lacuna — e é também onde o alerta ganha cara de
+/// alerta: imagem, vibração e som mudam conforme a urgência.
 class LocalNotifications {
   LocalNotifications._();
   static final LocalNotifications instance = LocalNotifications._();
@@ -15,21 +22,43 @@ class LocalNotifications {
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _ready = false;
 
-  /// Precisam casar com os `channelId` que a API manda no payload
-  /// (`FcmSender.sendToTokens`): canal inexistente no aparelho faz o Android
-  /// cair no padrão e ignorar a importância que pedimos.
-  static const _canalAvisos = AndroidNotificationChannel(
-    'avisos',
+  /// Canais versionados de propósito.
+  ///
+  /// O Android congela importância, vibração e som no momento em que o canal é
+  /// criado: alterar o código depois não muda nada em quem já tem o app
+  /// instalado, e não existe API para reconfigurar. Trocar o id é a única
+  /// forma de aplicar um padrão novo — daí o sufixo. Ao mexer em qualquer um
+  /// destes, suba a versão e atualize o mapa em `FcmSender.channelFor`.
+  static final _canalAvisos = AndroidNotificationChannel(
+    'avisos_v2',
     'Avisos',
     description: 'Comunicados e avisos da igreja.',
     importance: Importance.high,
   );
 
-  static const _canalCriticos = AndroidNotificationChannel(
-    'alertas_criticos',
+  /// Vibração longa e dupla: perceptível no bolso sem ser a de emergência.
+  static final _canalUrgentes = AndroidNotificationChannel(
+    'urgentes_v2',
+    'Urgentes',
+    description: 'A sala precisa falar com você.',
+    importance: Importance.high,
+    enableVibration: true,
+    vibrationPattern: Int64List.fromList([0, 500, 250, 500]),
+  );
+
+  /// Emergência: som próprio e vibração longa e insistente. `audioAttributes`
+  /// em alarme faz o Android tocar mesmo com o toque no mínimo.
+  static final _canalCriticos = AndroidNotificationChannel(
+    'alertas_criticos_v2',
     'Alertas críticos',
     description: 'Emergências da salinha infantil.',
     importance: Importance.max,
+    enableVibration: true,
+    vibrationPattern: Int64List.fromList([
+      0, 900, 300, 900, 300, 900, 300, 900,
+    ]),
+    sound: const RawResourceAndroidNotificationSound('alerta'),
+    audioAttributesUsage: AudioAttributesUsage.alarm,
   );
 
   /// Chamado quando o usuário toca numa notificação exibida por nós.
@@ -63,6 +92,7 @@ class LocalNotifications {
             AndroidFlutterLocalNotificationsPlugin
           >();
       await android?.createNotificationChannel(_canalAvisos);
+      await android?.createNotificationChannel(_canalUrgentes);
       await android?.createNotificationChannel(_canalCriticos);
 
       _ready = true;
@@ -79,7 +109,7 @@ class LocalNotifications {
     // Sem bloco `notification` é push silencioso (só dados): nada a exibir.
     if (notification == null) return;
 
-    final critical = message.data['level'] == 'EMERGENCY';
+    final nivel = KidsAlertLevel.fromWire(message.data['level'] as String?);
 
     try {
       await _plugin.show(
@@ -89,30 +119,110 @@ class LocalNotifications {
         notification.title,
         notification.body,
         NotificationDetails(
-          android: AndroidNotificationDetails(
-            critical ? _canalCriticos.id : _canalAvisos.id,
-            critical ? _canalCriticos.name : _canalAvisos.name,
-            channelDescription: critical
-                ? _canalCriticos.description
-                : _canalAvisos.description,
-            importance: critical ? Importance.max : Importance.high,
-            priority: critical ? Priority.max : Priority.high,
-            // Texto longo não fica cortado numa linha só.
-            styleInformation: BigTextStyleInformation(notification.body ?? ''),
-          ),
-          iOS: DarwinNotificationDetails(
-            presentAlert: true,
-            presentBadge: true,
-            presentSound: true,
-            interruptionLevel: critical
-                ? InterruptionLevel.timeSensitive
-                : InterruptionLevel.active,
-          ),
+          android: await _android(nivel, notification.body ?? ''),
+          iOS: await _ios(nivel),
         ),
         payload: _encode(message.data),
       );
     } catch (e) {
       debugPrint('LocalNotifications: exibição falhou ($e)');
+    }
+  }
+
+  AndroidNotificationChannel _canal(KidsAlertLevel nivel) => switch (nivel) {
+    KidsAlertLevel.emergency => _canalCriticos,
+    KidsAlertLevel.urgent => _canalUrgentes,
+    KidsAlertLevel.info => _canalAvisos,
+  };
+
+  /// Nome do drawable (em `android/app/src/main/res/drawable`) e do asset
+  /// usados como imagem grande. `null` em aviso comum: imagem ali só rouba
+  /// espaço da mensagem.
+  static String? _arte(KidsAlertLevel nivel) => switch (nivel) {
+    KidsAlertLevel.emergency => 'notif_emergencia',
+    KidsAlertLevel.urgent => 'notif_urgente',
+    KidsAlertLevel.info => null,
+  };
+
+  Future<AndroidNotificationDetails> _android(
+    KidsAlertLevel nivel,
+    String corpo,
+  ) async {
+    final canal = _canal(nivel);
+    final arte = _arte(nivel);
+
+    return AndroidNotificationDetails(
+      canal.id,
+      canal.name,
+      channelDescription: canal.description,
+      importance: canal.importance,
+      priority: nivel == KidsAlertLevel.info ? Priority.high : Priority.max,
+      // Repetidos aqui além do canal: em Android 7 e anteriores não existe
+      // canal, e é este bloco que vale.
+      enableVibration: true,
+      vibrationPattern: canal.vibrationPattern,
+      sound: canal.sound,
+      color: switch (nivel) {
+        KidsAlertLevel.emergency => const Color(0xFFB00020),
+        KidsAlertLevel.urgent => const Color(0xFFF9A825),
+        KidsAlertLevel.info => null,
+      },
+      colorized: nivel != KidsAlertLevel.info,
+      // Emergência fica na barra até ser tocada: dispensar sem querer é o
+      // modo mais fácil de perder o aviso que mais importa.
+      ongoing: nivel == KidsAlertLevel.emergency,
+      fullScreenIntent: nivel == KidsAlertLevel.emergency,
+      category: nivel == KidsAlertLevel.emergency
+          ? AndroidNotificationCategory.alarm
+          : null,
+      styleInformation: arte == null
+          // Texto longo não fica cortado numa linha só.
+          ? BigTextStyleInformation(corpo)
+          : BigPictureStyleInformation(
+              DrawableResourceAndroidBitmap(arte),
+              largeIcon: DrawableResourceAndroidBitmap(arte),
+              summaryText: corpo,
+              htmlFormatSummaryText: false,
+            ),
+    );
+  }
+
+  Future<DarwinNotificationDetails> _ios(KidsAlertLevel nivel) async {
+    final arte = _arte(nivel);
+    // O iOS anexa arquivo, não asset: o bundle precisa virar um arquivo em
+    // disco antes de ser referenciado.
+    final caminho = arte == null ? null : await _assetEmDisco(arte);
+
+    return DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: nivel == KidsAlertLevel.emergency ? 'alerta.wav' : null,
+      interruptionLevel: switch (nivel) {
+        KidsAlertLevel.emergency => InterruptionLevel.critical,
+        KidsAlertLevel.urgent => InterruptionLevel.timeSensitive,
+        KidsAlertLevel.info => InterruptionLevel.active,
+      },
+      attachments: caminho == null
+          ? null
+          : [DarwinNotificationAttachment(caminho)],
+    );
+  }
+
+  /// Copia o PNG do bundle para o diretório temporário, uma vez por execução.
+  final _emDisco = <String, String>{};
+  Future<String?> _assetEmDisco(String nome) async {
+    if (_emDisco.containsKey(nome)) return _emDisco[nome];
+    try {
+      final bytes = await rootBundle.load('assets/images/$nome.png');
+      final dir = await getTemporaryDirectory();
+      final arquivo = File('${dir.path}/$nome.png');
+      await arquivo.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+      _emDisco[nome] = arquivo.path;
+      return arquivo.path;
+    } catch (e) {
+      debugPrint('LocalNotifications: anexo $nome indisponível ($e)');
+      return null;
     }
   }
 

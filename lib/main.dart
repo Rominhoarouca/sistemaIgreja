@@ -8,6 +8,7 @@ import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations;
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
+import 'core/constants/app_constants.dart';
 import 'core/firebase/firebase_service.dart';
 import 'design_system/design_system.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -195,10 +196,46 @@ class _SistemaIgrejaAppState extends State<SistemaIgrejaApp> {
   GoRouter? _router;
   Object? _initError;
   StackTrace? _initStack;
+  StreamSubscription<RemoteMessage>? _aberturas;
+
+  /// Toque numa notificação: leva à tela que resolve o assunto dela.
+  ///
+  /// Vale para os três caminhos — app aberto, em segundo plano, e aberto a
+  /// partir da notificação com o app encerrado —, porque os três desembocam no
+  /// mesmo `onMessageOpened`. Sem isto o toque só trazia o app à frente e
+  /// parava na tela em que ele estava.
+  void _abrirNotificacao(RemoteMessage m) {
+    final router = _router;
+    if (router == null) return;
+
+    final destino = switch (m.data['type']) {
+      // Para o professor, o que importa é a sala onde a criança está.
+      'kids_ack' when (m.data['sessionId'] ?? '').isNotEmpty =>
+        '/kids/sessions/${m.data['sessionId']}',
+      // Para o responsável, o histórico de avisos dos filhos.
+      'kids_alert' => AppRoutes.guardianAlerts,
+      _ => AppRoutes.notifications,
+    };
+
+    try {
+      router.push(destino);
+    } catch (e) {
+      debugPrint('Notificação: navegação para $destino falhou ($e)');
+    }
+  }
+
+  @override
+  void dispose() {
+    _aberturas?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _aberturas = FirebaseService.instance.onMessageOpened.listen(
+      _abrirNotificacao,
+    );
     // Resolver o AuthBloc pode falhar quando o DI não subiu. Lançar aqui
     // derruba o primeiro build e devolve tela branca — daí o try.
     try {
