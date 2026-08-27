@@ -57,3 +57,10 @@ api/*.json.key
 udids*.txt
 # Chave da App Store Connect API — assina como App Manager na sua conta Apple.
 AuthKey_*.p8
+
+# Dumps de banco. Contêm a base inteira, produção inclusive — nunca versionar.
+backups/
+*.dump
+
+# Secrets montados no compose (service account do Firebase Admin).
+secrets/
