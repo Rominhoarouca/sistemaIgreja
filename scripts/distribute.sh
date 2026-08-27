@@ -98,22 +98,49 @@ fi
 
 echo "▸ enviando $artifact"
 
-# O `:distribute` às vezes falha com 404 logo após a release ser criada — a
-# release ainda não propagou quando o CLI tenta associar os testadores.
+# Resolver o grupo em e-mails aqui, em vez de passar `--groups`.
+#
+# Com `--groups`, o corpo da chamada vai como `{"groupAliases":["..."]}` e o
+# servidor resolve o alias. Essa resolução falha de forma intermitente com
+# `HTTP Error: 404, Requested entity was not found` — a mesma release, com o
+# mesmo alias, alterna entre 404 e 200. Mandando `testerEmails` não há alias
+# para resolver, e o passo deixa de depender disso.
+#
+# Se a listagem falhar (sem permissão, grupo vazio), cai de volta em
+# `--groups`: distribuir com o comportamento antigo é melhor que não
+# distribuir.
+alvo=()
+if emails=$(firebase appdistribution:testers:list "$GROUPS" \
+      --project "$PROJECT" --json 2>/dev/null \
+      | node -pe "
+          const r = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+          (r.result?.testers ?? [])
+            .map((t) => t.name.split('/testers/')[1])
+            .filter(Boolean)
+            .join(',');
+        " 2>/dev/null) && [[ -n "$emails" ]]; then
+  echo "▸ testadores do grupo '$GROUPS': ${emails//,/, }"
+  alvo=(--testers "$emails")
+else
+  echo "▸ não consegui listar o grupo '$GROUPS' — usando --groups"
+  alvo=(--groups "$GROUPS")
+fi
+
+# O 404 também aparece logo após a release ser criada, antes de ela propagar.
 # Reexecutar é seguro: o upload detecta a release existente e só refaz a
 # associação, em vez de criar outra.
-tentativas=3
+tentativas=4
 for n in $(seq 1 $tentativas); do
   if firebase appdistribution:distribute "$artifact" \
       --app "$app_id" \
       --project "$PROJECT" \
-      --groups "$GROUPS" \
+      "${alvo[@]}" \
       --release-notes-file "$notes_file"; then
-    echo "✓ distribuído para o grupo '$GROUPS'"
+    echo "✓ distribuído para: ${emails:-$GROUPS}"
     exit 0
   fi
   if [[ $n -lt $tentativas ]]; then
-    espera=$((n * 5))
+    espera=$((n * 15))
     echo "▸ falhou (tentativa $n/$tentativas) — nova tentativa em ${espera}s"
     sleep "$espera"
   fi
