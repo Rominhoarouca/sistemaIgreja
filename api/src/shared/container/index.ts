@@ -23,6 +23,9 @@ import { RegisterChurchUseCase } from '@application/usecases/signup/RegisterChur
 import { GetSaasUsageUseCase } from '@application/usecases/church/GetSaasUsageUseCase';
 
 // SaaS controllers
+import { AlbumController } from '@infrastructure/http/controllers/AlbumController';
+import { GetAlbumUseCase } from '@application/usecases/album/GetAlbumUseCase';
+import { PrismaAlbumRepository } from '@infrastructure/database/repositories/PrismaAlbumRepository';
 import { ChurchController } from '@infrastructure/http/controllers/ChurchController';
 import { PlanController } from '@infrastructure/http/controllers/PlanController';
 import { BillingController } from '@infrastructure/http/controllers/BillingController';
@@ -101,11 +104,13 @@ import { UpdateProfileUseCase } from '@application/usecases/user/UpdateProfileUs
 
 export interface Container {
   prisma: PrismaClient;
+  minioService: MinioService;
   authController: AuthController;
   visitorController: VisitorController;
   cellController: CellController;
   cellTypeController: CellTypeController;
   attendanceController: AttendanceController;
+  albumController: AlbumController;
   spiritualHistoryController: SpiritualHistoryController;
   dashboardController: DashboardController;
   materialController: MaterialController;
@@ -177,7 +182,7 @@ export function createContainer(): Container {
   const registerAttendanceUseCase = new RegisterAttendanceUseCase(attendanceRepo, cellRepo);
 
   // Spiritual history use cases
-  const addSpiritualEventUseCase = new AddSpiritualEventUseCase(spiritualHistoryRepo, visitorRepo);
+  const addSpiritualEventUseCase = new AddSpiritualEventUseCase(spiritualHistoryRepo, visitorRepo, cellMemberRepo);
 
   // Dashboard use cases
   const getDashboardStatsUseCase = new GetDashboardStatsUseCase(
@@ -238,8 +243,15 @@ export function createContainer(): Container {
     updateVisitorStatusUseCase,
     visitorRepo,
     cellMemberRepo,
+    minioService,
   );
-  const cellController = new CellController(getNearbyCellsUseCase, cellRepo, cellMemberRepo);
+  const cellController = new CellController(
+    getNearbyCellsUseCase,
+    cellRepo,
+    cellMemberRepo,
+    userRepo,
+    minioService,
+  );
   const attendanceController = new AttendanceController(registerAttendanceUseCase, attendanceRepo, minioService);
   const spiritualHistoryController = new SpiritualHistoryController(addSpiritualEventUseCase, spiritualHistoryRepo);
   const dashboardController = new DashboardController(
@@ -247,6 +259,10 @@ export function createContainer(): Container {
     visitorRepo,
     attendanceRepo,
     getDemographicsUseCase,
+  );
+  const albumRepo = new PrismaAlbumRepository(prisma);
+  const albumController = new AlbumController(
+    new GetAlbumUseCase(albumRepo, minioService),
   );
   const materialController = new MaterialController(uploadMaterialUseCase, materialRepo, minioService, cellRepo, prisma);
   const userController = new UserController(getProfileUseCase, updateProfileUseCase, userRepo, kidsRepo);
@@ -309,6 +325,7 @@ export function createContainer(): Container {
     assignPlanManuallyUseCase,
     createCheckoutUseCase,
     handleWebhookUseCase,
+    paymentGateway,
   );
   const signupController = new SignupController(registerChurchUseCase, loginUseCase);
   const superAdminController = new SuperAdminController(
@@ -320,11 +337,13 @@ export function createContainer(): Container {
 
   return {
     prisma,
+    minioService,
     authController,
     visitorController,
     cellController,
     cellTypeController,
     attendanceController,
+    albumController,
     spiritualHistoryController,
     dashboardController,
     materialController,

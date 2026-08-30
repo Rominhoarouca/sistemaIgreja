@@ -2,11 +2,13 @@ import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' show AuthorizationStatus;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/firebase/firebase_service.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../../routing/role_home.dart';
 import 'admin_create_notification_page.dart';
 import 'admin_notifications_list_page.dart';
 import 'notification_detail_page.dart';
@@ -113,6 +115,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  /// Volta para a tela anterior; sem pilha, cai na home do perfil do usuário.
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final state = context.read<AuthBloc>().state;
+    final home = state is AuthAuthenticated
+        ? homeRouteForRole(orderedRoles(state.user).first)
+        : '/';
+    context.go(home);
+  }
+
   @override
   Widget build(BuildContext context) {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
@@ -124,6 +139,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
+        // Botão de voltar explícito: a rota vive dentro do shell do admin e,
+        // dependendo de como se chega nela, o `automaticallyImplyLeading` não
+        // encontra nada para desempilhar — o líder ficava preso na tela.
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Voltar',
+          onPressed: _goBack,
+        ),
         title: const Text('Notificações'),
         actions: [
           if (isAdmin)

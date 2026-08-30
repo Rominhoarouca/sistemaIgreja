@@ -1,5 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
-import type { CellMember, CreateCellMemberData } from '@domain/entities/CellMember';
+import type {
+  CellMember,
+  CreateCellMemberData,
+  UpdateCellMemberData,
+} from '@domain/entities/CellMember';
 import type { ICellMemberRepository } from '@domain/repositories/ICellMemberRepository';
 import { AppError } from '@shared/errors/AppError';
 
@@ -36,6 +40,39 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
     return rows.map((row) => this.mapRow(row));
   }
 
+  async findById(id: string): Promise<CellMember | null> {
+    const row = await this.prisma.cellMember.findUnique({
+      where: { id },
+      include: { ...bairroInclude },
+    });
+    return row ? this.mapRow(row) : null;
+  }
+
+  async update(id: string, data: UpdateCellMemberData): Promise<CellMember> {
+    const row = await this.prisma.cellMember.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.email !== undefined ? { email: data.email } : {}),
+        ...(data.address !== undefined ? { address: data.address } : {}),
+        ...(data.bairroId !== undefined ? { bairroId: data.bairroId } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
+        ...(data.gender !== undefined ? { gender: data.gender } : {}),
+        ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
+        ...(data.isBaptized !== undefined ? { isBaptized: data.isBaptized } : {}),
+        ...(data.roleInCell !== undefined ? { roleInCell: data.roleInCell } : {}),
+        ...(data.photoKey !== undefined ? { photoKey: data.photoKey } : {}),
+      },
+      include: { ...bairroInclude },
+    });
+    return this.mapRow(row);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.prisma.cellMember.delete({ where: { id } });
+  }
+
   async create(data: CreateCellMemberData): Promise<CellMember> {
     const row = await this.prisma.cellMember.create({
       data: {
@@ -48,6 +85,8 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
         ...(data.birthDate !== undefined ? { birthDate: data.birthDate } : {}),
         ...(data.gender !== undefined ? { gender: data.gender } : {}),
         ...(data.maritalStatus !== undefined ? { maritalStatus: data.maritalStatus } : {}),
+        ...(data.isBaptized !== undefined ? { isBaptized: data.isBaptized } : {}),
+        ...(data.roleInCell !== undefined ? { roleInCell: data.roleInCell } : {}),
         ...(data.leaderId !== undefined ? { leaderId: data.leaderId } : {}),
       },
       include: { ...bairroInclude },
@@ -90,6 +129,8 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
           gender: visitor.gender,
           maritalStatus: visitor.maritalStatus,
           leaderId: visitor.leaderId,
+          photoKey: visitor.photoKey,
+          isBaptized: visitor.isBaptized,
           sourceVisitorId: visitor.id,
         },
         include: { ...bairroInclude },
@@ -121,6 +162,9 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
     birthDate?: Date | null;
     gender?: CellMember['gender'];
     maritalStatus?: string | null;
+    isBaptized?: boolean;
+    roleInCell?: CellMember['roleInCell'];
+    photoKey?: string | null;
     leaderId: string | null;
     sourceVisitorId: string | null;
     createdAt: Date;
@@ -141,6 +185,9 @@ export class PrismaCellMemberRepository implements ICellMemberRepository {
       birthDate: row.birthDate ?? null,
       gender: row.gender ?? null,
       maritalStatus: row.maritalStatus ?? null,
+      isBaptized: row.isBaptized ?? false,
+      roleInCell: row.roleInCell ?? 'MEMBRO',
+      photoKey: row.photoKey ?? null,
       leaderId: row.leaderId,
       sourceVisitorId: row.sourceVisitorId,
       createdAt: row.createdAt,

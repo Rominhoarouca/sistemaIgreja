@@ -10,7 +10,8 @@ export type DayOfWeek =
 export interface Cell {
   readonly id: string;
   readonly name: string;
-  readonly leaderId: string;
+  /** Null enquanto a célula não tem líder — ver vínculos pendentes. */
+  readonly leaderId: string | null;
   readonly leaderName?: string;
   // Derivados de leader → supervisor → coordenação. Null quando o líder não
   // tem supervisor, ou o supervisor não tem coordenação.
@@ -50,7 +51,7 @@ export interface NearbySearchParams {
 
 export interface CreateCellData {
   readonly name: string;
-  readonly leaderId: string;
+  readonly leaderId?: string | null;
   readonly cellTypeId?: string | null;
   readonly address: string;
   readonly bairroId?: string | null;

@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { IKidsRepository } from '@domain/repositories/IKidsRepository';
 import { AppError } from '@shared/errors/AppError';
+import { hasRole } from './auth.middleware';
 
 /** Papéis que operam a salinha. RESPONSAVEL fica de fora — ele só vê os filhos. */
 export function requireKidsStaff(req: Request, _res: Response, next: NextFunction): void {
-  const role = req.userRole;
-  if (role !== 'KIDS' && role !== 'ADMIN' && role !== 'SUPERADMIN') {
+  if (!hasRole(req, 'KIDS', 'ADMIN', 'SUPERADMIN')) {
     throw AppError.forbidden('Acesso restrito à equipe do ministério infantil');
   }
   next();
@@ -13,8 +13,7 @@ export function requireKidsStaff(req: Request, _res: Response, next: NextFunctio
 
 export function requireGuardian(req: Request, _res: Response, next: NextFunction): void {
   // ADMIN também passa: precisa conseguir depurar o que o pai está vendo.
-  const role = req.userRole;
-  if (role !== 'RESPONSAVEL' && role !== 'ADMIN' && role !== 'SUPERADMIN') {
+  if (!hasRole(req, 'RESPONSAVEL', 'ADMIN', 'SUPERADMIN')) {
     throw AppError.forbidden('Acesso restrito a responsáveis');
   }
   next();
@@ -30,7 +29,7 @@ export function requireGuardian(req: Request, _res: Response, next: NextFunction
 export function makeRequireRoomAccess(kidsRepo: IKidsRepository) {
   return (source: 'roomId' | 'sessionId' | 'checkinId', paramName = 'id') =>
     async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-      if (req.userRole === 'ADMIN' || req.userRole === 'SUPERADMIN') return next();
+      if (hasRole(req, 'ADMIN', 'SUPERADMIN')) return next();
 
       const raw = req.params[paramName];
       const value = Array.isArray(raw) ? raw[0] : raw;

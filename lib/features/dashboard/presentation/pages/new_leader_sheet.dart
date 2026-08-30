@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../utils/snackbar_helper.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 /// SRP: responsável apenas pelo formulário de novo líder.
 class NewLeaderSheet extends StatefulWidget {
@@ -91,7 +92,28 @@ class _NewLeaderSheetState extends State<NewLeaderSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.base),
-              Text('Novo Líder', style: AppTypography.headlineSmall),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Voltar',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Novo Líder',
+                      style: AppTypography.headlineSmall,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.xl),
               AppTextField(
                 controller: _nameCtrl,
@@ -116,6 +138,7 @@ class _NewLeaderSheetState extends State<NewLeaderSheet> {
                 hint: '(11) 99999-9999',
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+                inputFormatters: brPhoneInputFormatters,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: AppSpacing.base),

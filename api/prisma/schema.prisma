@@ -23,6 +23,14 @@ enum UserRole {
   RESPONSAVEL
 }
 
+/// Papel da pessoa dentro da célula. Só um vice-líder e um anfitrião por
+/// célula fazem sentido, mas isso é regra de aplicação, não do banco.
+enum CellMemberRole {
+  MEMBRO
+  VICE_LIDER
+  ANFITRIAO
+}
+
 enum VisitorStatus {
   novo
   em_acompanhamento
@@ -239,6 +247,10 @@ model User {
   email         String
   password      String
   role          UserRole  @default(LIDER)
+  /// Papéis adicionais acumulados pelo usuário. `role` continua sendo o papel
+  /// principal (compatibilidade e ordenação); a autorização usa a união dos
+  /// dois — um mesmo usuário pode ser líder, supervisor, admin e coordenador.
+  roles         UserRole[] @default([])
   photoKey      String?   @map("photo_key")
   phone         String?
   address       String?
@@ -687,7 +699,9 @@ model Cell {
   id          String    @id @default(uuid())
   churchId    String?   @map("church_id")
   name        String
-  leaderId    String    @map("leader_id")
+  /// Opcional: a célula pode ser cadastrada antes de existir um líder para ela
+  /// (e um líder pode existir sem célula). Ver a tela de vínculos pendentes.
+  leaderId    String?   @map("leader_id")
   cellTypeId  String?   @map("cell_type_id")
   address     String
   bairroId    String?   @map("bairro_id")
@@ -700,7 +714,7 @@ model Cell {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   church      Church?       @relation(fields: [churchId], references: [id])
-  leader      User          @relation("CellLeader", fields: [leaderId], references: [id])
+  leader      User?         @relation("CellLeader", fields: [leaderId], references: [id])
   cellType    CellType?     @relation(fields: [cellTypeId], references: [id])
   bairro      Bairro?       @relation(fields: [bairroId], references: [id])
   members     CellMember[]
@@ -735,6 +749,7 @@ model Visitor {
   knownPersonName String?       @map("known_person_name")
   interests       String[]      @default([]) @map("interests")
   status          VisitorStatus @default(novo)
+  photoKey        String?       @map("photo_key")
   leaderId        String?       @map("leader_id")
   cellId          String?       @map("cell_id")
   referredById    String?       @map("referred_by_id")
@@ -774,6 +789,9 @@ model CellMember {
   birthDate       DateTime? @map("birth_date")
   gender          Gender?
   maritalStatus   String?   @map("marital_status")
+  roleInCell      CellMemberRole @default(MEMBRO) @map("role_in_cell")
+  isBaptized      Boolean   @default(false) @map("is_baptized")
+  photoKey        String?   @map("photo_key")
   leaderId        String?   @map("leader_id")
   sourceVisitorId String?   @unique @map("source_visitor_id")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -786,6 +804,7 @@ model CellMember {
   sourceVisitor Visitor?     @relation("VisitorConvertedMember", fields: [sourceVisitorId], references: [id])
   attendances   Attendance[] @relation("MemberAttendances")
   children      Child[]
+  spiritualHistories SpiritualHistory[]
 
   @@index([churchId])
   @@index([cellId])
@@ -807,15 +826,20 @@ model CellMeeting {
   lesson      String?
   /// Quem ministrou. Texto livre: pode ser alguém de fora da célula.
   ministrante String?
+  /// Material da célula usado como lição. Opcional — quando a lição não está
+  /// no acervo, `lesson` continua sendo o texto livre.
+  materialId  String?  @map("material_id")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  church    Church? @relation(fields: [churchId], references: [id])
-  cell      Cell    @relation(fields: [cellId], references: [id], onDelete: Cascade)
-  createdBy User    @relation("CreatedMeetings", fields: [createdById], references: [id])
+  church    Church?   @relation(fields: [churchId], references: [id])
+  cell      Cell      @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("CreatedMeetings", fields: [createdById], references: [id])
+  material  Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
 
   @@unique([cellId, meetingDate])
   @@index([churchId])
   @@index([createdById])
+  @@index([materialId])
   @@map("cell_meetings")
 }
 
@@ -844,22 +868,30 @@ model Attendance {
 }
 
 // ── Spiritual History ─────────────────────────────────────────────────────────
+/// Evento espiritual de uma pessoa da célula.
+///
+/// A pessoa é um visitante OU um membro — exatamente um dos dois campos é
+/// preenchido. Antes só existia `visitor_id`, mas quem já é membro também é
+/// enviado para batismo e batizado.
 model SpiritualHistory {
   id           String             @id @default(uuid())
   churchId     String?            @map("church_id")
-  visitorId    String             @map("visitor_id")
+  visitorId    String?            @map("visitor_id")
+  memberId     String?            @map("member_id")
   eventType    SpiritualEventType @map("event_type")
   description  String?
   date         DateTime           @db.Date
   recordedById String             @map("recorded_by_id")
   createdAt    DateTime           @default(now()) @map("created_at")
 
-  church     Church? @relation(fields: [churchId], references: [id])
-  visitor    Visitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
-  recordedBy User    @relation("RecordedBy", fields: [recordedById], references: [id])
+  church     Church?     @relation(fields: [churchId], references: [id])
+  visitor    Visitor?    @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  member     CellMember? @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  recordedBy User        @relation("RecordedBy", fields: [recordedById], references: [id])
 
   @@index([churchId])
   @@index([visitorId])
+  @@index([memberId])
   @@index([recordedById])
   @@map("spiritual_histories")
 }
@@ -877,9 +909,10 @@ model Material {
   uploadedById String           @map("uploaded_by_id")
   uploadedAt   DateTime         @default(now()) @map("uploaded_at")
 
-  church     Church? @relation(fields: [churchId], references: [id])
-  cell       Cell    @relation(fields: [cellId], references: [id], onDelete: Cascade)
-  uploadedBy User    @relation("UploadedBy", fields: [uploadedById], references: [id])
+  church     Church?       @relation(fields: [churchId], references: [id])
+  cell       Cell          @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  uploadedBy User          @relation("UploadedBy", fields: [uploadedById], references: [id])
+  meetings   CellMeeting[]
 
   @@index([churchId])
   @@index([cellId])

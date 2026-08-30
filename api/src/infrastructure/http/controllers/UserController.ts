@@ -6,6 +6,23 @@ import type { UpdateProfileUseCase } from '@application/usecases/user/UpdateProf
 import type { IUserRepository } from '@domain/repositories/IUserRepository';
 import type { IKidsRepository } from '@domain/repositories/IKidsRepository';
 import { AppError } from '@shared/errors/AppError';
+import { hasRole } from '../middlewares/auth.middleware';
+import { effectiveRoles } from '@domain/entities/User';
+
+// ADMIN/SUPERADMIN ficam de fora de propósito: quem cria admin de igreja é o
+// signup do tenant e o super-admin, não esta tela.
+const roleEnum = z.enum(['LIDER', 'SUPERVISOR', 'COORDENADOR', 'KIDS', 'RESPONSAVEL']);
+
+// A tela de perfis também administra o papel de ADMIN da igreja — quem já é
+// admin pode promover outro. SUPERADMIN continua fora: é o dono do SaaS.
+const manageableRoleEnum = z.enum([
+  'ADMIN',
+  'LIDER',
+  'SUPERVISOR',
+  'COORDENADOR',
+  'KIDS',
+  'RESPONSAVEL',
+]);
 
 const childSchema = z.object({
   id: z.string().uuid().optional(),
@@ -52,6 +69,12 @@ export class UserController {
     res.json({ supervisors: coordinadores });
   };
 
+  /** Lista todos os usuários da igreja (tela de perfis). */
+  listUsers = async (_req: Request, res: Response): Promise<void> => {
+    const users = await this.userRepo.listAll();
+    res.json({ users });
+  };
+
   searchUsers = async (req: Request, res: Response): Promise<void> => {
     const { q } = z.object({ q: z.string().min(1) }).parse(req.query);
     const users = await this.userRepo.searchUsers(q);
@@ -59,10 +82,9 @@ export class UserController {
   };
 
   getMyLeaders = async (req: Request, res: Response): Promise<void> => {
-    const leaders =
-      req.userRole === 'COORDENADOR'
-        ? await this.userRepo.findLeadersByCoordinatorId(req.userId)
-        : await this.userRepo.findLeadersBySupervisorId(req.userId);
+    const leaders = hasRole(req, 'COORDENADOR')
+      ? await this.userRepo.findLeadersByCoordinatorId(req.userId)
+      : await this.userRepo.findLeadersBySupervisorId(req.userId);
     res.json({ leaders });
   };
 
@@ -85,7 +107,9 @@ export class UserController {
       .parse(req.body);
     const user = await this.userRepo.findById(leaderId);
     if (!user) throw AppError.notFound('Usuário não encontrado');
-    if (user.role !== 'LIDER') throw new AppError('Apenas líderes podem ser promovidos', 422, 'INVALID_ROLE');
+    if (!effectiveRoles(user).includes('LIDER')) {
+      throw new AppError('Apenas líderes podem ser promovidos', 422, 'INVALID_ROLE');
+    }
     await this.userRepo.promoteUser(leaderId, targetRole);
     res.status(204).send();
   };
@@ -113,16 +137,19 @@ export class UserController {
     const target = await this.userRepo.findById(userId);
     if (!target) throw AppError.notFound('Usuário não encontrado');
 
-    let allowed = false;
-    if (req.userRole === 'ADMIN') {
-      allowed = true;
-    } else if (req.userRole === 'SUPERVISOR') {
-      allowed = target.role === 'LIDER' && target.supervisorId === req.userId;
-    } else if (req.userRole === 'COORDENADOR') {
-      if (target.role === 'SUPERVISOR') {
+    // Cada papel do solicitante é um escopo somado — quem é supervisor E
+    // coordenador alcança os dois conjuntos.
+    const targetRoles = effectiveRoles(target);
+    let allowed = hasRole(req, 'ADMIN', 'SUPERADMIN');
+    if (!allowed && hasRole(req, 'SUPERVISOR')) {
+      allowed = targetRoles.includes('LIDER') && target.supervisorId === req.userId;
+    }
+    if (!allowed && hasRole(req, 'COORDENADOR')) {
+      if (targetRoles.includes('SUPERVISOR')) {
         const sups = await this.userRepo.findSupervisorsByCoordinatorId(req.userId);
         allowed = sups.some((s) => s.id === userId);
-      } else if (target.role === 'LIDER') {
+      }
+      if (!allowed && targetRoles.includes('LIDER')) {
         const leaders = await this.userRepo.findLeadersByCoordinatorId(req.userId);
         allowed = leaders.some((l) => l.id === userId);
       }
@@ -198,6 +225,35 @@ export class UserController {
     res.json({ user, children });
   };
 
+  /** Redefine o conjunto de papéis de um usuário (ADMIN). */
+  setUserRoles = async (req: Request, res: Response): Promise<void> => {
+    const { userId } = req.params as { userId: string };
+    const { roles } = z.object({ roles: z.array(manageableRoleEnum).min(1) }).parse(req.body);
+
+    const target = await this.userRepo.findById(userId);
+    if (!target) throw AppError.notFound('Usuário não encontrado');
+
+    // SUPERADMIN não é gerenciável por aqui: é o dono do SaaS, não um papel da
+    // igreja. Sem isso um admin rebaixaria o superadmin e perderia o acesso
+    // cross-tenant do sistema.
+    if (effectiveRoles(target).includes('SUPERADMIN')) {
+      throw AppError.forbidden('Os papéis do super-administrador não são editáveis aqui');
+    }
+
+    // Tirar o próprio ADMIN deixaria a pessoa sem acesso à tela que acabou de
+    // usar — e possivelmente a igreja sem nenhum admin.
+    if (userId === req.userId && !roles.includes('ADMIN')) {
+      throw new AppError(
+        'Você não pode remover o seu próprio perfil de administrador',
+        422,
+        'CANNOT_DEMOTE_SELF',
+      );
+    }
+
+    const user = await this.userRepo.setRoles(userId, roles);
+    res.json({ user });
+  };
+
   createUser = async (req: Request, res: Response): Promise<void> => {
     const body = z.object({
       name: z.string().min(1),
@@ -212,7 +268,10 @@ export class UserController {
       // KIDS e RESPONSAVEL entram aqui porque o ministério infantil cadastra
       // professor e pai pelo mesmo fluxo de admin. Nenhum dos dois participa
       // da hierarquia de células (cellIds/leaderIds ficam vazios para eles).
-      role: z.enum(['LIDER', 'SUPERVISOR', 'COORDENADOR', 'KIDS', 'RESPONSAVEL']),
+      role: roleEnum,
+      // Papéis extras: a mesma pessoa pode ser líder, supervisor, coordenador
+      // e admin ao mesmo tempo. `role` continua sendo o papel principal.
+      roles: z.array(roleEnum).optional(),
       cellIds: z.array(z.string().uuid()).optional(),
       leaderIds: z.array(z.string().uuid()).optional(),
       supervisorIds: z.array(z.string().uuid()).optional(),
@@ -230,6 +289,7 @@ export class UserController {
       email: body.email,
       password: hashedPassword,
       role: body.role,
+      roles: body.roles ?? [],
     };
 
     if (body.phone) createData.phone = body.phone;

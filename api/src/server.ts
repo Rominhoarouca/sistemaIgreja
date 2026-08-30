@@ -16,6 +16,15 @@ async function bootstrap(): Promise<void> {
   const container = createContainer();
   const app = createApp(container);
 
+  // Valida o storage no boot: sem isso, credencial errada só aparecia como
+  // 500 na primeira tentativa de upload do usuário.
+  container.minioService.healthCheck().catch((err: unknown) => {
+    logger.error(
+      '[API] Armazenamento de arquivos indisponível — uploads vão falhar',
+      err as Error,
+    );
+  });
+
   // Only HTTP — TLS is handled by nginx/reverse-proxy in production
   const server = http.createServer(app).listen(PORT, '0.0.0.0', () => {
     logger.info(`[API] Sistema Igreja rodando na porta ${PORT}`);

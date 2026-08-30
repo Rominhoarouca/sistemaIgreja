@@ -78,8 +78,10 @@ export class PrismaCellRepository implements ICellRepository {
       Array<{
         id: string;
         name: string;
-        leader_id: string;
+        leader_id: string | null;
         leader_name: string | null;
+        cell_type_id: string | null;
+        cell_type_name: string | null;
         address: string;
         bairro_id: string | null;
         day_of_week: string;
@@ -98,6 +100,8 @@ export class PrismaCellRepository implements ICellRepository {
         c.name,
         c.leader_id,
         u.name AS leader_name,
+        c.cell_type_id,
+        ct.name AS cell_type_name,
         c.address,
         c.bairro_id,
         c.day_of_week,
@@ -120,9 +124,10 @@ export class PrismaCellRepository implements ICellRepository {
       FROM cells c
       LEFT JOIN cell_members m ON m.cell_id = c.id
       LEFT JOIN users u ON u.id = c.leader_id
+      LEFT JOIN cell_types ct ON ct.id = c.cell_type_id
       WHERE c.latitude IS NOT NULL AND c.longitude IS NOT NULL
         AND (${churchId}::text IS NULL OR c.church_id = ${churchId})
-      GROUP BY c.id, u.name
+      GROUP BY c.id, u.name, ct.name
       HAVING (
         6371 * acos(
           cos(radians(${latitude})) *
@@ -157,8 +162,8 @@ export class PrismaCellRepository implements ICellRepository {
         name: r.name,
         leaderId: r.leader_id,
         ...(r.leader_name != null && { leaderName: r.leader_name }),
-        cellTypeId: null,
-        cellTypeName: null,
+        cellTypeId: r.cell_type_id,
+        cellTypeName: r.cell_type_name,
         address: r.address,
         bairroId: r.bairro_id,
         neighborhood: loc.neighborhood,
@@ -181,7 +186,7 @@ export class PrismaCellRepository implements ICellRepository {
     const row = await this.prisma.cell.create({
       data: {
         name: data.name,
-        leaderId: data.leaderId,
+        leaderId: data.leaderId ?? null,
         ...(data.cellTypeId !== undefined && data.cellTypeId !== null ? { cellTypeId: data.cellTypeId } : {}),
         address: data.address,
         ...(data.bairroId !== undefined && data.bairroId !== null ? { bairroId: data.bairroId } : {}),
@@ -201,7 +206,7 @@ export class PrismaCellRepository implements ICellRepository {
       where: { id },
       data: {
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.leaderId !== undefined && { leaderId: data.leaderId }),
+        ...(data.leaderId !== undefined && { leaderId: data.leaderId ?? null }),
         ...(data.cellTypeId !== undefined && { cellTypeId: data.cellTypeId }),
         ...(data.address !== undefined && { address: data.address }),
         ...(data.bairroId !== undefined && { bairroId: data.bairroId }),
@@ -224,6 +229,15 @@ export class PrismaCellRepository implements ICellRepository {
     return this.prisma.cell.count();
   }
 
+  async findWithoutLeader(): Promise<Cell[]> {
+    const rows = await this.prisma.cell.findMany({
+      where: { leaderId: null },
+      include: { ...leaderInclude, _count: { select: { members: true } }, ...bairroInclude },
+      orderBy: { name: 'asc' },
+    });
+    return rows.map((r) => this.mapRow(r));
+  }
+
   async findByLeaderId(leaderId: string): Promise<Cell[]> {
     const rows = await this.prisma.cell.findMany({
       where: { leaderId },
@@ -236,7 +250,7 @@ export class PrismaCellRepository implements ICellRepository {
   private mapRow(row: {
     id: string;
     name: string;
-    leaderId: string;
+    leaderId: string | null;
     leader?: {
       name: string;
       supervisor?: {

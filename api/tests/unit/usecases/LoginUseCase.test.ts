@@ -7,11 +7,13 @@ import bcrypt from 'bcryptjs';
 
 let mockUser: UserWithPassword;
 
-const makeUserRepo = (user: UserWithPassword | null): IUserRepository => ({
-  findById: jest.fn(),
-  findByEmail: jest.fn().mockResolvedValue(user),
-  save: jest.fn(),
-});
+// Só `findByEmail` importa aqui; o resto do contrato entra como stub.
+const makeUserRepo = (user: UserWithPassword | null): IUserRepository =>
+  ({
+    findById: jest.fn(),
+    findByEmail: jest.fn().mockResolvedValue(user),
+    save: jest.fn(),
+  }) as unknown as IUserRepository;
 
 const makeRefreshRepo = (): IRefreshTokenRepository => ({
   create: jest.fn().mockResolvedValue({}),
@@ -28,6 +30,18 @@ beforeAll(async () => {
     email: 'admin@test.com',
     password,
     role: 'ADMIN',
+    roles: ['ADMIN'],
+    churchId: 'church-1',
+    photoKey: null,
+    phone: null,
+    address: null,
+    birthDate: null,
+    isMarried: false,
+    spouseName: null,
+    weddingDate: null,
+    supervisorId: null,
+    coordenacaoId: null,
+    description: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

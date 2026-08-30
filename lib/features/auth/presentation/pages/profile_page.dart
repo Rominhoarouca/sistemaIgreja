@@ -15,6 +15,7 @@ import '../../../../design_system/design_system.dart';
 import '../../../../shared/utils/app_snackbar.dart';
 import '../bloc/auth_bloc.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 /// Profile page — view and edit user profile, including photo, contact info,
 /// birth date, and list of children.
@@ -600,8 +601,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                         controller: _phoneCtrl,
                                         decoration: const InputDecoration(
                                           labelText: 'Telefone',
+                                          hintText: '(11) 99999-9999',
                                         ),
                                         keyboardType: TextInputType.phone,
+                                        inputFormatters:
+                                            brPhoneInputFormatters,
                                       ),
                                       const SizedBox(height: AppSpacing.base),
                                       TextFormField(

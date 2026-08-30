@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { NotificationController } from '../controllers/NotificationController';
-import { authMiddleware, requireAdmin } from '../middlewares/auth.middleware';
+import { authMiddleware, requireAdmin, restoreTenantContext } from '../middlewares/auth.middleware';
 
 // Imagem opcional anexada à notificação — não é vídeo, limite pequeno.
 const upload = multer({
@@ -18,10 +18,16 @@ export function notificationRoutes(controller: NotificationController): Router {
   // como um id.
   router.get('/admin', requireAdmin, controller.listAllForAdmin);
   router.get('/admin/:id', requireAdmin, controller.getDetailForAdmin);
-  router.patch('/admin/:id', requireAdmin, upload.single('image'), controller.updateForAdmin);
+  router.patch(
+    '/admin/:id',
+    requireAdmin,
+    upload.single('image'),
+    restoreTenantContext,
+    controller.updateForAdmin,
+  );
 
   router.get('/', controller.listMine);
-  router.post('/', requireAdmin, upload.single('image'), controller.create);
+  router.post('/', requireAdmin, upload.single('image'), restoreTenantContext, controller.create);
   router.get('/:id', controller.getDetail);
   router.patch('/read-all', controller.markAllRead);
   router.patch('/:id/read', controller.markRead);

@@ -1,6 +1,6 @@
 import type { IMaterialRepository } from '@domain/repositories/IMaterialRepository';
 import type { Material, CreateMaterialData } from '@domain/entities/Material';
-import type { MinioService } from '@infrastructure/storage/MinioService';
+import { MinioService, StorageFolder } from '@infrastructure/storage/MinioService';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 
@@ -23,7 +23,11 @@ export class UploadMaterialUseCase {
 
   async execute(input: UploadMaterialInput): Promise<Material> {
     const ext = path.extname(input.originalName).toLowerCase();
-    const objectName = `${input.cellId}/${uuidv4()}${ext}`;
+    const objectName = MinioService.objectKey(
+      StorageFolder.materials,
+      input.cellId,
+      `${uuidv4()}${ext}`,
+    );
 
     await this.minioService.uploadFile({
       objectName,

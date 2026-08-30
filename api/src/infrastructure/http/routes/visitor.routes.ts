@@ -1,12 +1,19 @@
 import { Router } from 'express';
+import multer from 'multer';
 import type { VisitorController } from '../controllers/VisitorController';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, restoreTenantContext } from '../middlewares/auth.middleware';
 import type { RequestHandler } from 'express';
 
 export function visitorRoutes(
   controller: VisitorController,
   publicTenant: RequestHandler,
 ): Router {
+  // A foto já chega reduzida do app; o teto é rede de segurança.
+  const photoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+  });
+
   const router = Router();
   // Público (sem login). O publicTenant resolve a igreja pelo slug do link/QR
   // Code — sem ele o visitante seria gravado sem church_id e ficaria invisível
@@ -20,5 +27,7 @@ export function visitorRoutes(
   router.patch('/:id/status', controller.updateStatus);
   router.patch('/:id/assign-cell', controller.assignCell);
   router.patch('/:id/convert-member', controller.convertToMember);
+  router.patch('/:id/baptism', controller.setBaptism);
+  router.post('/:id/photo', photoUpload.single('photo'), restoreTenantContext, controller.uploadPhoto);
   return router;
 }

@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { RegisterAttendanceUseCase } from '@application/usecases/attendance/RegisterAttendanceUseCase';
 import type { IAttendanceRepository } from '@domain/repositories/IAttendanceRepository';
-import type { MinioService } from '@infrastructure/storage/MinioService';
+import { MinioService, StorageFolder } from '@infrastructure/storage/MinioService';
 import { randomUUID } from 'crypto';
 import { AppError } from '@shared/errors/AppError';
 
@@ -35,6 +35,8 @@ const createMeetingSchema = z.object({
   meetingDate: z.coerce.date(),
   lesson: optionalText(300),
   ministrante: optionalText(150),
+  // Material do acervo usado como lição. `null` desassocia.
+  materialId: z.string().uuid().nullish(),
 });
 
 const attendeeHistoryQuerySchema = z.object({
@@ -73,11 +75,12 @@ export class AttendanceController {
 
   createMeeting = async (req: Request, res: Response): Promise<void> => {
     const { cellId } = req.params as { cellId: string };
-    const { meetingDate, lesson, ministrante } = createMeetingSchema.parse(req.body);
+    const { meetingDate, lesson, ministrante, materialId } = createMeetingSchema.parse(req.body);
     const createdById = req.userId!;
     await this.attendanceRepo.createMeeting(cellId, meetingDate, createdById, {
       lesson,
       ministrante,
+      ...(materialId !== undefined ? { materialId: materialId ?? null } : {}),
     });
     res.status(201).json({ message: 'Encontro criado com sucesso' });
   };
@@ -85,7 +88,23 @@ export class AttendanceController {
   findAttendeesByCell = async (req: Request, res: Response): Promise<void> => {
     const { cellId } = req.params as { cellId: string };
     const attendees = await this.attendanceRepo.findAttendeesByCellId(cellId);
-    res.json({ attendees });
+    // Foto é enfeite da lista: falha de storage não pode derrubar a chamada.
+    const withPhotos = await Promise.all(
+      attendees.map(async (a) => ({
+        ...a,
+        photoUrl: a.photoKey
+          ? await this.minioService.presignedDownloadUrl(a.photoKey).catch(() => null)
+          : null,
+      })),
+    );
+    res.json({ attendees: withPhotos });
+  };
+
+  /** Líder + membros + visitantes, para o seletor de ministrante. */
+  findMinistranteOptions = async (req: Request, res: Response): Promise<void> => {
+    const { cellId } = req.params as { cellId: string };
+    const options = await this.attendanceRepo.findMinistranteOptions(cellId);
+    res.json({ options });
   };
 
   /** Histórico de encontros de uma pessoa — alimenta o calendário de frequência. */
@@ -108,7 +127,11 @@ export class AttendanceController {
     if (isNaN(meetingDate.getTime())) throw new AppError('Data inválida', 400, 'INVALID_DATE');
 
     const ext = req.file.originalname.split('.').pop() ?? 'jpg';
-    const objectName = `meetings/${cellId}/${meetingDateParam.slice(0, 10)}_${randomUUID()}.${ext}`;
+    const objectName = MinioService.objectKey(
+      StorageFolder.meetings,
+      cellId,
+      `${meetingDateParam.slice(0, 10)}_${randomUUID()}.${ext}`,
+    );
 
     await this.minioService.uploadFile({
       objectName,
@@ -117,7 +140,7 @@ export class AttendanceController {
       size: req.file.size,
     });
 
-    await this.attendanceRepo.updateMeetingPhoto(cellId, meetingDate, objectName);
+    await this.attendanceRepo.updateMeetingPhoto(cellId, meetingDate, objectName, req.userId);
 
     const photoUrl = await this.minioService.presignedDownloadUrl(objectName);
     res.json({ photoUrl });

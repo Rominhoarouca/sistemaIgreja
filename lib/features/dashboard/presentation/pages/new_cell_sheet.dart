@@ -8,6 +8,7 @@ import '../../domain/models/leader_option.dart';
 import '../utils/snackbar_helper.dart';
 import '../../../../shared/widgets/address_selector.dart';
 import 'leader_selector_page.dart';
+import '../../../../shared/widgets/app_map_tiles.dart';
 
 /// SRP: responsável apenas por renderizar o formulário de nova célula.
 class NewCellSheet extends StatefulWidget {
@@ -230,7 +231,6 @@ class _NewCellSheetState extends State<NewCellSheet> {
       if (!mounted) return;
       setState(() {
         _leaders = leaders;
-        _selectedLeader = leaders.isNotEmpty ? leaders.first : null;
         _isLoadingLeaders = false;
       });
     } on DioException catch (e) {
@@ -259,14 +259,8 @@ class _NewCellSheetState extends State<NewCellSheet> {
   }
 
   Future<void> _openLeaderSelector() async {
-    if (_leaders.isEmpty) {
-      showDashboardSnackBar(
-        context,
-        'Nenhum líder cadastrado.',
-        backgroundColor: AppColors.warning,
-      );
-      return;
-    }
+    // Sem líder cadastrado a tela ainda abre: ela oferece "sem líder por
+    // enquanto", que é como a primeira célula da igreja é criada.
     final selected = await Navigator.of(context).push<LeaderOption>(
       MaterialPageRoute(
         builder: (_) => LeaderSelectorPage(
@@ -275,7 +269,10 @@ class _NewCellSheetState extends State<NewCellSheet> {
         ),
       ),
     );
-    if (selected != null && mounted) setState(() => _selectedLeader = selected);
+    if (selected == null || !mounted) return;
+    setState(
+      () => _selectedLeader = selected.id.isEmpty ? null : selected,
+    );
   }
 
   Future<void> _save() async {
@@ -283,11 +280,9 @@ class _NewCellSheetState extends State<NewCellSheet> {
     final address = _addressCtrl.text.trim();
     final time = _timeCtrl.text.trim();
     final leaderId = _selectedLeader?.id ?? '';
-    if (name.isEmpty ||
-        address.isEmpty ||
-        _bairroId == null ||
-        time.isEmpty ||
-        leaderId.isEmpty) {
+    // Líder é opcional: a célula pode ficar sem líder e ser vinculada depois
+    // pela tela de vínculos pendentes.
+    if (name.isEmpty || address.isEmpty || _bairroId == null || time.isEmpty) {
       showDashboardSnackBar(
         context,
         'Preencha todos os campos obrigatórios',
@@ -301,7 +296,7 @@ class _NewCellSheetState extends State<NewCellSheet> {
         '/cells',
         data: {
           'name': name,
-          'leaderId': leaderId,
+          if (leaderId.isNotEmpty) 'leaderId': leaderId,
           'address': address,
           if (_estadoId != null) 'estadoId': _estadoId,
           if (_cidadeId != null) 'cidadeId': _cidadeId,
@@ -348,7 +343,30 @@ class _NewCellSheetState extends State<NewCellSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.base),
-              Text('Nova Célula', style: AppTypography.headlineSmall),
+              // O formulário é longo: no celular o usuário rolava e ficava sem
+              // saída visível (arrastar o sheet pra baixo é a única outra).
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Voltar',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Nova Célula',
+                      style: AppTypography.headlineSmall,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: AppSpacing.xl),
               AppTextField(
                 controller: _nameCtrl,
@@ -363,7 +381,7 @@ class _NewCellSheetState extends State<NewCellSheet> {
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 child: InputDecorator(
                   decoration: InputDecoration(
-                    labelText: 'Líder *',
+                    labelText: 'Líder',
                     prefixIcon: const Icon(Icons.person_search_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -385,7 +403,8 @@ class _NewCellSheetState extends State<NewCellSheet> {
                           children: [
                             Expanded(
                               child: Text(
-                                _selectedLeader?.name ?? 'Selecionar líder',
+                                _selectedLeader?.name ??
+                                    'Sem líder — definir depois',
                                 style: AppTypography.bodyMedium,
                               ),
                             ),
@@ -489,11 +508,7 @@ class _NewCellSheetState extends State<NewCellSheet> {
                       }),
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.app',
-                      ),
+                      appTileLayer(),
                       if (_latitude != null)
                         MarkerLayer(
                           markers: [

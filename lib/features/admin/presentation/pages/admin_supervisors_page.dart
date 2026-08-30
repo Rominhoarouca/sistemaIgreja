@@ -4,6 +4,7 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/route_aware_reload.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -96,7 +97,11 @@ class AdminSupervisorsPage extends StatefulWidget {
   State<AdminSupervisorsPage> createState() => _AdminSupervisorsPageState();
 }
 
-class _AdminSupervisorsPageState extends State<AdminSupervisorsPage> {
+class _AdminSupervisorsPageState extends State<AdminSupervisorsPage>
+    with RouteAwareReload<AdminSupervisorsPage> {
+  @override
+  void onRouteReturn() => _loadData();
+
   late final Dio _dio;
   bool _loading = true;
   String? _error;

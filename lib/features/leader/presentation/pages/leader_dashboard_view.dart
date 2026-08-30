@@ -9,6 +9,8 @@ import '../../../../injection/injection.dart';
 import '../widgets/attendance_calendar_dialog.dart';
 import '../widgets/attendee_widgets.dart';
 import '../../../../shared/utils/plural.dart';
+import '../../../../shared/widgets/cell_type_badge.dart';
+import '../../../saas/presentation/church_context_controller.dart';
 
 /// Destinos de navegação do perfil Líder — Início + abas da célula.
 /// Índices 1..4 correspondem às abas 0..3 da gestão de célula.
@@ -456,7 +458,23 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Painel do Líder'),
+        title: ListenableBuilder(
+          listenable: ChurchContextController.instance,
+          builder: (context, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Painel do Líder'),
+              Text(
+                ChurchContextController.instance.displayName,
+                style: AppTypography.labelSmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: isDark ? 'Modo claro' : 'Modo escuro',
@@ -729,13 +747,24 @@ class _LeaderDashboardViewState extends State<LeaderDashboardView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(cell.name, style: AppTypography.titleSmall),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  cell.name,
+                                  style: AppTypography.titleSmall,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (CellTypeBadge.has(cell.typeName)) ...[
+                                const SizedBox(width: AppSpacing.xs),
+                                CellTypeBadge(typeName: cell.typeName),
+                              ],
+                            ],
+                          ),
                           const SizedBox(height: 2),
                           Text(
-                            [
-                              if (cell.typeName != null) cell.typeName!,
-                              '${cell.dayLabel} ${cell.time}',
-                            ].join(' · '),
+                            '${cell.dayLabel} ${cell.time}',
                             style: AppTypography.bodySmall.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),

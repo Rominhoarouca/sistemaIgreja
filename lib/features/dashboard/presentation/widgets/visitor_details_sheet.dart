@@ -7,6 +7,9 @@ import '../utils/snackbar_helper.dart';
 import '../widgets/detail_row.dart';
 import '../widgets/visitor_widgets.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/app_snackbar.dart';
+import '../../../../shared/utils/profile_photo.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 /// SRP: responsável apenas por exibir os detalhes completos de um visitante.
 class VisitorDetailsSheet extends StatelessWidget {
@@ -85,9 +88,11 @@ class VisitorDetailsSheet extends StatelessWidget {
       children: [
         Row(
           children: [
-            AppAvatar(
+            _VisitorPhotoAvatar(
+              visitorId: visitor['id'] as String?,
               initials: name.split(' ').map((e) => e[0]).take(2).join(),
-              size: 56,
+              initialPhotoUrl: visitor['photoUrl'] as String?,
+              onUploaded: onChanged,
             ),
             const SizedBox(width: AppSpacing.base),
             Expanded(
@@ -114,7 +119,9 @@ class VisitorDetailsSheet extends StatelessWidget {
               DetailRow(
                 icon: Icons.phone_outlined,
                 label: 'Telefone',
-                value: _textOrDash(visitor['phone']),
+                value: _textOrDash(
+                  formatBrPhone((visitor['phone'] ?? '').toString()),
+                ),
               ),
               const Divider(height: 1),
               DetailRow(
@@ -177,10 +184,10 @@ class VisitorDetailsSheet extends StatelessWidget {
           padding: EdgeInsets.zero,
           child: Column(
             children: [
-              DetailRow(
-                icon: Icons.check_outlined,
-                label: 'Batizado',
-                value: (visitor['isBaptized'] as bool?) == true ? 'Sim' : 'Não',
+              _VisitorBaptismRow(
+                visitorId: visitor['id'] as String?,
+                initialValue: (visitor['isBaptized'] as bool?) == true,
+                onChanged: onChanged,
               ),
               const Divider(height: 1),
               DetailRow(
@@ -704,6 +711,167 @@ class _AssignVisitorCellSheetState extends State<_AssignVisitorCellSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Avatar do visitante com troca de foto.
+///
+/// Widget próprio (e stateful) para a [VisitorDetailsSheet] continuar sendo
+/// stateless: só o avatar precisa se redesenhar depois do upload.
+class _VisitorPhotoAvatar extends StatefulWidget {
+  const _VisitorPhotoAvatar({
+    required this.visitorId,
+    required this.initials,
+    required this.initialPhotoUrl,
+    this.onUploaded,
+  });
+
+  final String? visitorId;
+  final String initials;
+  final String? initialPhotoUrl;
+  final VoidCallback? onUploaded;
+
+  @override
+  State<_VisitorPhotoAvatar> createState() => _VisitorPhotoAvatarState();
+}
+
+class _VisitorPhotoAvatarState extends State<_VisitorPhotoAvatar> {
+  late String? _photoUrl = widget.initialPhotoUrl;
+  bool _busy = false;
+
+  Future<void> _changePhoto() async {
+    final id = widget.visitorId;
+    if (id == null) return;
+
+    final photo = await pickProfilePhoto(context);
+    if (photo == null || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final form = FormData.fromMap({
+        'photo': MultipartFile.fromBytes(photo.bytes, filename: photo.filename),
+      });
+      final resp = await getIt<DioClient>().dio.post(
+        '/visitors/$id/photo',
+        data: form,
+      );
+      if (!mounted) return;
+      setState(() {
+        _photoUrl = (resp.data as Map<String, dynamic>)['photoUrl'] as String?;
+      });
+      widget.onUploaded?.call();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      AppSnackbar.error(
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível enviar a foto',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: _busy || widget.visitorId == null ? null : _changePhoto,
+      borderRadius: BorderRadius.circular(28),
+      child: Stack(
+        children: [
+          AppAvatar(initials: widget.initials, imageUrl: _photoUrl, size: 56),
+          if (widget.visitorId != null)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: _busy
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.photo_camera_outlined,
+                        size: 12,
+                        color: AppColors.white,
+                      ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Linha de batismo editável.
+///
+/// Stateful só nesta linha para a [VisitorDetailsSheet] continuar stateless.
+/// Registrar "Batizado" no histórico espiritual também liga esta chave — as
+/// duas pontas escrevem no mesmo campo.
+class _VisitorBaptismRow extends StatefulWidget {
+  const _VisitorBaptismRow({
+    required this.visitorId,
+    required this.initialValue,
+    this.onChanged,
+  });
+
+  final String? visitorId;
+  final bool initialValue;
+  final VoidCallback? onChanged;
+
+  @override
+  State<_VisitorBaptismRow> createState() => _VisitorBaptismRowState();
+}
+
+class _VisitorBaptismRowState extends State<_VisitorBaptismRow> {
+  late bool _value = widget.initialValue;
+  bool _busy = false;
+
+  Future<void> _save(bool value) async {
+    final id = widget.visitorId;
+    if (id == null || _busy) return;
+
+    final previous = _value;
+    setState(() {
+      _value = value;
+      _busy = true;
+    });
+    try {
+      await getIt<DioClient>().dio.patch(
+        '/visitors/$id/baptism',
+        data: {'isBaptized': value},
+      );
+      widget.onChanged?.call();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _value = previous);
+      AppSnackbar.error(
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível alterar o batismo',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      secondary: const Icon(Icons.water_drop_outlined),
+      title: Text('Batizado', style: AppTypography.bodyMedium),
+      value: _value,
+      onChanged: widget.visitorId == null || _busy ? null : _save,
     );
   }
 }

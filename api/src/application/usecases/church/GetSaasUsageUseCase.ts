@@ -33,27 +33,6 @@ export interface SaasUsageResult {
   readonly churches: ChurchUsage[];
 }
 
-/**
- * Deriva o churchId "dono" de um objeto do MinIO a partir da convenção de
- * nomes usada pelos use cases de upload (ver UploadChurchLogoUseCase,
- * UpdateProfileUseCase, UploadMaterialUseCase, AttendanceController):
- *  - `churches/{churchId}/...`      → logo da igreja
- *  - `users/{userId}/...`           → foto de perfil
- *  - `meetings/{cellId}/...`        → foto de reunião de célula
- *  - `{cellId}/{uuid}.ext`          → material da célula
- */
-function resolveObjectChurchId(
-  objectName: string,
-  userChurchMap: Map<string, string>,
-  cellChurchMap: Map<string, string>,
-): string | undefined {
-  const parts = objectName.split('/');
-  if (parts[0] === 'churches' && parts[1]) return parts[1];
-  if (parts[0] === 'users' && parts[1]) return userChurchMap.get(parts[1]);
-  if (parts[0] === 'meetings' && parts[1]) return cellChurchMap.get(parts[1]);
-  return cellChurchMap.get(parts[0] ?? '');
-}
-
 export class GetSaasUsageUseCase {
   constructor(
     private readonly prisma: PrismaClient,
@@ -61,7 +40,7 @@ export class GetSaasUsageUseCase {
   ) {}
 
   async execute(): Promise<SaasUsageResult> {
-    const [churches, cells, users, cellMemberGroups, visitorGroups, coordenacaoGroups, objects] =
+    const [churches, cells, users, cellMemberGroups, visitorGroups, coordenacaoGroups] =
       await Promise.all([
         this.prisma.church.findMany({
           include: { subscription: { include: { plan: true } } },
@@ -72,11 +51,21 @@ export class GetSaasUsageUseCase {
         this.prisma.cellMember.groupBy({ by: ['churchId'], _count: { _all: true } }),
         this.prisma.visitor.groupBy({ by: ['churchId'], _count: { _all: true } }),
         this.prisma.coordenacao.groupBy({ by: ['churchId'], _count: { _all: true } }),
-        this.minio.listAllObjects(),
       ]);
 
-    const cellChurchMap = new Map(cells.map((c) => [c.id, c.churchId] as const).filter((e): e is [string, string] => e[1] != null));
-    const userChurchMap = new Map(users.map((u) => [u.id, u.churchId] as const).filter((e): e is [string, string] => e[1] != null));
+    // Com bucket por igreja o espaço em disco é o tamanho do próprio bucket —
+    // não é mais preciso adivinhar o dono pelo nome do objeto.
+    const storageByChurch = new Map<string, number>(
+      await Promise.all(
+        churches.map(
+          async (church) =>
+            [church.id, await this.minio.bucketSizeBytes(church.id).catch(() => 0)] as [
+              string,
+              number,
+            ],
+        ),
+      ),
+    );
 
     const cellsByChurch = new Map<string, number>();
     for (const c of cells) {
@@ -97,13 +86,6 @@ export class GetSaasUsageUseCase {
     const membersByChurch = new Map(cellMemberGroups.map((g) => [g.churchId, g._count._all]));
     const visitorsByChurch = new Map(visitorGroups.map((g) => [g.churchId, g._count._all]));
     const coordenacoesByChurch = new Map(coordenacaoGroups.map((g) => [g.churchId, g._count._all]));
-
-    const storageByChurch = new Map<string, number>();
-    for (const obj of objects) {
-      const churchId = resolveObjectChurchId(obj.name, userChurchMap, cellChurchMap);
-      if (!churchId) continue;
-      storageByChurch.set(churchId, (storageByChurch.get(churchId) ?? 0) + obj.size);
-    }
 
     const churchUsages: ChurchUsage[] = churches.map((church) => {
       const leaders = leadersByChurch.get(church.id) ?? { lider: 0, supervisor: 0, coordenador: 0 };

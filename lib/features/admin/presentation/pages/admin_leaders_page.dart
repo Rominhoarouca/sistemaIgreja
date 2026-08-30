@@ -5,6 +5,8 @@ import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/route_aware_reload.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data Models
@@ -114,7 +116,11 @@ class AdminLeadersPage extends StatefulWidget {
   State<AdminLeadersPage> createState() => _AdminLeadersPageState();
 }
 
-class _AdminLeadersPageState extends State<AdminLeadersPage> {
+class _AdminLeadersPageState extends State<AdminLeadersPage>
+    with RouteAwareReload<AdminLeadersPage> {
+  @override
+  void onRouteReturn() => _loadData();
+
   late final Dio _dio;
   bool _loading = true;
   String? _error;
@@ -578,7 +584,7 @@ class _LeaderDataTab extends StatelessWidget {
                 _InfoRow(
                   icon: Icons.phone_outlined,
                   label: 'Telefone',
-                  value: leader.phone,
+                  value: formatBrPhone(leader.phone),
                 ),
               ],
               if (leader.address != null && leader.address!.isNotEmpty) ...[

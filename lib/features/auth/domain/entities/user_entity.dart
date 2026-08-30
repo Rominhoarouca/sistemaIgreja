@@ -9,6 +9,7 @@ class UserEntity extends Equatable {
     required this.phone,
     required this.role,
     required this.isActive,
+    this.roles = const {},
     this.createdAt,
     this.description,
   });
@@ -17,23 +18,37 @@ class UserEntity extends Equatable {
   final String name;
   final String email;
   final String phone;
+  /// Papel principal — define a home do usuário ao entrar.
   final UserRole role;
+
+  /// Papéis adicionais. Uma mesma pessoa pode ser líder, supervisor, admin e
+  /// coordenador ao mesmo tempo; as permissões são a união de todos.
+  final Set<UserRole> roles;
   final bool isActive;
   final DateTime? createdAt;
   final String? description;
 
-  bool get isSuperAdmin => role == UserRole.superAdmin;
-  bool get isAdmin => role == UserRole.admin;
-  bool get isLeader => role == UserRole.leader;
-  bool get isSupervisor => role == UserRole.supervisor;
-  bool get isCoordinator => role == UserRole.coordinator;
-  bool get isKidsTeacher => role == UserRole.kids;
-  bool get isGuardian => role == UserRole.responsavel;
+  /// União de [role] e [roles], na ordem de precedência dos papéis.
+  Set<UserRole> get allRoles => {role, ...roles};
+
+  bool hasRole(UserRole r) => allRoles.contains(r);
+
+  bool get isSuperAdmin => hasRole(UserRole.superAdmin);
+  bool get isAdmin => hasRole(UserRole.admin);
+  bool get isLeader => hasRole(UserRole.leader);
+  bool get isSupervisor => hasRole(UserRole.supervisor);
+  bool get isCoordinator => hasRole(UserRole.coordinator);
+  bool get isKidsTeacher => hasRole(UserRole.kids);
+  bool get isGuardian => hasRole(UserRole.responsavel);
+
+  /// Mais de um perfil — habilita o seletor de perfil no menu.
+  bool get hasMultipleRoles => allRoles.length > 1;
 
   @override
-  List<Object?> get props => [id, email, role];
+  List<Object?> get props => [id, email, role, roles];
 }
 
+/// Ordem = precedência (mais privilegiado primeiro).
 enum UserRole {
   superAdmin,
   admin,
@@ -55,6 +70,17 @@ enum UserRole {
     'KIDS' => kids,
     'RESPONSAVEL' => responsavel,
     _ => leader,
+  };
+
+  /// Rótulo exibido ao usuário.
+  String get label => switch (this) {
+    UserRole.superAdmin => 'Super administrador',
+    UserRole.admin => 'Administrador',
+    UserRole.leader => 'Líder',
+    UserRole.supervisor => 'Supervisor',
+    UserRole.coordinator => 'Coordenador',
+    UserRole.kids => 'Professor do Kids',
+    UserRole.responsavel => 'Responsável',
   };
 
   String get value => switch (this) {

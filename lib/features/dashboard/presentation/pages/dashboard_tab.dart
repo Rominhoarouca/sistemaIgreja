@@ -12,6 +12,8 @@ import 'admin_dashboard_sheets.dart';
 import 'report_metric_detail_page.dart';
 import '../widgets/visitor_widgets.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/route_aware_reload.dart';
+import '../../../../shared/widgets/cell_type_badge.dart';
 
 /// SRP: responsável apenas por exibir a aba de overview do dashboard.
 /// DIP: depende de IDashboardService, não de Dio diretamente.
@@ -24,7 +26,11 @@ class DashboardTab extends StatefulWidget {
   State<DashboardTab> createState() => _DashboardTabState();
 }
 
-class _DashboardTabState extends State<DashboardTab> {
+class _DashboardTabState extends State<DashboardTab>
+    with RouteAwareReload<DashboardTab> {
+  @override
+  void onRouteReturn() => _loadData();
+
   late final IDashboardService _dashboardService;
   bool _loading = true;
   String? _error;
@@ -113,6 +119,25 @@ class _DashboardTabState extends State<DashboardTab> {
       builder: (_) => sheet,
     );
   }
+
+  /// Ação secundária no cabeçalho da seção ("Ver todos", "Gerenciar").
+  /// Fica ao lado da seta de recolher, então tem toque próprio.
+  Widget _sectionAction(String label, VoidCallback onTap) => TextButton(
+    onPressed: onTap,
+    style: TextButton.styleFrom(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    child: Text(
+      label,
+      style: AppTypography.labelMedium.copyWith(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.linkDark
+            : AppColors.primary,
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -206,183 +231,191 @@ class _DashboardTabState extends State<DashboardTab> {
             ]),
           ),
           const SizedBox(height: AppSpacing.xl),
-          AppSectionHeader(
+          AppCollapsibleSection(
             title: 'Visitantes recentes',
-            actionLabel: 'Ver todos',
-            onAction: () => widget.onSwitchTab(1),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (_recentVisitors.isEmpty)
-            AppCard(
-              child: Text(
-                'Nenhum visitante cadastrado ainda.',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            )
-          else
-            ..._recentVisitors.map(
-              (v) => VisitorAdminTile(
-                name: (v['name'] as String?) ?? '—',
-                status: (v['status'] as String?) ?? AppConstants.statusNew,
-                time: (v['cellName'] as String?) ?? 'Sem célula',
-                timeLabel: '',
-                onTap: () => widget.onSwitchTab(1),
-              ),
-            ),
-          const SizedBox(height: AppSpacing.base),
-          AppSectionHeader(
-            title: 'Funil de integração',
-            actionLabel: 'Ver relatório',
-            onAction: () => widget.onSwitchTab(3),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            trailing: _sectionAction('Ver todos', () => widget.onSwitchTab(1)),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _FunnelBar(
-                  label: 'Cadastrados',
-                  value: totalVisitors,
-                  max: totalVisitors,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FunnelBar(
-                  label: 'Encaminhados',
-                  value: forwarded,
-                  max: totalVisitors,
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _FunnelBar(
-                  label: 'Integrados',
-                  value: integrated,
-                  max: totalVisitors,
-                  color: AppColors.success,
-                ),
+                if (_recentVisitors.isEmpty)
+                  AppCard(
+                    child: Text(
+                      'Nenhum visitante cadastrado ainda.',
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                else
+                  ..._recentVisitors.map(
+                    (v) => VisitorAdminTile(
+                      name: (v['name'] as String?) ?? '—',
+                      status:
+                          (v['status'] as String?) ?? AppConstants.statusNew,
+                      time: (v['cellName'] as String?) ?? 'Sem célula',
+                      timeLabel: '',
+                      onTap: () => widget.onSwitchTab(1),
+                    ),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.base),
-          AppSectionHeader(title: 'Crescimento de Integração'),
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            child: _months.isEmpty
-                ? SizedBox(
-                    height: 160,
-                    child: Center(
+          AppCollapsibleSection(
+            title: 'Funil de integração',
+            trailing: _sectionAction(
+              'Ver relatório',
+              () => widget.onSwitchTab(3),
+            ),
+            child: AppCard(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                children: [
+                  _FunnelBar(
+                    label: 'Cadastrados',
+                    value: totalVisitors,
+                    max: totalVisitors,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FunnelBar(
+                    label: 'Encaminhados',
+                    value: forwarded,
+                    max: totalVisitors,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _FunnelBar(
+                    label: 'Integrados',
+                    value: integrated,
+                    max: totalVisitors,
+                    color: AppColors.success,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          AppCollapsibleSection(
+            title: 'Crescimento de Integração',
+            child: AppCard(
+              child: _months.isEmpty
+                  ? SizedBox(
+                      height: 160,
+                      child: Center(
+                        child: Text(
+                          'Sem dados de visitantes ainda.',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    )
+                  : TappableChart(
+                      detailTitle: 'Crescimento de Integração',
+                      detailSubtitle:
+                          'Total de visitantes vs integrados por mês',
+                      detailChart: DetailLineChart(months: _months),
+                      columns: const ['Mês', 'Total', 'Integrados', 'Taxa'],
+                      rows: _months.map((m) {
+                        final total = (m['total'] as num?)?.toInt() ?? 0;
+                        final integ = (m['integrated'] as num?)?.toInt() ?? 0;
+                        final rate = total == 0
+                            ? '0%'
+                            : '${(integ / total * 100).toStringAsFixed(1)}%';
+                        return ChartDataRow(
+                          label: (m['month'] as String?) ?? '',
+                          values: [
+                            ChartValue(
+                              header: 'Total',
+                              value: '$total',
+                              color: AppColors.primary,
+                            ),
+                            ChartValue(
+                              header: 'Integrados',
+                              value: '$integ',
+                              color: AppColors.success,
+                            ),
+                            ChartValue(header: 'Taxa', value: rate),
+                          ],
+                        );
+                      }).toList(),
+                      legendItems: const [
+                        (color: AppColors.primary, label: 'Total'),
+                        (color: AppColors.success, label: 'Integrados'),
+                      ],
+                      child: IntegrationLineChart(months: _months),
+                    ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AppCollapsibleSection(
+            title: 'Células Ativas',
+            trailing: _sectionAction('Gerenciar', () => widget.onSwitchTab(2)),
+            child: AppCard(
+              padding: EdgeInsets.zero,
+              child: highlightedCells.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(AppSpacing.base),
                       child: Text(
-                        'Sem dados de visitantes ainda.',
-                        style: AppTypography.bodySmall.copyWith(
+                        'Nenhuma célula cadastrada.',
+                        style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
-                    ),
-                  )
-                : TappableChart(
-                    detailTitle: 'Crescimento de Integração',
-                    detailSubtitle: 'Total de visitantes vs integrados por mês',
-                    detailChart: DetailLineChart(months: _months),
-                    columns: const ['Mês', 'Total', 'Integrados', 'Taxa'],
-                    rows: _months.map((m) {
-                      final total = (m['total'] as num?)?.toInt() ?? 0;
-                      final integ = (m['integrated'] as num?)?.toInt() ?? 0;
-                      final rate = total == 0
-                          ? '0%'
-                          : '${(integ / total * 100).toStringAsFixed(1)}%';
-                      return ChartDataRow(
-                        label: (m['month'] as String?) ?? '',
-                        values: [
-                          ChartValue(
-                            header: 'Total',
-                            value: '$total',
-                            color: AppColors.primary,
-                          ),
-                          ChartValue(
-                            header: 'Integrados',
-                            value: '$integ',
-                            color: AppColors.success,
-                          ),
-                          ChartValue(header: 'Taxa', value: rate),
-                        ],
-                      );
-                    }).toList(),
-                    legendItems: const [
-                      (color: AppColors.primary, label: 'Total'),
-                      (color: AppColors.success, label: 'Integrados'),
-                    ],
-                    child: IntegrationLineChart(months: _months),
-                  ),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          AppSectionHeader(
-            title: 'Células Ativas',
-            actionLabel: 'Gerenciar',
-            onAction: () => widget.onSwitchTab(2),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppCard(
-            padding: EdgeInsets.zero,
-            child: highlightedCells.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(AppSpacing.base),
-                    child: Text(
-                      'Nenhuma célula cadastrada.',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: List.generate(highlightedCells.length, (index) {
-                      final cell = highlightedCells[index];
-                      return Column(
-                        children: [
-                          _DashboardCellRow(
-                            name: (cell['name'] as String?) ?? 'Célula',
-                            leader:
-                                (cell['leaderName'] as String?) ?? 'Sem líder',
-                            day: _dayLabel(
-                              (cell['dayOfWeek'] as String?) ?? '',
+                    )
+                  : Column(
+                      children: List.generate(highlightedCells.length, (index) {
+                        final cell = highlightedCells[index];
+                        return Column(
+                          children: [
+                            _DashboardCellRow(
+                              name: (cell['name'] as String?) ?? 'Célula',
+                              leader:
+                                  (cell['leaderName'] as String?) ??
+                                  'Sem líder',
+                              day: _dayLabel(
+                                (cell['dayOfWeek'] as String?) ?? '',
+                              ),
+                              cellTypeName: cell['cellTypeName'] as String?,
+                              status: 'Ativa',
                             ),
-                            status: 'Ativa',
-                          ),
-                          if (index < highlightedCells.length - 1)
-                            const Divider(height: 1),
-                        ],
-                      );
-                    }),
-                  ),
+                            if (index < highlightedCells.length - 1)
+                              const Divider(height: 1),
+                          ],
+                        );
+                      }),
+                    ),
+            ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          AppSectionHeader(title: 'Ações Rápidas'),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: 'Nova Célula',
-                  variant: AppButtonVariant.secondary,
-                  prefixIcon: Icons.add_circle_outline,
-                  onPressed: () => _showSheet(
-                    context,
-                    NewCellSheet(dio: getIt<DioClient>().dio),
+          AppCollapsibleSection(
+            title: 'Ações Rápidas',
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: 'Nova Célula',
+                    variant: AppButtonVariant.secondary,
+                    prefixIcon: Icons.add_circle_outline,
+                    onPressed: () => _showSheet(
+                      context,
+                      NewCellSheet(dio: getIt<DioClient>().dio),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: AppButton(
-                  label: 'Novo Líder',
-                  variant: AppButtonVariant.secondary,
-                  prefixIcon: Icons.person_add_outlined,
-                  onPressed: () => _showSheet(
-                    context,
-                    NewLeaderSheet(dio: getIt<DioClient>().dio),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: AppButton(
+                    label: 'Novo Líder',
+                    variant: AppButtonVariant.secondary,
+                    prefixIcon: Icons.person_add_outlined,
+                    onPressed: () => _showSheet(
+                      context,
+                      NewLeaderSheet(dio: getIt<DioClient>().dio),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.xl2),
         ],
@@ -464,12 +497,14 @@ class _DashboardCellRow extends StatelessWidget {
     required this.leader,
     required this.day,
     required this.status,
+    this.cellTypeName,
   });
 
   final String name;
   final String leader;
   final String day;
   final String status;
+  final String? cellTypeName;
 
   @override
   Widget build(BuildContext context) {
@@ -480,7 +515,19 @@ class _DashboardCellRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Expanded(flex: 2, child: Text(name, style: AppTypography.titleSmall)),
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: AppTypography.titleSmall),
+                if (CellTypeBadge.has(cellTypeName)) ...[
+                  const SizedBox(height: AppSpacing.xs2),
+                  CellTypeBadge(typeName: cellTypeName),
+                ],
+              ],
+            ),
+          ),
           Expanded(
             flex: 2,
             child: Text(

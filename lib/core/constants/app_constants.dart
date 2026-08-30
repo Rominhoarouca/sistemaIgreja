@@ -102,7 +102,19 @@ abstract final class AppRoutes {
   static const String adminCellTypes = '/admin/cell-types';
   static const String adminWhatsapp = '/admin/whatsapp';
   static const String adminUsersRegister = '/admin/users/register';
+
+  /// Adicionar/remover perfis de um usuário existente.
+  static const String adminUserRoles = '/admin/users/perfis';
+
+  /// Álbuns de fotos dos encontros. Compartilhada por admin, coordenador e
+  /// supervisor — o recorte de quem vê o quê é feito pela API.
+  static const String albums = '/albuns';
+  static const String albumDay = '/albuns/:date';
   static const String adminChurch = '/admin/church';
+
+  /// Células sem líder e líderes sem célula — as duas pontas do vínculo que
+  /// ficou pela metade.
+  static const String adminPendingLinks = '/admin/vinculos';
   static const String adminQrCode = '/admin/qrcode';
 
   // Líder — sob /leader para herdar o guard de papel do router.

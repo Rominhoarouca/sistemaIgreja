@@ -30,6 +30,12 @@ import 'report_metric_detail_page.dart';
 import '../widgets/admin_scaffold.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/widgets/app_map_tiles.dart';
+import '../../../../shared/utils/profile_photo.dart';
+import '../../../../shared/utils/route_aware_reload.dart';
+import '../../../../shared/utils/phone_input.dart';
+import '../../../../shared/widgets/cell_type_badge.dart';
+import '../../../saas/presentation/church_context_controller.dart';
 
 // Alias para retrocompatibilidade com código legado no arquivo
 void _showTopSnackBar(
@@ -88,7 +94,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
     final appBar = AppBar(
       automaticallyImplyLeading: false,
-      title: Text(_tabTitles[_selectedIndex]),
+      // No desktop a sidebar já mostra o nome da igreja; no mobile ela não
+      // existe, então o nome entra como subtítulo do topo.
+      title: isDesktop
+          ? Text(_tabTitles[_selectedIndex])
+          : ListenableBuilder(
+              listenable: ChurchContextController.instance,
+              builder: (context, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_tabTitles[_selectedIndex]),
+                  Text(
+                    ChurchContextController.instance.displayName,
+                    style: AppTypography.labelSmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
       actions: [
         if (isDesktop && _selectedIndex != 4) ...[
           SizedBox(
@@ -189,7 +215,11 @@ class _VisitorsAdminTab extends StatefulWidget {
   State<_VisitorsAdminTab> createState() => _VisitorsAdminTabState();
 }
 
-class _VisitorsAdminTabState extends State<_VisitorsAdminTab> {
+class _VisitorsAdminTabState extends State<_VisitorsAdminTab>
+    with RouteAwareReload<_VisitorsAdminTab> {
+  @override
+  void onRouteReturn() => _loadVisitors();
+
   late final Dio _dio;
   bool _isLoading = true;
   String? _error;
@@ -769,7 +799,11 @@ class _CellsAdminTab extends StatefulWidget {
   State<_CellsAdminTab> createState() => _CellsAdminTabState();
 }
 
-class _CellsAdminTabState extends State<_CellsAdminTab> {
+class _CellsAdminTabState extends State<_CellsAdminTab>
+    with RouteAwareReload<_CellsAdminTab> {
+  @override
+  void onRouteReturn() => _loadCells();
+
   late final Dio _dio;
   bool _isLoading = true;
   String? _error;
@@ -840,6 +874,7 @@ class _CellsAdminTabState extends State<_CellsAdminTab> {
         _dayLabels[c['dayOfWeek'] as String] ?? c['dayOfWeek'] as String;
     final members = '${c['currentCount']}/${c['maxCapacity']}';
     final address = (c['address'] as String?) ?? 'Não informado';
+    final cellTypeName = c['cellTypeName'] as String?;
     final supervisorName = c['supervisorName'] as String?;
     final coordenacaoName = c['coordenacaoName'] as String?;
     final coordenacaoColor = c['coordenacaoColor'] as String?;
@@ -850,6 +885,7 @@ class _CellsAdminTabState extends State<_CellsAdminTab> {
       day: day,
       members: members,
       address: address,
+      cellTypeName: cellTypeName,
       supervisorName: supervisorName,
       coordenacaoName: coordenacaoName,
       coordenacaoColor: coordenacaoColor,
@@ -1006,6 +1042,7 @@ class _CellAdminCard extends StatelessWidget {
     required this.members,
     required this.address,
     required this.onTap,
+    this.cellTypeName,
     this.supervisorName,
     this.coordenacaoName,
     this.coordenacaoColor,
@@ -1018,6 +1055,7 @@ class _CellAdminCard extends StatelessWidget {
   final String members;
   final String address;
   final VoidCallback onTap;
+  final String? cellTypeName;
   final String? supervisorName;
   final String? coordenacaoName;
   final String? coordenacaoColor;
@@ -1046,10 +1084,20 @@ class _CellAdminCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: AppTypography.titleSmall,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: AppTypography.titleSmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (CellTypeBadge.has(cellTypeName)) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      CellTypeBadge(typeName: cellTypeName),
+                    ],
+                  ],
                 ),
                 Text(
                   '$leader · $day',
@@ -1520,8 +1568,14 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        builder: (_) => _CellMemberDetailSheet(member: attendee),
+        builder: (_) => _CellMemberDetailSheet(
+          member: attendee,
+          dio: _dio,
+          cellId: widget.id,
+        ),
       );
+      // A ficha edita função e foto; recarrega para a lista refletir.
+      if (mounted) _load();
       return;
     }
     try {
@@ -1879,6 +1933,7 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
     final day = (cell['dayOfWeek'] as String?) ?? widget.day;
     final time = (cell['time'] as String?) ?? '';
     final address = (cell['address'] as String?) ?? widget.address;
+    final cellTypeName = cell['cellTypeName'] as String?;
     final membersLabel = '${_attendees.length}/${(cell['maxCapacity'] ?? '—')}';
 
     final meetingsCard = LastMeetingsCard(
@@ -1928,6 +1983,13 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
                     ),
                   ],
                 ),
+                if (CellTypeBadge.has(cellTypeName)) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: CellTypeBadge(typeName: cellTypeName),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.xs),
                 Row(
                   children: [
@@ -2057,32 +2119,40 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
               ],
             ),
             const SizedBox(height: AppSpacing.base),
-            AppSectionHeader(title: 'Frequentadores (${filtered.length})'),
-            const SizedBox(height: AppSpacing.sm),
-            if (filtered.isEmpty)
-              AppEmptyState(
-                title: _query.isNotEmpty || _filter != AttendeeFilter.all
-                    ? 'Nada encontrado'
-                    : 'Ninguém na célula ainda',
-                subtitle: _query.isNotEmpty || _filter != AttendeeFilter.all
-                    ? 'Ajuste a busca ou o filtro.'
-                    : 'Cadastre um visitante ou adicione um membro pelo botão abaixo.',
-                icon: Icons.groups_outlined,
-              )
-            else
-              for (final attendee in filtered) ...[
-                AttendeeCard(
-                  attendee: attendee,
-                  onTap: () => _openAttendeeDetails(attendee),
-                  onFrequencyTap: () => showAttendanceCalendarDialog(
-                    context: context,
-                    dio: _dio,
-                    cellId: widget.id,
-                    attendee: attendee,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
+            AppCollapsibleSection(
+              title: 'Frequentadores (${filtered.length})',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (filtered.isEmpty)
+                    AppEmptyState(
+                      title: _query.isNotEmpty || _filter != AttendeeFilter.all
+                          ? 'Nada encontrado'
+                          : 'Ninguém na célula ainda',
+                      subtitle:
+                          _query.isNotEmpty || _filter != AttendeeFilter.all
+                          ? 'Ajuste a busca ou o filtro.'
+                          : 'Cadastre um visitante ou adicione um membro pelo '
+                                'botão abaixo.',
+                      icon: Icons.groups_outlined,
+                    )
+                  else
+                    for (final attendee in filtered) ...[
+                      AttendeeCard(
+                        attendee: attendee,
+                        onTap: () => _openAttendeeDetails(attendee),
+                        onFrequencyTap: () => showAttendanceCalendarDialog(
+                          context: context,
+                          dio: _dio,
+                          cellId: widget.id,
+                          attendee: attendee,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                ],
+              ),
+            ),
           ];
 
           final isWide = constraints.maxWidth >= 1000;
@@ -2138,10 +2208,28 @@ class _CellDetailsPageState extends State<_CellDetailsPage> {
 /// Detalhes de um membro de célula, no mesmo padrão visual das outras fichas
 /// do admin (`VisitorDetailsSheet`): avatar + nome + badge, depois seções com
 /// `DetailRow`. Endereço não é clicável aqui, igual à ficha de visitante.
-class _CellMemberDetailSheet extends StatelessWidget {
-  const _CellMemberDetailSheet({required this.member});
+class _CellMemberDetailSheet extends StatefulWidget {
+  const _CellMemberDetailSheet({
+    required this.member,
+    required this.dio,
+    required this.cellId,
+  });
 
   final CellAttendee member;
+  final Dio dio;
+  final String cellId;
+
+  @override
+  State<_CellMemberDetailSheet> createState() => _CellMemberDetailSheetState();
+}
+
+class _CellMemberDetailSheetState extends State<_CellMemberDetailSheet> {
+  late String _roleInCell = widget.member.roleInCell;
+  late String? _photoUrl = widget.member.photoUrl;
+  late bool _isBaptized = widget.member.isBaptized == true;
+  bool _busy = false;
+
+  CellAttendee get member => widget.member;
 
   static String _textOrDash(String? v) =>
       (v == null || v.isEmpty) ? 'Não informado' : v;
@@ -2151,6 +2239,91 @@ class _CellMemberDetailSheet extends StatelessWidget {
     'FEMININO' => 'Feminino',
     _ => 'Não informado',
   };
+
+  static const _roleOptions = [
+    ('MEMBRO', 'Membro'),
+    ('VICE_LIDER', 'Vice-líder'),
+    ('ANFITRIAO', 'Anfitrião'),
+  ];
+
+  Future<void> _setRole(String role) async {
+    if (role == _roleInCell || _busy) return;
+    final previous = _roleInCell;
+    setState(() {
+      _roleInCell = role;
+      _busy = true;
+    });
+    try {
+      await widget.dio.patch(
+        '/cells/${widget.cellId}/members/${member.id}',
+        data: {'roleInCell': role},
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _roleInCell = previous);
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível alterar a função',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setBaptized(bool value) async {
+    if (_busy) return;
+    final previous = _isBaptized;
+    setState(() {
+      _isBaptized = value;
+      _busy = true;
+    });
+    try {
+      await widget.dio.patch(
+        '/cells/${widget.cellId}/members/${member.id}',
+        data: {'isBaptized': value},
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isBaptized = previous);
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível alterar o batismo',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _changePhoto() async {
+    final photo = await pickProfilePhoto(context);
+    if (photo == null || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final form = FormData.fromMap({
+        'photo': MultipartFile.fromBytes(photo.bytes, filename: photo.filename),
+      });
+      final resp = await widget.dio.post(
+        '/cells/${widget.cellId}/members/${member.id}/photo',
+        data: form,
+      );
+      if (!mounted) return;
+      setState(() {
+        _photoUrl = (resp.data as Map<String, dynamic>)['photoUrl'] as String?;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível enviar a foto',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2179,7 +2352,36 @@ class _CellMemberDetailSheet extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
               Row(
                 children: [
-                  AppAvatar(initials: member.initials, size: 56),
+                  // Toque na foto troca a imagem — o badge de câmera indica.
+                  InkWell(
+                    onTap: _busy ? null : _changePhoto,
+                    borderRadius: BorderRadius.circular(28),
+                    child: Stack(
+                      children: [
+                        AppAvatar(
+                          initials: member.initials,
+                          imageUrl: _photoUrl,
+                          size: 56,
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.photo_camera_outlined,
+                              size: 12,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: AppSpacing.base),
                   Expanded(
                     child: Column(
@@ -2195,6 +2397,31 @@ class _CellMemberDetailSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              Text('Função na célula', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                children: [
+                  for (final (value, label) in _roleOptions)
+                    ChoiceChip(
+                      label: Text(label),
+                      selected: _roleInCell == value,
+                      onSelected: _busy ? null : (_) => _setRole(value),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.base),
+              // Registrar "Batizado" no histórico também marca aqui.
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.water_drop_outlined),
+                  title: Text('Batizado', style: AppTypography.bodyMedium),
+                  value: _isBaptized,
+                  onChanged: _busy ? null : _setBaptized,
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
               Text('Frequência', style: AppTypography.titleSmall),
@@ -2220,7 +2447,9 @@ class _CellMemberDetailSheet extends StatelessWidget {
                     DetailRow(
                       icon: Icons.phone_outlined,
                       label: 'Telefone',
-                      value: _textOrDash(member.phone),
+                      value: _textOrDash(
+                        member.phone == null ? null : formatBrPhone(member.phone!),
+                      ),
                     ),
                     const Divider(height: 1),
                     DetailRow(
@@ -2754,6 +2983,7 @@ class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
     complemento: null,
     bairroId: null,
   );
+  bool _isBaptized = false;
   String? _gender;
   DateTime? _birthDate;
   String? _maritalStatus;
@@ -2793,6 +3023,7 @@ class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
           if (_gender != null) 'gender': _gender,
           if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
           if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
+          'isBaptized': _isBaptized,
         },
       );
       if (!mounted) return;
@@ -2834,6 +3065,7 @@ class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
                 hint: '(11) 99999-9999',
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+                inputFormatters: brPhoneInputFormatters,
               ),
               const SizedBox(height: AppSpacing.base),
               CepAddressFields(
@@ -2849,6 +3081,14 @@ class _AddCellMemberSheetState extends State<_AddCellMemberSheet> {
                 onBirthDateChanged: (v) => setState(() => _birthDate = v),
                 onMaritalStatusChanged: (v) =>
                     setState(() => _maritalStatus = v),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.water_drop_outlined),
+                title: Text('Já é batizado', style: AppTypography.bodyMedium),
+                value: _isBaptized,
+                onChanged: (v) => setState(() => _isBaptized = v),
               ),
               const SizedBox(height: AppSpacing.base),
               AppButton(
@@ -3195,11 +3435,7 @@ class _EditCellSheetState extends State<_EditCellSheet> {
                       }),
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.app',
-                      ),
+                      appTileLayer(),
                       if (_latitude != null)
                         MarkerLayer(
                           markers: [
@@ -3375,11 +3611,7 @@ class _AddressMapSheetState extends State<_AddressMapSheet> {
                       initialZoom: 15,
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.sistemaigreja.app',
-                      ),
+                      appTileLayer(),
                       MarkerLayer(
                         markers: [
                           Marker(

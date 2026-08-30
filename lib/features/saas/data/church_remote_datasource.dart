@@ -51,6 +51,30 @@ class ChurchRemoteDatasource {
     return (plans: plans, catalog: catalog);
   }
 
+  /// Troca o plano da própria igreja (ADMIN).
+  ///
+  /// Devolve `checkoutUrl` quando o gateway de pagamento exige checkout; nulo
+  /// quando o plano já foi aplicado (downgrade para FREE ou cobrança manual).
+  Future<String?> changePlan({
+    required String planTier,
+    String billingCycle = 'MONTHLY',
+    String? customerName,
+    String? customerEmail,
+    String? taxId,
+  }) async {
+    final res = await _dio.post('/billing/plan', data: {
+      'planTier': planTier,
+      'billingCycle': billingCycle,
+      if (customerName != null && customerEmail != null)
+        'customer': {
+          'name': customerName,
+          'email': customerEmail,
+          if (taxId != null && taxId.isNotEmpty) 'taxId': taxId,
+        },
+    });
+    return res.data['checkoutUrl'] as String?;
+  }
+
   Future<String> createCheckout({
     required String planTier,
     required String billingCycle,

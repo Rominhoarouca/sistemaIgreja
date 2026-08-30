@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 import '../../../../design_system/design_system.dart';
 import '../../../../injection/injection.dart';
 import '../../data/kids_models.dart';
 import '../../data/kids_repository.dart';
 import '../widgets/kids_widgets.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 /// Cadastro/edição do próprio filho pelo responsável.
 ///
@@ -47,10 +47,8 @@ class _GuardianChildFormPageState extends State<GuardianChildFormPage> {
   );
   final _birthDateCtrl = TextEditingController();
 
-  final _phoneMask = MaskTextInputFormatter(
-    mask: '(##) #####-####',
-    filter: {'#': RegExp(r'\d')},
-  );
+  /// Formatter compartilhado — aceita fixo (10 dígitos) e celular (11).
+  final _phoneMask = const BrPhoneInputFormatter();
 
   DateTime? _birthDate;
   String? _gender;

@@ -7,12 +7,54 @@ import '../../../../shared/utils/app_snackbar.dart';
 import '../../../../shared/widgets/address_selector.dart';
 import '../widgets/coordenacao_form_sheet.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum _UserType { leader, supervisor, coordinator }
+/// Perfis que o admin cadastra por esta tela. Mais de um pode ser marcado ao
+/// mesmo tempo — a mesma pessoa costuma ser líder e supervisor, por exemplo.
+/// A ordem da declaração é a precedência: o primeiro marcado vira o papel
+/// principal do usuário.
+enum _UserType {
+  coordinator('COORDENADOR', 'Coordenador', Icons.account_tree_outlined),
+  supervisor('SUPERVISOR', 'Supervisor', Icons.manage_accounts_outlined),
+  leader('LIDER', 'Líder', Icons.person_outlined),
+  kidsTeacher('KIDS', 'Professor Kids', Icons.child_care_outlined),
+  guardian('RESPONSAVEL', 'Responsável', Icons.family_restroom_outlined);
+
+  const _UserType(this.role, this.label, this.icon);
+
+  final String role;
+  final String label;
+  final IconData icon;
+}
+
+class _KidsRoom {
+  _KidsRoom({required this.id, required this.name, required this.teachers});
+
+  final String id;
+  final String name;
+
+  /// Professores já vinculados — precisam ser reenviados no PUT, que troca a
+  /// lista inteira da sala.
+  final List<({String userId, String role})> teachers;
+
+  factory _KidsRoom.fromJson(Map<String, dynamic> j) => _KidsRoom(
+    id: j['id'] as String,
+    name: j['name'] as String? ?? '',
+    teachers: ((j['teachers'] as List?) ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(
+          (t) => (
+            userId: t['userId'] as String,
+            role: t['role'] as String? ?? 'AUXILIAR',
+          ),
+        )
+        .toList(),
+  );
+}
 
 class _Cell {
   _Cell({
@@ -90,13 +132,14 @@ class AdminUsersRegisterPage extends StatefulWidget {
 
 class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
   late final Dio _dio;
-  _UserType _selectedType = _UserType.leader;
+  final Set<_UserType> _selectedTypes = {_UserType.leader};
 
   // Data
   List<_Cell> _cells = [];
   List<_Leader> _leaders = [];
   List<_Supervisor> _supervisors = [];
   List<_Coordenacao> _coordenacoes = [];
+  List<_KidsRoom> _rooms = [];
   bool _loadingData = true;
 
   // Form
@@ -121,6 +164,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
   final Set<String> _selectedCells = {};
   final Set<String> _selectedLeaders = {};
   final Set<String> _selectedSupervisors = {};
+  final Set<String> _selectedRooms = {};
   String? _selectedCoordenacaoId;
   String _cellSearch = '';
   String _leaderSearch = '';
@@ -191,10 +235,30 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
 
         _loadingData = false;
       });
+      await _loadRooms();
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingData = false);
       _showError('Erro ao carregar dados');
+    }
+  }
+
+  /// Salas do Kids são opcionais: a igreja pode não ter o módulo no plano
+  /// (a rota responde 402) ou simplesmente não ter sala cadastrada.
+  Future<void> _loadRooms() async {
+    try {
+      final resp = await _dio.get('/kids/rooms');
+      final rooms =
+          ((resp.data as Map<String, dynamic>)['rooms'] as List?)
+              ?.cast<Map<String, dynamic>>()
+              .map(_KidsRoom.fromJson)
+              .toList() ??
+          [];
+      if (!mounted) return;
+      setState(() => _rooms = rooms);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _rooms = []);
     }
   }
 
@@ -239,6 +303,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                 .toList() ??
             [];
       });
+      await _loadRooms();
     } catch (_) {
       // Ignora erros silenciosos no refresh
     }
@@ -348,39 +413,61 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
     }
   }
 
+  void _toggleType(_UserType type) {
+    setState(() {
+      if (!_selectedTypes.remove(type)) _selectedTypes.add(type);
+      // Limpa vínculos de um perfil desmarcado para não enviar lixo.
+      if (!_selectedTypes.contains(_UserType.leader)) {
+        _selectedCells.clear();
+        _cellSearch = '';
+      }
+      if (!_selectedTypes.contains(_UserType.supervisor) &&
+          !_selectedTypes.contains(_UserType.coordinator)) {
+        _selectedLeaders.clear();
+        _leaderSearch = '';
+      }
+      if (!_selectedTypes.contains(_UserType.coordinator)) {
+        _selectedSupervisors.clear();
+        _supervisorSearch = '';
+        _selectedCoordenacaoId = null;
+      }
+      if (!_selectedTypes.contains(_UserType.kidsTeacher)) {
+        _selectedRooms.clear();
+      }
+    });
+    _refreshData();
+  }
+
+  /// Perfis marcados na ordem de precedência do enum. O primeiro é o papel
+  /// principal enviado em `role`; todos vão em `roles`.
+  List<_UserType> get _orderedTypes =>
+      _UserType.values.where(_selectedTypes.contains).toList();
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Validate associations
-    if (_selectedType == _UserType.leader && _selectedCells.isEmpty) {
-      _showError('Selecione pelo menos uma célula');
+    if (_selectedTypes.isEmpty) {
+      _showError('Selecione pelo menos um perfil');
       return;
     }
-    if (_selectedType == _UserType.supervisor && _selectedLeaders.isEmpty) {
-      _showError('Selecione pelo menos um líder');
-      return;
-    }
-    if (_selectedType == _UserType.coordinator &&
-        (_selectedLeaders.isEmpty || _selectedSupervisors.isEmpty)) {
-      _showError('Selecione líderes e supervisores');
-      return;
-    }
+
+    // Os vínculos (célula, líderes, supervisores) são opcionais de propósito:
+    // numa igreja recém-criada não existe nenhum dos dois lados ainda, e
+    // exigir o vínculo travava o primeiro cadastro. O que ficar sem par
+    // aparece na tela de vínculos pendentes.
 
     setState(() => _submitting = true);
 
     try {
-      const roleMap = {
-        _UserType.leader: 'LIDER',
-        _UserType.supervisor: 'SUPERVISOR',
-        _UserType.coordinator: 'COORDENADOR',
-      };
+      final types = _orderedTypes;
 
       final Map<String, dynamic> payload = {
         'name': _nameCtrl.text.trim(),
         'email': _emailCtrl.text.trim(),
         'password': _passwordCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
-        'role': roleMap[_selectedType],
+        'role': types.first.role,
+        'roles': [for (final t in types) t.role],
         if (_addressCtrl.text.trim().isNotEmpty)
           'address': _addressCtrl.text.trim(),
         if (_numeroCtrl.text.trim().isNotEmpty)
@@ -391,19 +478,33 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
       };
 
       // Add associations
-      if (_selectedType == _UserType.leader) {
+      if (_selectedTypes.contains(_UserType.leader) &&
+          _selectedCells.isNotEmpty) {
         payload['cellIds'] = _selectedCells.toList();
-      } else if (_selectedType == _UserType.supervisor) {
+      }
+      if (_selectedLeaders.isNotEmpty) {
         payload['leaderIds'] = _selectedLeaders.toList();
-      } else if (_selectedType == _UserType.coordinator) {
-        payload['leaderIds'] = _selectedLeaders.toList();
-        payload['supervisorIds'] = _selectedSupervisors.toList();
+      }
+      if (_selectedTypes.contains(_UserType.coordinator)) {
+        if (_selectedSupervisors.isNotEmpty) {
+          payload['supervisorIds'] = _selectedSupervisors.toList();
+        }
         if (_selectedCoordenacaoId != null) {
           payload['coordenacaoId'] = _selectedCoordenacaoId;
         }
       }
 
-      await _dio.post('/users/create', data: payload);
+      final response = await _dio.post('/users/create', data: payload);
+      final userId =
+          ((response.data as Map<String, dynamic>)['user']
+              as Map<String, dynamic>?)?['id']
+          as String?;
+
+      if (userId != null &&
+          _selectedTypes.contains(_UserType.kidsTeacher) &&
+          _selectedRooms.isNotEmpty) {
+        await _assignRooms(userId);
+      }
 
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -420,6 +521,25 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
       );
 
       _showError(errorMessage);
+    }
+  }
+
+  /// Vincula o professor recém-criado às salas marcadas. O endpoint troca a
+  /// lista inteira, então reenvia quem já estava lá.
+  Future<void> _assignRooms(String userId) async {
+    for (final room in _rooms.where((r) => _selectedRooms.contains(r.id))) {
+      final teachers = [
+        for (final t in room.teachers) {'userId': t.userId, 'role': t.role},
+        {'userId': userId, 'role': 'AUXILIAR'},
+      ];
+      try {
+        await _dio.put(
+          '/kids/rooms/${room.id}/teachers',
+          data: {'teachers': teachers},
+        );
+      } on DioException {
+        _showError('Cadastro criado, mas falhou ao vincular à sala ${room.name}');
+      }
     }
   }
 
@@ -441,6 +561,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
       _selectedCells.clear();
       _selectedLeaders.clear();
       _selectedSupervisors.clear();
+      _selectedRooms.clear();
       _selectedCoordenacaoId = null;
       _cellSearch = '';
       _leaderSearch = '';
@@ -531,12 +652,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
               hintText: '(11) 99999-9999',
             ),
             keyboardType: TextInputType.phone,
-            inputFormatters: [
-              MaskTextInputFormatter(
-                mask: '(##) #####-####',
-                filter: {'#': RegExp(r'[0-9]')},
-              ),
-            ],
+            inputFormatters: brPhoneInputFormatters,
             validator: (v) => (v == null || v.trim().isEmpty)
                 ? 'Telefone é obrigatório'
                 : null,
@@ -653,7 +769,7 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
           children: [
             const Text('Novo Cadastro'),
             Text(
-              'Líderes, Supervisores e Coordenadores',
+              'Líderes, supervisores, coordenadores e equipe Kids',
               style: AppTypography.bodySmall.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -671,53 +787,45 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Type selector
-                      _SectionHeader(title: 'Tipo de Cadastro'),
+                      // Type selector — múltipla escolha: a mesma pessoa pode
+                      // ser líder, supervisor, coordenador e professor.
+                      _SectionHeader(title: 'Perfis'),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Marque todos os perfis que a pessoa exerce.',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                       const SizedBox(height: AppSpacing.sm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _UserTypeCard(
-                              label: 'Líder',
-                              icon: Icons.person_outlined,
-                              selected: _selectedType == _UserType.leader,
-                              onTap: () => setState(() {
-                                _selectedCells.clear();
-                                _cellSearch = '';
-                                _selectedType = _UserType.leader;
-                                _refreshData();
-                              }),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: _UserTypeCard(
-                              label: 'Supervisor',
-                              icon: Icons.manage_accounts_outlined,
-                              selected: _selectedType == _UserType.supervisor,
-                              onTap: () => setState(() {
-                                _selectedLeaders.clear();
-                                _leaderSearch = '';
-                                _selectedType = _UserType.supervisor;
-                                _refreshData();
-                              }),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: _UserTypeCard(
-                              label: 'Coordenador',
-                              icon: Icons.account_tree_outlined,
-                              selected: _selectedType == _UserType.coordinator,
-                              onTap: () => setState(() {
-                                _selectedSupervisors.clear();
-                                _supervisorSearch = '';
-                                _selectedType = _UserType.coordinator;
-                                _refreshData();
-                              }),
-                            ),
-                          ),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          // 3 por linha no desktop, 2 no celular.
+                          final columns = constraints.maxWidth >= 700 ? 3 : 2;
+                          final spacing = AppSpacing.sm;
+                          final width =
+                              (constraints.maxWidth -
+                                  spacing * (columns - 1)) /
+                              columns;
+                          return Wrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            children: [
+                              for (final type in _UserType.values)
+                                SizedBox(
+                                  width: width,
+                                  child: _UserTypeCard(
+                                    label: type.label,
+                                    icon: type.icon,
+                                    selected: _selectedTypes.contains(type),
+                                    onTap: () => _toggleType(type),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: AppSpacing.xl),
                       // Form
@@ -752,8 +860,8 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                               },
                             ),
                             const SizedBox(height: AppSpacing.xl),
-                            // Associations
-                            if (_selectedType == _UserType.leader)
+                            // Associations — uma seção por perfil marcado.
+                            if (_selectedTypes.contains(_UserType.leader))
                               _CellAssociation(
                                 cells: _filteredCells,
                                 selectedIds: _selectedCells,
@@ -767,8 +875,16 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                                 searchQuery: _cellSearch,
                                 onSearchChanged: (v) =>
                                     setState(() => _cellSearch = v),
-                              )
-                            else if (_selectedType == _UserType.supervisor)
+                              ),
+                            if (_selectedTypes.contains(_UserType.leader) &&
+                                (_selectedTypes.contains(
+                                      _UserType.supervisor,
+                                    ) ||
+                                    _selectedTypes.contains(
+                                      _UserType.coordinator,
+                                    )))
+                              const SizedBox(height: AppSpacing.lg),
+                            if (_selectedTypes.contains(_UserType.supervisor))
                               _LeaderAssociation(
                                 leaders: _filteredLeaders,
                                 selectedIds: _selectedLeaders,
@@ -782,10 +898,11 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                                 searchQuery: _leaderSearch,
                                 onSearchChanged: (v) =>
                                     setState(() => _leaderSearch = v),
-                              )
-                            else if (_selectedType ==
-                                _UserType.coordinator) ...[
-                              _LeaderAssociation(
+                              ),
+                            if (_selectedTypes.contains(_UserType.coordinator)) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              if (!_selectedTypes.contains(_UserType.supervisor))
+                                _LeaderAssociation(
                                 leaders: _filteredLeaders,
                                 selectedIds: _selectedLeaders,
                                 onToggle: (id) => setState(() {
@@ -917,6 +1034,22 @@ class _AdminUsersRegisterPageState extends State<AdminUsersRegisterPage> {
                                     ),
                                   ],
                                 ),
+                            ],
+                            if (_selectedTypes.contains(
+                              _UserType.kidsTeacher,
+                            )) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              _KidsRoomAssociation(
+                                rooms: _rooms,
+                                selectedIds: _selectedRooms,
+                                onToggle: (id) => setState(() {
+                                  if (_selectedRooms.contains(id)) {
+                                    _selectedRooms.remove(id);
+                                  } else {
+                                    _selectedRooms.add(id);
+                                  }
+                                }),
+                              ),
                             ],
                             const SizedBox(height: AppSpacing.xl2),
                             // Buttons
@@ -1268,6 +1401,65 @@ class _SupervisorAssociation extends StatelessWidget {
               ),
               value: selected,
               onChanged: (_) => onToggle(supervisor.id),
+              activeColor: AppColors.primary,
+            );
+          },
+        ),
+    ],
+  );
+}
+
+/// Salas do ministério infantil às quais o professor recém-cadastrado será
+/// vinculado. Sem seleção o professor é criado mesmo assim — o vínculo pode
+/// ser feito depois em "Salas do Kids".
+class _KidsRoomAssociation extends StatelessWidget {
+  const _KidsRoomAssociation({
+    required this.rooms,
+    required this.selectedIds,
+    required this.onToggle,
+  });
+
+  final List<_KidsRoom> rooms;
+  final Set<String> selectedIds;
+  final void Function(String) onToggle;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _SectionHeader(
+        title:
+            'Salas do Kids (${selectedIds.length} selecionada${selectedIds.length == 1 ? '' : 's'})',
+      ),
+      const SizedBox(height: AppSpacing.sm),
+      if (rooms.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child: Text(
+            'Nenhuma sala cadastrada — o professor pode ser vinculado depois '
+            'em "Salas do Kids".',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        )
+      else
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: rooms.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (_, i) {
+            final room = rooms[i];
+            return CheckboxListTile(
+              title: Text(
+                room.name,
+                style: AppTypography.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              value: selectedIds.contains(room.id),
+              onChanged: (_) => onToggle(room.id),
               activeColor: AppColors.primary,
             );
           },

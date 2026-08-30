@@ -2,7 +2,7 @@ name: multiplicado
 description: "Multiplicado — recepção e integração de visitantes em células."
 publish_to: 'none'
 
-version: 0.1.10+2
+version: 0.1.11+1
 
 environment:
   sdk: ^3.11.1

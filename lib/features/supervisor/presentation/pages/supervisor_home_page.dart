@@ -10,6 +10,9 @@ import '../../../../shared/widgets/address_selector.dart';
 import '../../../../shared/widgets/reset_password_sheet.dart';
 import 'supervisor_dashboard_tab.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/widgets/app_map_tiles.dart';
+import '../../../../shared/widgets/cell_type_badge.dart';
+import '../../../../core/constants/app_constants.dart';
 
 /// Supervisor Panel — coordinates multiple leaders and their cells.
 class SupervisorHomePage extends StatefulWidget {
@@ -48,6 +51,11 @@ class _SupervisorHomePageState extends State<SupervisorHomePage> {
       title: const Text('Painel do Supervisor'),
       elevation: 0,
       actions: [
+        IconButton(
+          tooltip: 'Álbuns dos encontros',
+          icon: const Icon(Icons.photo_library_outlined),
+          onPressed: () => context.push(AppRoutes.albums),
+        ),
         IconButton(
           tooltip: Theme.of(context).brightness == Brightness.dark
               ? 'Modo claro'
@@ -544,18 +552,13 @@ class LeaderCellsSheetState extends State<LeaderCellsSheet> {
                                       c.name,
                                       style: AppTypography.titleSmall,
                                     ),
-                                    if (c.cellTypeName != null &&
-                                        c.cellTypeName!.isNotEmpty)
+                                    if (CellTypeBadge.has(c.cellTypeName))
                                       Padding(
                                         padding: const EdgeInsets.only(
                                           top: AppSpacing.xs2,
                                         ),
-                                        child: Text(
-                                          c.cellTypeName!,
-                                          style: AppTypography.bodySmall
-                                              .copyWith(
-                                                color: AppColors.primary,
-                                              ),
+                                        child: CellTypeBadge(
+                                          typeName: c.cellTypeName,
                                         ),
                                       ),
                                   ],
@@ -845,15 +848,22 @@ class SupervisedCellsTabState extends State<SupervisedCellsTab> {
                           ),
                         ],
                       ),
-                      Text(
-                        [
-                          'Líder: ${c.leaderName}',
-                          if ((c.cellTypeName ?? '').isNotEmpty)
-                            c.cellTypeName!,
-                        ].join(' · '),
-                        style: AppTypography.bodySmall.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Líder: ${c.leaderName}',
+                              style: AppTypography.bodySmall.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (CellTypeBadge.has(c.cellTypeName)) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            CellTypeBadge(typeName: c.cellTypeName),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Row(
@@ -1352,11 +1362,7 @@ class EditCellDetailsSheetState extends State<EditCellDetailsSheet> {
                       },
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.app',
-                      ),
+                      appTileLayer(),
                       if (hasCoords)
                         MarkerLayer(
                           markers: [

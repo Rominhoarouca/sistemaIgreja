@@ -36,7 +36,7 @@ export class GetChurchContextUseCase {
     let logoUrl: string | null = null;
     if (church.logoKey) {
       try {
-        logoUrl = await this.minio.presignedDownloadUrl(church.logoKey);
+        logoUrl = await this.minio.presignedDownloadUrl(church.logoKey, 3600, churchId);
       } catch {
         logoUrl = null;
       }

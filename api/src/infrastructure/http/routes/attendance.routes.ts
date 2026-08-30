@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { AttendanceController } from '../controllers/AttendanceController';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, restoreTenantContext } from '../middlewares/auth.middleware';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -14,10 +14,16 @@ export function attendanceRoutes(controller: AttendanceController): Router {
   router.post('/', controller.register);
   router.get('/cell/:cellId', controller.findByCellAndDate);
   router.get('/cell/:cellId/attendees', controller.findAttendeesByCell);
+  router.get('/cell/:cellId/ministrantes', controller.findMinistranteOptions);
   router.get('/cell/:cellId/attendees/:personId/history', controller.findAttendeeHistory);
   router.get('/cell/:cellId/meetings', controller.findMeetingsByCell);
   router.post('/cell/:cellId/meetings', controller.createMeeting);
-  router.post('/cell/:cellId/meetings/:meetingDate/photo', upload.single('photo'), controller.uploadMeetingPhoto);
+  router.post(
+    '/cell/:cellId/meetings/:meetingDate/photo',
+    upload.single('photo'),
+    restoreTenantContext,
+    controller.uploadMeetingPhoto,
+  );
   router.get('/cell/:cellId/meetings/:meetingDate/photo', controller.getMeetingPhoto);
   return router;
 }

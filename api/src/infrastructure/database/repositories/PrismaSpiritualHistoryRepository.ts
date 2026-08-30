@@ -12,16 +12,31 @@ export class PrismaSpiritualHistoryRepository implements ISpiritualHistoryReposi
     });
   }
 
+  async findByMember(memberId: string): Promise<SpiritualHistory[]> {
+    return this.prisma.spiritualHistory.findMany({
+      where: { memberId },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  /** Eventos da célula pelos dois lados: visitantes e membros. */
   async findByCellId(cellId: string): Promise<SpiritualHistoryWithVisitor[]> {
     const rows = await this.prisma.spiritualHistory.findMany({
-      where: { visitor: { cellId } },
-      include: { visitor: { select: { name: true } } },
+      where: {
+        OR: [{ visitor: { cellId } }, { member: { cellId } }],
+      },
+      include: {
+        visitor: { select: { name: true } },
+        member: { select: { name: true } },
+      },
       orderBy: { date: 'desc' },
     });
     return rows.map((r) => ({
       id: r.id,
       visitorId: r.visitorId,
-      visitorName: r.visitor.name,
+      memberId: r.memberId,
+      visitorName: r.visitor?.name ?? r.member?.name ?? 'Sem nome',
+      personKind: r.memberId ? ('MEMBER' as const) : ('VISITOR' as const),
       eventType: r.eventType as SpiritualHistory['eventType'],
       description: r.description,
       date: r.date,
@@ -33,7 +48,8 @@ export class PrismaSpiritualHistoryRepository implements ISpiritualHistoryReposi
   async add(data: AddSpiritualEventData): Promise<SpiritualHistory> {
     return this.prisma.spiritualHistory.create({
       data: {
-        visitorId: data.visitorId,
+        visitorId: data.visitorId ?? null,
+        memberId: data.memberId ?? null,
         eventType: data.eventType,
         description: data.description ?? null,
         date: data.date,

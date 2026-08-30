@@ -49,7 +49,7 @@ services:
       - sistema_igreja_net
 
   app:
-    image: rominhoarouca/sistema-igreja-app:0.1.10
+    image: rominhoarouca/sistema-igreja-app:0.1.11
     container_name: sistema_igreja_app
     restart: unless-stopped
     environment:
@@ -59,7 +59,7 @@ services:
       - sistema_igreja_net
 
   api:
-    image: rominhoarouca/sistema-igreja-api:0.1.10
+    image: rominhoarouca/sistema-igreja-api:0.1.11
     container_name: sistema_igreja_api
     restart: unless-stopped
     environment:

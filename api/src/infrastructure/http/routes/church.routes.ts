@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { ChurchController } from '../controllers/ChurchController';
-import { authMiddleware, requireAdmin } from '../middlewares/auth.middleware';
+import { authMiddleware, requireAdmin, restoreTenantContext } from '../middlewares/auth.middleware';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -22,7 +22,13 @@ export function churchRoutes(controller: ChurchController): Router {
 
   // Edição dos dados da igreja — apenas ADMIN (ou SUPERADMIN).
   router.patch('/me', requireAdmin, controller.update);
-  router.post('/me/logo', requireAdmin, upload.single('logo'), controller.uploadLogoHandler);
+  router.post(
+    '/me/logo',
+    requireAdmin,
+    upload.single('logo'),
+    restoreTenantContext,
+    controller.uploadLogoHandler,
+  );
 
   return router;
 }

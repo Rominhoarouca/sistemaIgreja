@@ -1,0 +1,19 @@
+- [x] Na celula, possibilide sinalizar o vice-lider e anfitriao 
+- [x] Na edição do cadastro dos membros/visitantes possibilite o envio de uma foto. Essa foto deve ser reduzida o tamanho para ocupar o minimo possivel de espaço em disco 
+- [x] Ter uma tela para adicionar/remover perfil dos usuarios
+- [x] Quando tento subir uma foto do logo da igreja estou recebendo erro 500. Valide pelos logs.
+- [x] Ao fazer um cadastro é preciso fazer pull to refresh na home para ser considerado nas listas(Celula, lider, visitante...)
+- [x] Quando for registrar presença, liste os materiais disponiveis para associar qual lição foi dada(Com possibilidade de pesquisar na lista de materiais disponóveis, exiba a lista de materiais disponiveis ordenada pela data do mais recente para o mais antigo). Caso não tenha o material da aula, deixe um campo de texto para escrever a lição como já existe hj. 
+- [x] Quando for registrar presença, no campo ministrante, exiba a lista de participantes da celula incluindo o lider com uma badge de visitante, lider, anfitriao, vice-lider) 
+- [x] Quando estou salvando um foto na seção de presença está dando erro de mini s3, valide pelo log no servidor
+- [x] A tela de cadastro de membro não está com scroll
+- [x] possibilite sinalizar se o membro ou vizitante já é batizado ou não. No historico, liste tambem os membros que não são batizados quando selecionar "Enviado para Batismo". Quando adicionar um historico de "Batizado", sinalize no cadastro que foi batizado.
+- [x] Quando entro em notificaçoes no perfil de lider não tem opção de voltar
+- [x] Valide todas as telas que tenha telefone e coloque mascara de telefone
+- [x] Coloque um collapse na tela pessoas na seção de frequentadoees e ultimas reunioes.
+- [x] Ainda não consegui subir imagens no registro de presença
+- [x] Na tela de home coloque collapse em cada seção
+- [x] Nas telas que mostram informaçoes de celula, inclua um badge com o tipo de celula
+- [x] No topo do sistema junto da logo inclua o nome da igreja. Caso não tenha nome, deixe o texto do nome da aplicação "Multiplicado"
+- [] Quando salvo 
+- [x] Álbum de fotos dos encontros por dia, com drill-down coordenação → supervisão → célula por perfil

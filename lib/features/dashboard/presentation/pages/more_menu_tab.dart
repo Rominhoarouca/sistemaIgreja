@@ -3,7 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../../routing/role_home.dart';
 
 class _MoreItem {
   const _MoreItem(this.icon, this.label, this.route, {this.subtitle});
@@ -34,12 +36,24 @@ class MoreMenuTab extends StatelessWidget {
       Icons.person_add_alt_outlined,
       'Novo Cadastro',
       AppRoutes.adminUsersRegister,
-      subtitle: 'Líder, supervisor ou coordenador',
+      subtitle: 'Líder, supervisor, coordenador ou professor',
+    ),
+    _MoreItem(
+      Icons.manage_accounts_outlined,
+      'Perfis dos usuários',
+      AppRoutes.adminUserRoles,
+      subtitle: 'Adicionar ou remover perfis',
     ),
     _MoreItem(
       Icons.qr_code_2_outlined,
       'QR Code de cadastro',
       AppRoutes.adminQrCode,
+    ),
+    _MoreItem(
+      Icons.link_off_outlined,
+      'Vínculos pendentes',
+      AppRoutes.adminPendingLinks,
+      subtitle: 'Células sem líder e líderes sem célula',
     ),
   ];
 
@@ -50,6 +64,12 @@ class MoreMenuTab extends StatelessWidget {
       AppRoutes.adminCellTypes,
     ),
     _MoreItem(Icons.folder_open_rounded, 'Materiais', AppRoutes.adminMaterials),
+    _MoreItem(
+      Icons.photo_library_outlined,
+      'Álbuns',
+      AppRoutes.albums,
+      subtitle: 'Fotos dos encontros por dia',
+    ),
     // Salas do ministério infantil: a rota já existia e a sidebar do desktop
     // já a listava, mas no mobile não havia como chegar nela.
     _MoreItem(
@@ -64,11 +84,49 @@ class MoreMenuTab extends StatelessWidget {
       'Cidades e Bairros',
       AppRoutes.adminLocation,
     ),
+    // A tela existia e a sidebar do desktop já a listava, mas no mobile o
+    // admin não tinha como chegar nas configurações da própria igreja.
+    _MoreItem(
+      Icons.church_outlined,
+      'Igreja',
+      AppRoutes.adminChurch,
+      subtitle: 'Plano, cor do menu, logo e redes sociais',
+    ),
   ];
+
+  /// Lista as áreas dos papéis que o usuário acumula e navega para a
+  /// escolhida.
+  void _showRoleSwitcher(BuildContext context, UserEntity user) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            Text('Trocar de perfil', style: AppTypography.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            for (final role in orderedRoles(user))
+              ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: Text(role.label),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  context.go(homeRouteForRole(role));
+                },
+              ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authState = context.watch<AuthBloc>().state;
+    final user = authState is AuthAuthenticated ? authState.user : null;
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.pagePaddingH,
@@ -102,6 +160,21 @@ class MoreMenuTab extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right, size: 20),
                 onTap: () => context.push('/profile'),
               ),
+              // Só aparece para quem acumula papéis — o usuário de um papel só
+              // não tem para onde trocar.
+              if (user != null && user.hasMultipleRoles) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.swap_horiz_rounded),
+                  title: Text('Trocar de perfil', style: AppTypography.bodyLarge),
+                  subtitle: Text(
+                    orderedRoles(user).map((r) => r.label).join(' · '),
+                    style: AppTypography.bodySmall,
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () => _showRoleSwitcher(context, user),
+                ),
+              ],
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.info_outline),

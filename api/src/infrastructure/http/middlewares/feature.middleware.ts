@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AppError } from '@shared/errors/AppError';
+import { hasRole } from './auth.middleware';
 import type { FeatureResolver } from '@application/services/FeatureResolver';
 import type { FeatureKey } from '@shared/plans/features';
 
@@ -10,7 +11,7 @@ import type { FeatureKey } from '@shared/plans/features';
 export function makeRequireFeature(resolver: FeatureResolver) {
   return (feature: FeatureKey) =>
     async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-      if (req.userRole === 'SUPERADMIN') return next();
+      if (hasRole(req, 'SUPERADMIN')) return next();
       if (!req.churchId) throw AppError.forbidden('Igreja não identificada');
 
       const allowed = await resolver.hasFeature(req.churchId, feature);

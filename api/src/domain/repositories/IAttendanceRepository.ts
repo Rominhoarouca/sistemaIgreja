@@ -11,6 +11,9 @@ export interface MeetingSummary {
   readonly visitorsPresent: number;
   readonly lesson: string | null;
   readonly ministrante: string | null;
+  /** Material do acervo usado como lição, quando houver. */
+  readonly materialId: string | null;
+  readonly materialTitle: string | null;
   /**
    * `true` quando há presença registrada. Um encontro criado e nunca preenchido
    * fica pendente mesmo depois da data passar.
@@ -22,6 +25,7 @@ export interface MeetingDetails {
   /** `null` limpa o campo; `undefined` deixa como está. */
   readonly lesson?: string | null | undefined;
   readonly ministrante?: string | null | undefined;
+  readonly materialId?: string | null | undefined;
 }
 
 export interface CellAttendanceSummary {
@@ -52,6 +56,15 @@ export interface CellAttendee {
   readonly city: string | null;
   /** Só para visitantes: onde está no funil de acompanhamento. */
   readonly status: string | null;
+  /**
+   * Papel na célula. `LIDER` é sintético (vem do dono da célula, não da tabela
+   * de membros); membros trazem o que está em `cell_members.role_in_cell`;
+   * visitante é sempre `VISITANTE`.
+   */
+  readonly roleInCell: 'LIDER' | 'VICE_LIDER' | 'ANFITRIAO' | 'MEMBRO' | 'VISITANTE';
+  readonly photoKey: string | null;
+  /** URL assinada da foto, preenchida na camada HTTP. */
+  readonly photoUrl?: string | null;
   /** Só para visitantes. */
   readonly isBaptized: boolean | null;
   /** Encontros em que a presença dessa pessoa foi registrada (presente ou não). */
@@ -84,6 +97,17 @@ export interface AttendeeMeetingHistory {
   readonly ministrante: string | null;
 }
 
+/**
+ * Quem pode ter ministrado o encontro: o líder da célula, os membros (com o
+ * papel de cada um) e os visitantes. É só para preencher o campo de texto
+ * `ministrante` — por isso não carrega estatística nenhuma.
+ */
+export interface MinistranteOption {
+  readonly id: string;
+  readonly name: string;
+  readonly role: 'LIDER' | 'VICE_LIDER' | 'ANFITRIAO' | 'MEMBRO' | 'VISITANTE';
+}
+
 export interface IAttendanceRepository {
   register(data: RegisterAttendanceData): Promise<Attendance>;
   findByCellAndDate(cellId: string, meetingDate: Date): Promise<Attendance[]>;
@@ -92,6 +116,7 @@ export interface IAttendanceRepository {
   getAttendanceRateByCell(): Promise<CellAttendanceSummary[]>;
   findMeetingsByCellId(cellId: string): Promise<MeetingSummary[]>;
   findAttendeesByCellId(cellId: string): Promise<CellAttendee[]>;
+  findMinistranteOptions(cellId: string): Promise<MinistranteOption[]>;
   findAttendeeHistory(
     cellId: string,
     personId: string,
@@ -103,6 +128,11 @@ export interface IAttendanceRepository {
     createdById: string,
     details?: MeetingDetails,
   ): Promise<void>;
-  updateMeetingPhoto(cellId: string, meetingDate: Date, photoKey: string): Promise<void>;
+  updateMeetingPhoto(
+    cellId: string,
+    meetingDate: Date,
+    photoKey: string,
+    createdById: string,
+  ): Promise<void>;
   getMeetingPhotoKey(cellId: string, meetingDate: Date): Promise<string | null>;
 }

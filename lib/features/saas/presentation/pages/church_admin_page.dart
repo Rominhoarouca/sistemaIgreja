@@ -1,5 +1,8 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../../injection/injection.dart';
 import '../../data/church_remote_datasource.dart';
 import '../../domain/church_context.dart';
@@ -27,6 +30,8 @@ class _ChurchAdminPageState extends State<ChurchAdminPage> {
   String _menuColor = '#3F51B5';
   bool _saving = false;
   bool _uploading = false;
+  bool _changingPlan = false;
+  List<PlanInfo> _plans = const [];
 
   static const _palette = [
     '#3F51B5', '#1E3A8A', '#0EA5E9', '#059669', '#16A34A',
@@ -38,6 +43,72 @@ class _ChurchAdminPageState extends State<ChurchAdminPage> {
     super.initState();
     final c = ChurchContextController.instance.church;
     if (c != null) _fill(c);
+    _loadPlans();
+  }
+
+  Future<void> _loadPlans() async {
+    try {
+      final plans = await _ds.listActivePlans();
+      if (mounted) setState(() => _plans = plans);
+    } catch (_) {
+      // Sem a lista, o card do plano continua mostrando só o plano atual.
+    }
+  }
+
+  /// Troca o plano da igreja. Quando o gateway exige pagamento online a API
+  /// devolve a URL do checkout; caso contrário o plano já vale na hora.
+  Future<void> _changePlan(PlanInfo plan) async {
+    // O "cliente" da cobrança é a igreja; o e-mail é o do admin logado.
+    final church = ChurchContextController.instance.church;
+    final authState = context.read<AuthBloc>().state;
+    final adminEmail = authState is AuthAuthenticated
+        ? authState.user.email
+        : null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Mudar para o plano ${plan.name}?'),
+        content: Text(
+          plan.priceMonth == 0
+              ? 'O plano ${plan.name} é gratuito. Recursos fora dele deixam de '
+                    'ficar disponíveis.'
+              : 'Valor: ${plan.priceMonthLabel}. Se a cobrança online estiver '
+                    'ativa, você será levado ao checkout.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _changingPlan = true);
+    try {
+      final checkoutUrl = await _ds.changePlan(
+        planTier: plan.tier,
+        customerName: church?.name,
+        customerEmail: adminEmail,
+      );
+      if (checkoutUrl != null) {
+        final uri = Uri.parse(checkoutUrl);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        _snack('Finalize o pagamento para ativar o plano');
+      } else {
+        await ChurchContextController.instance.load();
+        _snack('Plano alterado para ${plan.name}');
+      }
+    } catch (e) {
+      _snack('Erro ao alterar o plano: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _changingPlan = false);
+    }
   }
 
   void _fill(ChurchInfo c) {
@@ -214,14 +285,56 @@ class _ChurchAdminPageState extends State<ChurchAdminPage> {
   }
 
   Widget _planCard(PlanInfo plan, String? status) {
+    final others = _plans.where((p) => p.tier != plan.tier).toList();
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4),
-      child: ListTile(
-        leading: const Icon(Icons.workspace_premium_outlined),
-        title: Text('Plano ${plan.name}'),
-        subtitle: Text(
-          '${plan.priceMonthLabel}${status != null ? ' • $status' : ''}',
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.workspace_premium_outlined),
+            title: Text('Plano ${plan.name}'),
+            subtitle: Text(
+              '${plan.priceMonthLabel}${status != null ? ' • $status' : ''}',
+            ),
+          ),
+          if (others.isNotEmpty) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Mudar de plano',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final other in others)
+                        OutlinedButton(
+                          onPressed: _changingPlan
+                              ? null
+                              : () => _changePlan(other),
+                          child: Text(
+                            '${other.name} · ${other.priceMonthLabel}',
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_changingPlan)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: LinearProgressIndicator(),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

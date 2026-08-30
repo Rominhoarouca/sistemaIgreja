@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.routes';
 import { visitorRoutes } from './routes/visitor.routes';
 import { cellRoutes } from './routes/cell.routes';
 import { attendanceRoutes } from './routes/attendance.routes';
+import { albumRoutes } from './routes/album.routes';
 import { spiritualHistoryRoutes } from './routes/spiritual-history.routes';
 import { dashboardRoutes } from './routes/dashboard.routes';
 import { materialRoutes } from './routes/material.routes';
@@ -114,6 +115,7 @@ export function createApp(container: Container): Application {
     cellRoutes(container.cellController, container.publicTenantRequired),
   );
   app.use(`${v1}/attendance`, attendanceRoutes(container.attendanceController));
+  app.use(`${v1}/albums`, albumRoutes(container.albumController));
   app.use(`${v1}/dashboard`, dashboardRoutes(container.dashboardController));
   app.use(`${v1}/users`, userRoutes(container.userController));
   app.use(`${v1}/location`, locationRoutes(container.locationController));

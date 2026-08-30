@@ -6,6 +6,9 @@ import '../domain/church_context.dart';
 
 /// Estado global do tenant (igreja): dados, plano, features e cor do menu.
 /// Singleton no estilo do [ThemeController] — dirige tema dinâmico + gating de UI.
+/// Nome da aplicação — fallback do nome da igreja no topo do sistema.
+const String kAppName = 'Multiplicado';
+
 class ChurchContextController extends ChangeNotifier {
   ChurchContextController._();
   static final ChurchContextController instance = ChurchContextController._();
@@ -20,6 +23,13 @@ class ChurchContextController extends ChangeNotifier {
   bool get loading => _loading;
 
   ChurchInfo? get church => _context?.church;
+
+  /// Nome exibido no topo do app. Cai no nome da aplicação enquanto o
+  /// contexto da igreja não carregou (ou quando a igreja está sem nome).
+  String get displayName {
+    final name = _context?.church.name.trim() ?? '';
+    return name.isEmpty ? kAppName : name;
+  }
   PlanInfo? get plan => _context?.plan;
   List<String> get features => _context?.features ?? const [];
 

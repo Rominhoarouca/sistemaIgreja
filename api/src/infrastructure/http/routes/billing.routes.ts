@@ -11,5 +11,8 @@ export function billingRoutes(controller: BillingController): Router {
   // Checkout — ADMIN da igreja.
   router.post('/checkout', authMiddleware, requireAdmin, controller.checkout);
 
+  // Troca de plano pela própria igreja — ADMIN.
+  router.post('/plan', authMiddleware, requireAdmin, controller.changePlan);
+
   return router;
 }

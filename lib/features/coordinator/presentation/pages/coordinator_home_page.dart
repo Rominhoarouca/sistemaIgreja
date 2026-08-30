@@ -8,6 +8,7 @@ import '../../../supervisor/presentation/pages/supervisor_home_page.dart';
 import 'coordinator_dashboard_tab.dart';
 import '../../../../injection/injection.dart';
 import '../../../../shared/utils/plural.dart';
+import '../../../../core/constants/app_constants.dart';
 
 /// Painel do Coordenador — coordena supervisores, seus líderes e células.
 /// Abas: Início (dashboard) · Supervisores · Líderes · Células.
@@ -55,6 +56,11 @@ class _CoordinatorHomePageState extends State<CoordinatorHomePage> {
       title: const Text('Painel do Coordenador'),
       elevation: 0,
       actions: [
+        IconButton(
+          tooltip: 'Álbuns dos encontros',
+          icon: const Icon(Icons.photo_library_outlined),
+          onPressed: () => context.push(AppRoutes.albums),
+        ),
         IconButton(
           tooltip: isDark ? 'Modo claro' : 'Modo escuro',
           icon: Icon(

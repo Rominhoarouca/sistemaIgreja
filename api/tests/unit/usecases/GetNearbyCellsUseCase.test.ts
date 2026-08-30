@@ -6,9 +6,12 @@ const makeCell = (distanceKm: number): CellWithDistance => ({
   id: `cell-${distanceKm}`,
   name: `Célula ${distanceKm}km`,
   leaderId: 'leader-1',
+  cellTypeId: null,
   address: 'Rua A, 1',
+  bairroId: null,
   neighborhood: 'Centro',
   city: 'São Paulo',
+  state: 'SP',
   dayOfWeek: 'quarta',
   time: '19:30',
   maxCapacity: 20,
@@ -23,8 +26,12 @@ const makeCell = (distanceKm: number): CellWithDistance => ({
 const makeRepo = (cells: CellWithDistance[]): ICellRepository => ({
   findById: jest.fn(),
   findAll: jest.fn(),
+  findByLeaderId: jest.fn(),
+  findWithoutLeader: jest.fn(),
   findNearby: jest.fn().mockResolvedValue(cells),
   create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
   count: jest.fn(),
 });
 

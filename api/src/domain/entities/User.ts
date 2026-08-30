@@ -15,6 +15,8 @@ export interface User {
   readonly name: string;
   readonly email: string;
   readonly role: UserRole;
+  /** Todos os papéis do usuário (inclui `role`). Ver `effectiveRoles`. */
+  readonly roles: UserRole[];
   readonly photoKey: string | null;
   readonly phone: string | null;
   readonly address: string | null;
@@ -46,4 +48,31 @@ export interface UserProfile extends User {
   readonly children: Child[];
   readonly coordenacaoName: string | null;
   readonly coordenacaoColor: string | null;
+}
+
+/**
+ * Precedência de papéis, do mais para o menos privilegiado. Usada para escolher
+ * o papel "efetivo" quando o usuário acumula vários: as regras que *restringem*
+ * (ex.: "líder só enxerga a própria célula") precisam olhar o papel mais alto,
+ * senão um admin que também é líder perderia acesso.
+ */
+export const ROLE_PRECEDENCE: readonly UserRole[] = [
+  'SUPERADMIN',
+  'ADMIN',
+  'COORDENADOR',
+  'SUPERVISOR',
+  'LIDER',
+  'KIDS',
+  'RESPONSAVEL',
+];
+
+/** União de `role` + `roles`, sem repetição e na ordem de precedência. */
+export function effectiveRoles(user: { role: UserRole; roles?: UserRole[] | null }): UserRole[] {
+  const set = new Set<UserRole>([user.role, ...(user.roles ?? [])]);
+  return ROLE_PRECEDENCE.filter((r) => set.has(r));
+}
+
+/** Papel mais privilegiado entre os que o usuário acumula. */
+export function highestRole(roles: readonly UserRole[]): UserRole {
+  return ROLE_PRECEDENCE.find((r) => roles.includes(r)) ?? 'LIDER';
 }

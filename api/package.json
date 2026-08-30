@@ -1,6 +1,6 @@
 {
   "name": "sistema-igreja-api",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "API REST para o Sistema de Recepção e Integração de Igreja",
   "main": "dist/server.js",
   "scripts": {
@@ -21,7 +21,8 @@
     "type-check": "tsc --noEmit",
     "publishAPI": "cd .. && bash scripts/publish_api.sh",
     "publishAPP": "cd .. && bash scripts/publish_app.sh",
-    "publishLanding": "cd .. && bash scripts/publish_landing.sh"
+    "publishLanding": "cd .. && bash scripts/publish_landing.sh",
+    "migrate:minio": "tsx scripts/migrate-minio-buckets.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

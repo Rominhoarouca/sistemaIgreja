@@ -9,12 +9,22 @@ import { AppError } from '@shared/errors/AppError';
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
   address: z.string().nullable().optional(),
-  site: z.string().url().nullable().optional().or(z.literal('')),
+  // Aceita o que o usuário digita ("igreja.com.br", "www.igreja.com"): exigir
+  // URL completa fazia o formulário inteiro falhar no save por causa do
+  // esquema faltando. A normalização acontece abaixo.
+  site: z.string().max(255).nullable().optional(),
   instagram: z.string().nullable().optional(),
   youtube: z.string().nullable().optional(),
   tiktok: z.string().nullable().optional(),
   menuColor: z.string().regex(/^#([0-9a-fA-F]{6})$/, 'Cor inválida (#RRGGBB)').optional(),
 });
+
+/** "igreja.com.br" → "https://igreja.com.br". Vazio vira null. */
+function normalizeSite(site: string | null | undefined): string | null {
+  const trimmed = site?.trim() ?? '';
+  if (trimmed === '') return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
 
 export class ChurchController {
   constructor(
@@ -41,7 +51,10 @@ export class ChurchController {
   update = async (req: Request, res: Response): Promise<void> => {
     if (!req.churchId) throw AppError.forbidden('Usuário sem igreja associada');
     const data = updateSchema.parse(req.body);
-    const church = await this.updateChurch.execute(req.churchId, data);
+    const church = await this.updateChurch.execute(req.churchId, {
+      ...data,
+      ...(data.site !== undefined && { site: normalizeSite(data.site) }),
+    });
     res.json({ church });
   };
 

@@ -7,7 +7,9 @@ export type SpiritualEventType =
 
 export interface SpiritualHistory {
   readonly id: string;
-  readonly visitorId: string;
+  /** Exatamente um entre `visitorId` e `memberId` é preenchido. */
+  readonly visitorId: string | null;
+  readonly memberId: string | null;
   readonly eventType: SpiritualEventType;
   readonly description: string | null;
   readonly date: Date;
@@ -16,7 +18,8 @@ export interface SpiritualHistory {
 }
 
 export interface AddSpiritualEventData {
-  readonly visitorId: string;
+  readonly visitorId?: string | undefined;
+  readonly memberId?: string | undefined;
   readonly eventType: SpiritualEventType;
   readonly description?: string | undefined;
   readonly date: Date;

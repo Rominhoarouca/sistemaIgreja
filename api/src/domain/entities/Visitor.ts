@@ -23,6 +23,9 @@ export interface Visitor {
   readonly knownPersonName: string | null;
   readonly interests: string[];
   readonly status: VisitorStatus;
+  readonly photoKey: string | null;
+  /** URL assinada da foto, preenchida na camada HTTP. */
+  readonly photoUrl?: string | null;
   readonly leaderId: string | null;
   readonly cellId: string | null;
   readonly referredById: string | null;

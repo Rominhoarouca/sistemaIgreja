@@ -5,6 +5,8 @@ import type { GetVisitorsUseCase } from '@application/usecases/visitor/GetVisito
 import type { UpdateVisitorStatusUseCase } from '@application/usecases/visitor/UpdateVisitorStatusUseCase';
 import type { IVisitorRepository } from '@domain/repositories/IVisitorRepository';
 import type { ICellMemberRepository } from '@domain/repositories/ICellMemberRepository';
+import { MinioService, StorageFolder } from '@infrastructure/storage/MinioService';
+import { randomUUID } from 'crypto';
 import { AppError } from '@shared/errors/AppError';
 
 const genderSchema = z.enum(['MASCULINO', 'FEMININO']);
@@ -86,6 +88,7 @@ export class VisitorController {
     private readonly updateStatusUseCase: UpdateVisitorStatusUseCase,
     private readonly visitorRepo: IVisitorRepository,
     private readonly cellMemberRepo: ICellMemberRepository,
+    private readonly minioService: MinioService,
   ) {}
 
   create = async (req: Request, res: Response): Promise<void> => {
@@ -131,7 +134,50 @@ export class VisitorController {
     const { id } = req.params as { id: string };
     const visitor = await this.visitorRepo.findById(id);
     if (!visitor) throw AppError.notFound('Visitante não encontrado');
-    res.json({ visitor });
+    res.json({ visitor: { ...visitor, photoUrl: await this.photoUrl(visitor.photoKey) } });
+  };
+
+  /** URL assinada da foto. Falha de storage vira `null`, não derruba a leitura. */
+  private async photoUrl(photoKey: string | null): Promise<string | null> {
+    if (!photoKey) return null;
+    return this.minioService.presignedDownloadUrl(photoKey).catch(() => null);
+  }
+
+  /** Marca/desmarca o visitante como batizado direto no cadastro. */
+  setBaptism = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params as { id: string };
+    const { isBaptized } = z.object({ isBaptized: z.boolean() }).parse(req.body);
+    const existing = await this.visitorRepo.findById(id);
+    if (!existing) throw AppError.notFound('Visitante não encontrado');
+    const visitor = await this.visitorRepo.setBaptized(id, isBaptized);
+    res.json({ visitor: { ...visitor, photoUrl: await this.photoUrl(visitor.photoKey) } });
+  };
+
+  uploadPhoto = async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params as { id: string };
+    const existing = await this.visitorRepo.findById(id);
+    if (!existing) throw AppError.notFound('Visitante não encontrado');
+    if (!req.file) throw new AppError('Nenhuma foto enviada', 400, 'NO_FILE');
+
+    const ext = (req.file.originalname.split('.').pop() ?? 'jpg').toLowerCase().slice(0, 5);
+    const objectName = MinioService.objectKey(
+      StorageFolder.visitors,
+      id,
+      `${randomUUID()}.${ext}`,
+    );
+
+    await this.minioService.uploadFile({
+      objectName,
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    });
+
+    const visitor = await this.visitorRepo.updatePhotoKey(id, objectName);
+    if (existing.photoKey) await this.minioService.deleteObject(existing.photoKey);
+
+    const photoUrl = await this.minioService.presignedDownloadUrl(objectName);
+    res.json({ visitor: { ...visitor, photoUrl }, photoUrl });
   };
 
   updateStatus = async (req: Request, res: Response): Promise<void> => {

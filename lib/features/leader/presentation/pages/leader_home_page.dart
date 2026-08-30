@@ -16,6 +16,11 @@ import '../../../../shared/widgets/cep_address_fields.dart';
 import '../../../dashboard/presentation/widgets/demographic_fields.dart';
 import 'leader_dashboard_view.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/widgets/app_map_tiles.dart';
+import '../../../../shared/utils/profile_photo.dart';
+import '../../../../shared/utils/route_aware_reload.dart';
+import '../../../../shared/utils/phone_input.dart';
+import '../../../../shared/widgets/cell_type_badge.dart';
 
 /// Show a snackbar above any modal sheet by using the root navigator's context.
 void _showTopSnackBar(
@@ -79,7 +84,11 @@ class LeaderHomePage extends StatefulWidget {
   State<LeaderHomePage> createState() => _LeaderHomePageState();
 }
 
-class _LeaderHomePageState extends State<LeaderHomePage> {
+class _LeaderHomePageState extends State<LeaderHomePage>
+    with RouteAwareReload<LeaderHomePage> {
+  @override
+  void onRouteReturn() => _loadCells();
+
   int _selectedTab = 0;
   String? _coordenacaoName;
   Color? _coordenacaoColor;
@@ -190,12 +199,10 @@ class _LeaderHomePageState extends State<LeaderHomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(cell.name, style: AppTypography.titleSmall),
-          if (cell.typeName != null)
-            Text(
-              cell.typeName!,
-              style: AppTypography.labelSmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
+          if (CellTypeBadge.has(cell.typeName))
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: CellTypeBadge(typeName: cell.typeName),
             ),
         ],
       ),
@@ -342,7 +349,11 @@ class _AttendeesTab extends StatefulWidget {
 
 /// Membros e visitantes da célula em uma lista só. O que diferencia é a badge,
 /// e o filtro permite isolar um dos dois grupos.
-class _AttendeesTabState extends State<_AttendeesTab> {
+class _AttendeesTabState extends State<_AttendeesTab>
+    with RouteAwareReload<_AttendeesTab> {
+  @override
+  void onRouteReturn() => _loadData();
+
   late final Dio _dio;
   final _searchCtrl = TextEditingController();
   String _query = '';
@@ -416,6 +427,7 @@ class _AttendeesTabState extends State<_AttendeesTab> {
       _attendees.where(filter.matches).length;
 
   Future<void> _openDetails(CellAttendee attendee) async {
+    var memberChanged = false;
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -423,14 +435,19 @@ class _AttendeesTabState extends State<_AttendeesTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => attendee.isMember
-          ? _MemberDetailSheet(member: attendee)
+          ? _MemberDetailSheet(
+              member: attendee,
+              dio: _dio,
+              cellId: widget.cellId,
+              onChanged: () => memberChanged = true,
+            )
           : _VisitorDetailSheet(
               visitor: _VisitorData.fromAttendee(attendee, widget.cellId),
               dio: _dio,
               cellId: widget.cellId,
             ),
     );
-    if (changed == true) _loadData();
+    if (changed == true || memberChanged) _loadData();
   }
 
   /// Duas origens de cadastro (visitante e membro) atrás de um único botão.
@@ -597,32 +614,39 @@ class _AttendeesTabState extends State<_AttendeesTab> {
         ],
       ),
       const SizedBox(height: AppSpacing.base),
-      AppSectionHeader(title: 'Frequentadores (${filtered.length})'),
-      const SizedBox(height: AppSpacing.sm),
-      if (filtered.isEmpty)
-        AppEmptyState(
-          title: _query.isNotEmpty || _filter != AttendeeFilter.all
-              ? 'Nada encontrado'
-              : 'Ninguém na célula ainda',
-          subtitle: _query.isNotEmpty || _filter != AttendeeFilter.all
-              ? 'Ajuste a busca ou o filtro.'
-              : 'Cadastre um visitante ou adicione um membro pelo botão abaixo.',
-          icon: Icons.groups_outlined,
-        )
-      else
-        for (final attendee in filtered) ...[
-          AttendeeCard(
-            attendee: attendee,
-            onTap: () => _openDetails(attendee),
-            onFrequencyTap: () => showAttendanceCalendarDialog(
-              context: context,
-              dio: _dio,
-              cellId: widget.cellId,
-              attendee: attendee,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
+      AppCollapsibleSection(
+        title: 'Frequentadores (${filtered.length})',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (filtered.isEmpty)
+              AppEmptyState(
+                title: _query.isNotEmpty || _filter != AttendeeFilter.all
+                    ? 'Nada encontrado'
+                    : 'Ninguém na célula ainda',
+                subtitle: _query.isNotEmpty || _filter != AttendeeFilter.all
+                    ? 'Ajuste a busca ou o filtro.'
+                    : 'Cadastre um visitante ou adicione um membro pelo botão '
+                          'abaixo.',
+                icon: Icons.groups_outlined,
+              )
+            else
+              for (final attendee in filtered) ...[
+                AttendeeCard(
+                  attendee: attendee,
+                  onTap: () => _openDetails(attendee),
+                  onFrequencyTap: () => showAttendanceCalendarDialog(
+                    context: context,
+                    dio: _dio,
+                    cellId: widget.cellId,
+                    attendee: attendee,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+          ],
+        ),
+      ),
     ];
   }
 }
@@ -637,6 +661,8 @@ class _VisitorData {
   final String phone;
   final String neighborhood;
   final String address;
+  final String? photoUrl;
+  final bool isBaptized;
 
   const _VisitorData(
     this.id,
@@ -647,8 +673,10 @@ class _VisitorData {
     this.time,
     this.phone,
     this.neighborhood,
-    this.address,
-  );
+    this.address, [
+    this.photoUrl,
+    this.isBaptized = false,
+  ]);
 
   /// `memberId` é sempre nulo aqui: a lista de frequentadores já exclui os
   /// visitantes convertidos em membro, senão a pessoa apareceria duas vezes.
@@ -663,6 +691,8 @@ class _VisitorData {
         attendee.phone ?? 'Nao informado',
         attendee.neighborhood ?? 'Nao informado',
         attendee.address ?? 'Nao informado',
+        attendee.photoUrl,
+        attendee.isBaptized == true,
       );
 
   static String _relativeTime(DateTime? createdAt) {
@@ -801,8 +831,10 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: brPhoneInputFormatters,
                   decoration: const InputDecoration(
                     labelText: 'Telefone *',
+                    hintText: '(11) 99999-9999',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                   validator: (v) => (v == null || v.trim().length < 8)
@@ -840,6 +872,59 @@ class _NewVisitorSheetState extends State<_NewVisitorSheet> {
   }
 }
 
+/// Avatar com badge de câmera — usado nas fichas de membro e de visitante.
+class _PhotoAvatar extends StatelessWidget {
+  const _PhotoAvatar({
+    required this.initials,
+    required this.photoUrl,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final String initials;
+  final String? photoUrl;
+  final bool busy;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Stack(
+        children: [
+          AppAvatar(initials: initials, imageUrl: photoUrl, size: 56),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: busy
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.white,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.photo_camera_outlined,
+                      size: 12,
+                      color: AppColors.white,
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Visitor Detail Sheet ───────────────────────────────────────────────────
 
 class _VisitorDetailSheet extends StatefulWidget {
@@ -860,6 +945,64 @@ class _VisitorDetailSheet extends StatefulWidget {
 class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
   late String _status;
   bool _updatingStatus = false;
+  late String? _photoUrl = widget.visitor.photoUrl;
+  late bool _isBaptized = widget.visitor.isBaptized;
+  bool _uploadingPhoto = false;
+  bool _savingBaptism = false;
+
+  Future<void> _setBaptized(bool value) async {
+    if (_savingBaptism) return;
+    final previous = _isBaptized;
+    setState(() {
+      _isBaptized = value;
+      _savingBaptism = true;
+    });
+    try {
+      await widget.dio.patch(
+        '/visitors/${widget.visitor.id}/baptism',
+        data: {'isBaptized': value},
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isBaptized = previous);
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível alterar o batismo',
+      );
+    } finally {
+      if (mounted) setState(() => _savingBaptism = false);
+    }
+  }
+
+  Future<void> _changePhoto() async {
+    final photo = await pickProfilePhoto(context);
+    if (photo == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final form = FormData.fromMap({
+        'photo': MultipartFile.fromBytes(photo.bytes, filename: photo.filename),
+      });
+      final resp = await widget.dio.post(
+        '/visitors/${widget.visitor.id}/photo',
+        data: form,
+      );
+      if (!mounted) return;
+      setState(() {
+        _photoUrl = (resp.data as Map<String, dynamic>)['photoUrl'] as String?;
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível enviar a foto',
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
   bool _converting = false;
   bool _assigningCell = false;
 
@@ -971,13 +1114,15 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
 
               Row(
                 children: [
-                  AppAvatar(
+                  _PhotoAvatar(
                     initials: widget.visitor.name
                         .split(' ')
                         .map((e) => e[0])
                         .take(2)
                         .join(),
-                    size: 56,
+                    photoUrl: _photoUrl,
+                    busy: _uploadingPhoto,
+                    onTap: _uploadingPhoto ? null : _changePhoto,
                   ),
                   const SizedBox(width: AppSpacing.base),
                   Expanded(
@@ -998,6 +1143,19 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
 
               const SizedBox(height: AppSpacing.xl),
 
+              // Registrar "Batizado" no histórico também liga esta chave.
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.water_drop_outlined),
+                  title: Text('Batizado', style: AppTypography.bodyMedium),
+                  value: _isBaptized,
+                  onChanged: _savingBaptism ? null : _setBaptized,
+                ),
+              ),
+
+              const SizedBox(height: AppSpacing.base),
+
               AppCard(
                 padding: EdgeInsets.zero,
                 child: Column(
@@ -1005,7 +1163,7 @@ class _VisitorDetailSheetState extends State<_VisitorDetailSheet> {
                     _DetailRow(
                       icon: Icons.phone_outlined,
                       label: 'Telefone',
-                      value: widget.visitor.phone,
+                      value: formatBrPhone(widget.visitor.phone),
                     ),
                     const Divider(height: 1),
                     _TappableDetailRow(
@@ -1313,11 +1471,7 @@ class _VisitorMapSheetState extends State<_VisitorMapSheet> {
                       initialZoom: 15,
                     ),
                     children: [
-                      TileLayer(
-                        urlTemplate:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.sistemaigreja.app',
-                      ),
+                      appTileLayer(),
                       MarkerLayer(
                         markers: [
                           Marker(
@@ -1392,16 +1546,127 @@ class _StatusChip extends StatelessWidget {
 
 /// Detalhes de um membro de célula. Visitante usa [_VisitorDetailSheet], que
 /// tem as ações do funil de acompanhamento — membro não precisa delas.
-class _MemberDetailSheet extends StatelessWidget {
-  const _MemberDetailSheet({required this.member});
+class _MemberDetailSheet extends StatefulWidget {
+  const _MemberDetailSheet({
+    required this.member,
+    required this.dio,
+    required this.cellId,
+    required this.onChanged,
+  });
 
   final CellAttendee member;
+  final Dio dio;
+  final String cellId;
+
+  /// Avisa o caller que função/foto mudaram. É callback e não resultado do
+  /// `pop` porque o sheet também fecha por arrasto, sem passar por `pop`.
+  final VoidCallback onChanged;
+
+  @override
+  State<_MemberDetailSheet> createState() => _MemberDetailSheetState();
+}
+
+class _MemberDetailSheetState extends State<_MemberDetailSheet> {
+  late String _roleInCell = widget.member.roleInCell;
+  late String? _photoUrl = widget.member.photoUrl;
+  late bool _isBaptized = widget.member.isBaptized == true;
+  bool _busy = false;
+
+  CellAttendee get member => widget.member;
+
+  static const _roleOptions = [
+    ('MEMBRO', 'Membro'),
+    ('VICE_LIDER', 'Vice-líder'),
+    ('ANFITRIAO', 'Anfitrião'),
+  ];
 
   String get _genderLabel => switch (member.gender) {
     'MASCULINO' => 'Masculino',
     'FEMININO' => 'Feminino',
     _ => 'Não informado',
   };
+
+  Future<void> _setRole(String role) async {
+    if (role == _roleInCell || _busy) return;
+    final previous = _roleInCell;
+    setState(() {
+      _roleInCell = role;
+      _busy = true;
+    });
+    try {
+      await widget.dio.patch(
+        '/cells/${widget.cellId}/members/${member.id}',
+        data: {'roleInCell': role},
+      );
+      widget.onChanged();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _roleInCell = previous);
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível alterar a função',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setBaptized(bool value) async {
+    if (_busy) return;
+    final previous = _isBaptized;
+    setState(() {
+      _isBaptized = value;
+      _busy = true;
+    });
+    try {
+      await widget.dio.patch(
+        '/cells/${widget.cellId}/members/${member.id}',
+        data: {'isBaptized': value},
+      );
+      widget.onChanged();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() => _isBaptized = previous);
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível alterar o batismo',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _changePhoto() async {
+    final photo = await pickProfilePhoto(context);
+    if (photo == null || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final form = FormData.fromMap({
+        'photo': MultipartFile.fromBytes(photo.bytes, filename: photo.filename),
+      });
+      final resp = await widget.dio.post(
+        '/cells/${widget.cellId}/members/${member.id}/photo',
+        data: form,
+      );
+      if (!mounted) return;
+      setState(() {
+        _photoUrl = (resp.data as Map<String, dynamic>)['photoUrl'] as String?;
+      });
+      widget.onChanged();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      _showTopSnackBar(
+        context,
+        e.response?.data?['error']?['message'] as String? ??
+            'Não foi possível enviar a foto',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1438,7 +1703,13 @@ class _MemberDetailSheet extends StatelessWidget {
 
               Row(
                 children: [
-                  AppAvatar(initials: member.initials, size: 56),
+                  // Toque na foto troca a imagem.
+                  _PhotoAvatar(
+                    initials: member.initials,
+                    photoUrl: _photoUrl,
+                    busy: _busy,
+                    onTap: _busy ? null : _changePhoto,
+                  ),
                   const SizedBox(width: AppSpacing.base),
                   Expanded(
                     child: Column(
@@ -1454,6 +1725,33 @@ class _MemberDetailSheet extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: AppSpacing.xl),
+              Text('Função na célula', style: AppTypography.titleSmall),
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.sm,
+                children: [
+                  for (final (value, label) in _roleOptions)
+                    ChoiceChip(
+                      label: Text(label),
+                      selected: _roleInCell == value,
+                      onSelected: _busy ? null : (_) => _setRole(value),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.base),
+              // Registrar "Batizado" no histórico também marca aqui.
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.water_drop_outlined),
+                  title: Text('Batizado', style: AppTypography.bodyMedium),
+                  value: _isBaptized,
+                  onChanged: _busy ? null : _setBaptized,
+                ),
               ),
 
               const SizedBox(height: AppSpacing.xl),
@@ -1475,7 +1773,7 @@ class _MemberDetailSheet extends StatelessWidget {
                       icon: Icons.phone_outlined,
                       label: 'Telefone',
                       value: member.phone?.isNotEmpty == true
-                          ? member.phone!
+                          ? formatBrPhone(member.phone!)
                           : 'Não informado',
                     ),
                     const Divider(height: 1),
@@ -1581,6 +1879,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
     complemento: null,
     bairroId: null,
   );
+  bool _isBaptized = false;
   String? _gender;
   DateTime? _birthDate;
   String? _maritalStatus;
@@ -1613,6 +1912,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
           if (_gender != null) 'gender': _gender,
           if (_birthDate != null) 'birthDate': apiBirthDate(_birthDate),
           if (_maritalStatus != null) 'maritalStatus': _maritalStatus,
+          'isBaptized': _isBaptized,
         },
       );
       if (!mounted) return;
@@ -1630,7 +1930,9 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    // O formulário é mais alto que o sheet quando o teclado abre; sem o
+    // scroll os últimos campos e o botão de salvar ficavam inalcançáveis.
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.pagePaddingH,
         AppSpacing.md,
@@ -1665,8 +1967,10 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
             const SizedBox(height: AppSpacing.sm),
             AppTextField(
               label: 'Telefone',
+              hint: '(11) 99999-9999',
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
+              inputFormatters: brPhoneInputFormatters,
               validator: (v) => (v == null || v.trim().length < 8)
                   ? 'Informe o telefone'
                   : null,
@@ -1690,6 +1994,14 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
               onGenderChanged: (v) => setState(() => _gender = v),
               onBirthDateChanged: (v) => setState(() => _birthDate = v),
               onMaritalStatusChanged: (v) => setState(() => _maritalStatus = v),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.water_drop_outlined),
+              title: Text('Já é batizado', style: AppTypography.bodyMedium),
+              value: _isBaptized,
+              onChanged: (v) => setState(() => _isBaptized = v),
             ),
             const SizedBox(height: AppSpacing.base),
             AppButton(
@@ -1717,7 +2029,11 @@ class _AttendanceTab extends StatefulWidget {
   State<_AttendanceTab> createState() => _AttendanceTabState();
 }
 
-class _AttendanceTabState extends State<_AttendanceTab> {
+class _AttendanceTabState extends State<_AttendanceTab>
+    with RouteAwareReload<_AttendanceTab> {
+  @override
+  void onRouteReturn() => _loadData();
+
   late final Dio _dio;
   bool _loading = true;
   String? _error;
@@ -1865,6 +2181,8 @@ class _AttendanceTabState extends State<_AttendanceTab> {
         meetingDateIso: meeting['meetingDate'] as String,
         lesson: meeting['lesson'] as String?,
         ministrante: meeting['ministrante'] as String?,
+        materialId: meeting['materialId'] as String?,
+        materialTitle: meeting['materialTitle'] as String?,
       ),
     );
 
@@ -2350,6 +2668,201 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
   }
 }
 
+/// Material do acervo da célula. A API já devolve do mais recente para o mais
+/// antigo, então a ordem da lista é a ordem de exibição.
+class _MaterialOption {
+  const _MaterialOption({
+    required this.id,
+    required this.title,
+    required this.uploadedAt,
+  });
+
+  final String id;
+  final String title;
+  final DateTime? uploadedAt;
+
+  /// Sentinela de "nenhum material" — distingue "limpou" de "fechou o sheet".
+  static const none = _MaterialOption(id: '', title: '', uploadedAt: null);
+
+  factory _MaterialOption.fromJson(Map<String, dynamic> j) => _MaterialOption(
+    id: j['id'] as String,
+    title: j['title'] as String? ?? '',
+    uploadedAt: DateTime.tryParse(j['uploadedAt'] as String? ?? ''),
+  );
+}
+
+/// Quem pode ter ministrado: líder, membros (com o papel na célula) e
+/// visitantes.
+class _MinistranteOption {
+  const _MinistranteOption({required this.name, required this.role});
+
+  final String name;
+  final String role;
+
+  factory _MinistranteOption.fromJson(Map<String, dynamic> j) =>
+      _MinistranteOption(
+        name: j['name'] as String? ?? '',
+        role: j['role'] as String? ?? 'MEMBRO',
+      );
+
+  String get roleLabel => switch (role) {
+    'LIDER' => 'Líder',
+    'VICE_LIDER' => 'Vice-líder',
+    'ANFITRIAO' => 'Anfitrião',
+    'VISITANTE' => 'Visitante',
+    _ => 'Membro',
+  };
+
+  AppBadgeVariant get roleVariant => switch (role) {
+    'LIDER' => AppBadgeVariant.primary,
+    'VICE_LIDER' => AppBadgeVariant.info,
+    'ANFITRIAO' => AppBadgeVariant.success,
+    'VISITANTE' => AppBadgeVariant.warning,
+    _ => AppBadgeVariant.neutral,
+  };
+}
+
+/// Escolha do material usado como lição, com busca. A lista já vem ordenada
+/// da API (mais recente primeiro).
+class _MaterialPickerSheet extends StatefulWidget {
+  const _MaterialPickerSheet({required this.materials, this.selectedId});
+
+  final List<_MaterialOption> materials;
+  final String? selectedId;
+
+  @override
+  State<_MaterialPickerSheet> createState() => _MaterialPickerSheetState();
+}
+
+class _MaterialPickerSheetState extends State<_MaterialPickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.materials
+        .where((m) => m.title.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.base),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Material da lição', style: AppTypography.titleMedium),
+              const SizedBox(height: AppSpacing.sm),
+              AppSearchField(
+                hint: 'Buscar material...',
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _query = v),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              ListTile(
+                leading: const Icon(Icons.block_outlined),
+                title: const Text('Nenhum material'),
+                subtitle: const Text('Escrever a lição à mão'),
+                onTap: () =>
+                    Navigator.of(context).pop(_MaterialOption.none),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: filtered.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Text(
+                          'Nenhum material encontrado',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final material = filtered[i];
+                          final selected = material.id == widget.selectedId;
+                          return ListTile(
+                            leading: const Icon(Icons.description_outlined),
+                            title: Text(material.title),
+                            subtitle: material.uploadedAt == null
+                                ? null
+                                : Text(formatDateBr(material.uploadedAt!)),
+                            trailing: selected
+                                ? const Icon(
+                                    Icons.check_circle,
+                                    color: AppColors.success,
+                                  )
+                                : null,
+                            onTap: () => Navigator.of(context).pop(material),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Escolha do ministrante entre os participantes da célula.
+class _MinistrantePickerSheet extends StatelessWidget {
+  const _MinistrantePickerSheet({required this.options});
+
+  final List<_MinistranteOption> options;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.base),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Quem ministrou', style: AppTypography.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final option = options[i];
+                  return ListTile(
+                    title: Text(option.name),
+                    trailing: AppBadge(
+                      label: option.roleLabel,
+                      variant: option.roleVariant,
+                      size: AppBadgeSize.sm,
+                    ),
+                    onTap: () => Navigator.of(context).pop(option),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MeetingAttendanceSheet extends StatefulWidget {
   const _MeetingAttendanceSheet({
     required this.dio,
@@ -2357,6 +2870,8 @@ class _MeetingAttendanceSheet extends StatefulWidget {
     required this.meetingDateIso,
     this.lesson,
     this.ministrante,
+    this.materialId,
+    this.materialTitle,
   });
 
   final Dio dio;
@@ -2366,6 +2881,10 @@ class _MeetingAttendanceSheet extends StatefulWidget {
   /// Valores atuais do encontro, para pré-preencher os campos editáveis.
   final String? lesson;
   final String? ministrante;
+
+  /// Material do acervo já associado como lição, quando houver.
+  final String? materialId;
+  final String? materialTitle;
 
   @override
   State<_MeetingAttendanceSheet> createState() =>
@@ -2393,6 +2912,14 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
   late final String _initialLesson;
   late final String _initialMinistrante;
 
+  /// Acervo da célula, do mais recente para o mais antigo (ordem que a API
+  /// devolve), e quem pode ter ministrado.
+  List<_MaterialOption> _materials = const [];
+  List<_MinistranteOption> _ministrantes = const [];
+  String? _materialId;
+  String? _materialTitle;
+  late final String? _initialMaterialId;
+
   /// A lista costuma ser longa; começa aberta só quando ninguém foi marcado
   /// ainda, que é o caso em que o líder precisa mexer nela.
   bool _participantsExpanded = true;
@@ -2402,6 +2929,9 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
     super.initState();
     _initialLesson = widget.lesson?.trim() ?? '';
     _initialMinistrante = widget.ministrante?.trim() ?? '';
+    _initialMaterialId = widget.materialId;
+    _materialId = widget.materialId;
+    _materialTitle = widget.materialTitle;
     _lessonCtrl = TextEditingController(text: _initialLesson);
     _ministranteCtrl = TextEditingController(text: _initialMinistrante);
     _loadInitialData();
@@ -2494,6 +3024,8 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
         _participantsExpanded = presentIds.isEmpty;
         _loading = false;
       });
+      // Auxiliares: se falharem, o líder ainda escreve lição e ministrante à mão.
+      await _loadPickerOptions();
     } on DioException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -2503,6 +3035,80 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
         _loading = false;
       });
     }
+  }
+
+  /// Acervo de materiais da célula e possíveis ministrantes. Nenhum dos dois
+  /// é obrigatório para salvar o encontro, então falha aqui é silenciosa.
+  Future<void> _loadPickerOptions() async {
+    try {
+      final results = await Future.wait([
+        widget.dio.get(
+          '/materials',
+          queryParameters: {'cellId': widget.cellId},
+        ),
+        widget.dio.get('/attendance/cell/${widget.cellId}/ministrantes'),
+      ]);
+
+      final materials =
+          ((results[0].data as Map<String, dynamic>)['materials'] as List? ?? [])
+              .cast<Map<String, dynamic>>()
+              .map(_MaterialOption.fromJson)
+              .toList();
+      final ministrantes =
+          ((results[1].data as Map<String, dynamic>)['options'] as List? ?? [])
+              .cast<Map<String, dynamic>>()
+              .map(_MinistranteOption.fromJson)
+              .toList();
+
+      if (!mounted) return;
+      setState(() {
+        _materials = materials;
+        _ministrantes = ministrantes;
+        // O título só chega junto do encontro; se não veio, resolve pelo acervo.
+        if (_materialTitle == null && _materialId != null) {
+          _materialTitle = materials
+              .where((m) => m.id == _materialId)
+              .map((m) => m.title)
+              .firstOrNull;
+        }
+      });
+    } catch (_) {
+      // Sem acervo/lista: os campos de texto continuam funcionando.
+    }
+  }
+
+  Future<void> _pickMaterial() async {
+    final selected = await showModalBottomSheet<_MaterialOption?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _MaterialPickerSheet(
+        materials: _materials,
+        selectedId: _materialId,
+      ),
+    );
+    // `null` = fechou sem escolher. A opção "nenhum" devolve o sentinela.
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (selected.id.isEmpty) {
+        _materialId = null;
+        _materialTitle = null;
+      } else {
+        _materialId = selected.id;
+        _materialTitle = selected.title;
+      }
+    });
+  }
+
+  Future<void> _pickMinistrante() async {
+    final selected = await showModalBottomSheet<_MinistranteOption>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _MinistrantePickerSheet(options: _ministrantes),
+    );
+    if (selected == null || !mounted) return;
+    // Grava o nome: `ministrante` é texto livre no banco, pode ser alguém de
+    // fora da célula digitado à mão.
+    setState(() => _ministranteCtrl.text = selected.name);
   }
 
   Future<void> _reloadVisitorsOnly() async {
@@ -2561,7 +3167,9 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
     final lesson = _lessonCtrl.text.trim();
     final ministrante = _ministranteCtrl.text.trim();
     final detailsChanged =
-        lesson != _initialLesson || ministrante != _initialMinistrante;
+        lesson != _initialLesson ||
+        ministrante != _initialMinistrante ||
+        _materialId != _initialMaterialId;
 
     if (changedParticipants.isEmpty && _photo == null && !detailsChanged) {
       if (!mounted) return;
@@ -2599,6 +3207,7 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
             'meetingDate': widget.meetingDateIso,
             'lesson': lesson,
             'ministrante': ministrante,
+            'materialId': _materialId,
           },
         );
       }
@@ -2718,11 +3327,31 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
                         }),
                       ),
                       const SizedBox(height: AppSpacing.base),
+                      // Lição vinda do acervo. Quando a lição não está lá, o
+                      // campo de texto abaixo continua valendo.
+                      _pickerField(
+                        label: 'Lição (material da célula)',
+                        icon: Icons.menu_book_outlined,
+                        value: _materialTitle,
+                        placeholder: _materials.isEmpty
+                            ? 'Nenhum material cadastrado'
+                            : 'Escolher do acervo',
+                        onTap: _materials.isEmpty ? null : _pickMaterial,
+                        onClear: _materialId == null
+                            ? null
+                            : () => setState(() {
+                                _materialId = null;
+                                _materialTitle = null;
+                              }),
+                      ),
+                      const SizedBox(height: AppSpacing.base),
                       AppTextField(
                         controller: _lessonCtrl,
-                        label: 'Lição',
+                        label: _materialId == null
+                            ? 'Lição'
+                            : 'Observação sobre a lição',
                         hint: 'Tema ministrado no encontro',
-                        prefixIcon: Icons.menu_book_outlined,
+                        prefixIcon: Icons.edit_note_outlined,
                         maxLines: 2,
                         textInputAction: TextInputAction.next,
                       ),
@@ -2733,6 +3362,12 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
                         hint: 'Quem ministrou',
                         prefixIcon: Icons.person_outline,
                         textInputAction: TextInputAction.done,
+                        suffixIcon: _ministrantes.isEmpty
+                            ? null
+                            : Icons.groups_2_outlined,
+                        onSuffixTap: _ministrantes.isEmpty
+                            ? null
+                            : _pickMinistrante,
                       ),
                       const SizedBox(height: AppSpacing.base),
                       _buildParticipantsSection(),
@@ -2744,6 +3379,52 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
               _buildFooter(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Campo somente-leitura que abre um seletor. Usado pela lição do acervo.
+  Widget _pickerField({
+    required String label,
+    required IconData icon,
+    required String? value,
+    required String placeholder,
+    required VoidCallback? onTap,
+    VoidCallback? onClear,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                value ?? placeholder,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: value == null ? AppColors.textSecondary : null,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (onClear != null)
+              IconButton(
+                onPressed: onClear,
+                icon: const Icon(Icons.close, size: 18),
+                tooltip: 'Remover material',
+                visualDensity: VisualDensity.compact,
+              )
+            else if (onTap != null)
+              const Icon(Icons.chevron_right),
+          ],
         ),
       ),
     );
@@ -3615,11 +4296,14 @@ class _AddHistoryEventSheet extends StatefulWidget {
 
 class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
   final _descCtrl = TextEditingController();
-  String? _selectedVisitorId;
+  String? _selectedPersonId;
   String _selectedType = 'enviado_batismo';
-  bool _loadingVisitors = true;
+  bool _loadingPeople = true;
   bool _saving = false;
-  List<Map<String, dynamic>> _visitors = [];
+
+  /// Membros e visitantes da célula na mesma lista — quem já é membro também
+  /// é enviado para batismo.
+  List<CellAttendee> _people = [];
 
   static const _types = [
     ('enviado_batismo', 'Enviado para Batismo'),
@@ -3629,46 +4313,68 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
     ('tornou_se_lider', 'Tornou-se Líder'),
   ];
 
+  /// Eventos de batismo só fazem sentido para quem ainda não é batizado —
+  /// listar o resto só atrapalha a busca do líder.
+  bool get _onlyUnbaptized =>
+      _selectedType == 'enviado_batismo' || _selectedType == 'batizado';
+
+  List<CellAttendee> get _visiblePeople => _onlyUnbaptized
+      ? _people.where((p) => p.isBaptized != true).toList()
+      : _people;
+
   @override
   void initState() {
     super.initState();
-    _loadVisitors();
+    _loadPeople();
   }
 
-  Future<void> _loadVisitors() async {
+  Future<void> _loadPeople() async {
     try {
       final resp = await widget.dio.get(
-        '/visitors',
-        queryParameters: {'cellId': widget.cellId},
+        '/attendance/cell/${widget.cellId}/attendees',
       );
-      final body = resp.data as Map<String, dynamic>;
-      // API returns paginated response: { data: [...], total, page, ... }
-      final rawList = (body['data'] ?? body['visitors'] ?? []) as List;
-      final visitors = rawList.cast<Map<String, dynamic>>();
+      final raw =
+          ((resp.data as Map<String, dynamic>)['attendees'] as List? ?? [])
+              .cast<Map<String, dynamic>>();
       if (!mounted) return;
       setState(() {
-        _visitors = visitors;
-        _loadingVisitors = false;
-        if (visitors.isNotEmpty) {
-          _selectedVisitorId = visitors.first['id'] as String;
-        }
+        _people = raw.map(CellAttendee.fromJson).toList();
+        _loadingPeople = false;
+        _syncSelection();
       });
     } catch (e) {
-      debugPrint('[AddHistorySheet] Erro ao carregar visitantes: $e');
+      debugPrint('[AddHistorySheet] Erro ao carregar pessoas: $e');
       if (!mounted) return;
-      setState(() => _loadingVisitors = false);
+      setState(() => _loadingPeople = false);
     }
   }
 
+  /// Mantém a seleção válida quando a lista muda de tamanho ao trocar o tipo
+  /// de evento — um id fora dos itens quebra o DropdownButton.
+  void _syncSelection() {
+    final visible = _visiblePeople;
+    if (visible.any((p) => p.id == _selectedPersonId)) return;
+    _selectedPersonId = visible.isEmpty ? null : visible.first.id;
+  }
+
+  /// Rótulo do badge: função na célula para membros, "Visitante" no resto.
+  static String _personRoleLabel(CellAttendee person) => switch (person.roleInCell) {
+    'VICE_LIDER' => 'Vice-líder',
+    'ANFITRIAO' => 'Anfitrião',
+    'MEMBRO' => 'Membro',
+    _ => 'Visitante',
+  };
+
   Future<void> _save() async {
-    final visitorId = _selectedVisitorId;
-    if (visitorId == null) return;
+    final personId = _selectedPersonId;
+    if (personId == null) return;
+    final person = _visiblePeople.firstWhere((p) => p.id == personId);
     setState(() => _saving = true);
     try {
       await widget.dio.post(
         '/spiritual-history',
         data: {
-          'visitorId': visitorId,
+          if (person.isMember) 'memberId': personId else 'visitorId': personId,
           'eventType': _selectedType,
           'description': _descCtrl.text,
           'date': DateTime.now().toIso8601String().substring(0, 10),
@@ -3718,36 +4424,56 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
               Text('Adicionar Evento', style: AppTypography.headlineSmall),
               const SizedBox(height: AppSpacing.xl),
 
-              // Visitor
+              // Pessoa: membros e visitantes na mesma lista.
               Text(
-                'Visitante',
+                'Pessoa',
                 style: AppTypography.labelMedium.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.grey700,
                 ),
               ),
               const SizedBox(height: AppSpacing.xs),
-              if (_loadingVisitors)
+              if (_loadingPeople)
                 const LinearProgressIndicator()
-              else if (_visitors.isEmpty)
+              else if (_visiblePeople.isEmpty)
                 Text(
-                  'Nenhum visitante na célula',
+                  _onlyUnbaptized
+                      ? 'Todos da célula já estão batizados'
+                      : 'Ninguém na célula ainda',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
                 )
               else
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedVisitorId,
-                  items: _visitors
+                  initialValue: _selectedPersonId,
+                  isExpanded: true,
+                  items: _visiblePeople
                       .map(
-                        (v) => DropdownMenuItem(
-                          value: v['id'] as String,
-                          child: Text(v['name'] as String),
+                        (p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  p.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              AppBadge(
+                                label: _personRoleLabel(p),
+                                variant: p.isMember
+                                    ? AppBadgeVariant.success
+                                    : AppBadgeVariant.info,
+                                size: AppBadgeSize.sm,
+                              ),
+                            ],
+                          ),
                         ),
                       )
                       .toList(),
-                  onChanged: (v) => setState(() => _selectedVisitorId = v),
+                  onChanged: (v) => setState(() => _selectedPersonId = v),
                   decoration: InputDecoration(
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -3778,7 +4504,10 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
                       (t) => DropdownMenuItem(value: t.$1, child: Text(t.$2)),
                     )
                     .toList(),
-                onChanged: (v) => setState(() => _selectedType = v!),
+                onChanged: (v) => setState(() {
+                  _selectedType = v!;
+                  _syncSelection();
+                }),
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -3808,7 +4537,7 @@ class _AddHistoryEventSheetState extends State<_AddHistoryEventSheet> {
                 prefixIcon: Icons.add_circle_outline,
                 isLoading: _saving,
                 onPressed:
-                    (_saving || _loadingVisitors || _selectedVisitorId == null)
+                    (_saving || _loadingPeople || _selectedPersonId == null)
                     ? null
                     : _save,
               ),

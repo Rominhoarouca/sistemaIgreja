@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants/app_constants.dart';
 import '../features/auth/domain/entities/user_entity.dart';
+import 'role_home.dart';
+import 'route_observer.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/register_page.dart';
@@ -28,6 +30,10 @@ import '../features/admin/presentation/pages/admin_qrcode_page.dart';
 import '../features/leader/presentation/pages/leader_qrcode_page.dart';
 import '../features/whatsapp/presentation/pages/admin_whatsapp_page.dart';
 import '../features/admin/presentation/pages/admin_users_register_page.dart';
+import '../features/admin/presentation/pages/admin_pending_links_page.dart';
+import '../features/admin/presentation/pages/admin_user_roles_page.dart';
+import '../features/album/presentation/pages/albums_page.dart';
+import '../features/album/presentation/pages/album_day_page.dart';
 import '../features/dashboard/presentation/widgets/admin_scaffold.dart';
 import '../features/saas/presentation/pages/church_admin_page.dart';
 import '../features/saas/presentation/pages/church_signup_page.dart';
@@ -53,17 +59,10 @@ const _alwaysAllowedRoutes = {AppRoutes.visitorSelfRegister};
 
 /// Home route for the user's role — used both to land after login and to
 /// bounce a user away from a section that isn't theirs.
-String _homeForRole(UserEntity user) {
-  if (user.isSuperAdmin) return AppRoutes.superAdmin;
-  if (user.isAdmin) return AppRoutes.adminDashboard;
-  if (user.isSupervisor) return AppRoutes.supervisorHome;
-  if (user.isCoordinator) return AppRoutes.coordinatorHome;
-  // Kids: professor e responsável não têm nada fora do módulo — a home deles é
-  // a própria sala / a lista de filhos.
-  if (user.isKidsTeacher) return AppRoutes.kidsHome;
-  if (user.isGuardian) return AppRoutes.guardianHome;
-  return AppRoutes.leaderHome;
-}
+/// Com multi-papel, a home é a do papel mais privilegiado; os demais ficam
+/// acessíveis pelo seletor de perfil.
+String _homeForRole(UserEntity user) =>
+    homeRouteForRole(orderedRoles(user).first);
 
 /// Whether [user] is allowed on [location]. Each role-owned section
 /// (super-admin panel, admin shell, supervisor/coordinator/leader home) is
@@ -92,6 +91,8 @@ GoRouter createRouter(AuthBloc authBloc) {
     initialLocation: AppRoutes.login,
     debugLogDiagnostics: false,
     refreshListenable: notifier,
+    // Permite às listas recarregarem ao voltar de uma tela de cadastro.
+    observers: [appRouteObserver],
 
     redirect: (BuildContext context, GoRouterState state) {
       final authState = authBloc.state;
@@ -334,6 +335,22 @@ GoRouter createRouter(AuthBloc authBloc) {
                 const NoTransitionPage(child: AdminUsersRegisterPage()),
           ),
 
+          // ── Admin: perfis dos usuários ────────────────────────────────
+          GoRoute(
+            path: AppRoutes.adminUserRoles,
+            name: 'admin-user-roles',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AdminUserRolesPage()),
+          ),
+
+          // ── Admin: vínculos pendentes (célula ↔ líder) ────────────────
+          GoRoute(
+            path: AppRoutes.adminPendingLinks,
+            name: 'admin-pending-links',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AdminPendingLinksPage()),
+          ),
+
           // ── SaaS: configurações da igreja ─────────────────────────────
           GoRoute(
             path: AppRoutes.adminChurch,
@@ -349,6 +366,24 @@ GoRouter createRouter(AuthBloc authBloc) {
             name: 'notifications',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: NotificationsPage()),
+          ),
+        ],
+      ),
+
+      // ── Álbuns dos encontros ──────────────────────────────────────────
+      // Fora do shell do admin: coordenador e supervisor também entram aqui,
+      // e para eles a sidebar não deve aparecer.
+      GoRoute(
+        path: AppRoutes.albums,
+        name: 'albums',
+        pageBuilder: (context, state) => const MaterialPage(child: AlbumsPage()),
+        routes: [
+          GoRoute(
+            path: ':date',
+            name: 'album-day',
+            pageBuilder: (context, state) => MaterialPage(
+              child: AlbumDayPage(date: state.pathParameters['date']!),
+            ),
           ),
         ],
       ),

@@ -5,6 +5,7 @@ import type {
   IAttendanceRepository,
   MeetingDetails,
   MeetingSummary,
+  MinistranteOption,
 } from '@domain/repositories/IAttendanceRepository';
 import type { Attendance, RegisterAttendanceData } from '@domain/entities/Attendance';
 import { getEffectiveChurchId } from '@shared/context/tenant-context';
@@ -146,6 +147,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         meeting_date: Date;
         lesson: string | null;
         ministrante: string | null;
+        material_id: string | null;
+        material_title: string | null;
         total: bigint;
         present: bigint;
         members_present: bigint;
@@ -156,6 +159,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         m.meeting_date,
         m.lesson,
         m.ministrante,
+        m.material_id,
+        mat.title                                                AS material_title,
         COUNT(a.id)::bigint                                      AS total,
         COALESCE(SUM(CASE WHEN a.is_present THEN 1 ELSE 0 END), 0)::bigint AS present,
         COALESCE(SUM(CASE WHEN a.is_present AND a.member_id IS NOT NULL THEN 1 ELSE 0 END), 0)::bigint  AS members_present,
@@ -164,9 +169,10 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
       LEFT JOIN attendances a
         ON a.cell_id = m.cell_id
        AND a.meeting_date = m.meeting_date
+      LEFT JOIN materials mat ON mat.id = m.material_id
       WHERE m.cell_id = ${cellId}
         AND (${churchId}::text IS NULL OR m.church_id = ${churchId})
-      GROUP BY m.meeting_date, m.lesson, m.ministrante
+      GROUP BY m.meeting_date, m.lesson, m.ministrante, m.material_id, mat.title
 
       UNION ALL
 
@@ -174,6 +180,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         a2.meeting_date,
         NULL::text                                                   AS lesson,
         NULL::text                                                   AS ministrante,
+        NULL::text                                                   AS material_id,
+        NULL::text                                                   AS material_title,
         COUNT(a2.id)::bigint                                         AS total,
         SUM(CASE WHEN a2.is_present THEN 1 ELSE 0 END)::bigint       AS present,
         SUM(CASE WHEN a2.is_present AND a2.member_id IS NOT NULL THEN 1 ELSE 0 END)::bigint  AS members_present,
@@ -199,6 +207,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         visitorsPresent: Number(r.visitors_present),
         lesson: r.lesson,
         ministrante: r.ministrante,
+        materialId: r.material_id,
+        materialTitle: r.material_title,
         isRecorded: total > 0,
       };
     });
@@ -227,6 +237,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         city: string | null;
         status: string | null;
         is_baptized: boolean | null;
+        role_in_cell: string;
+        photo_key: string | null;
         meetings: bigint;
         present: bigint;
         last_present_date: Date | null;
@@ -278,7 +290,9 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         b.name                      AS neighborhood,
         ci.name                     AS city,
         NULL::text                  AS status,
-        NULL::boolean               AS is_baptized,
+        cm.is_baptized,
+        cm.role_in_cell::text       AS role_in_cell,
+        cm.photo_key,
         COALESCE(s.meetings, 0)     AS meetings,
         COALESCE(s.present, 0)      AS present,
         s.last_present_date,
@@ -308,6 +322,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         ci2.name                    AS city,
         v.status::text              AS status,
         v.is_baptized,
+        'VISITANTE'                 AS role_in_cell,
+        v.photo_key,
         COALESCE(s2.meetings, 0)    AS meetings,
         COALESCE(s2.present, 0)     AS present,
         s2.last_present_date,
@@ -344,6 +360,8 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         city: r.city,
         status: r.status,
         isBaptized: r.is_baptized,
+        roleInCell: r.role_in_cell as CellAttendee['roleInCell'],
+        photoKey: r.photo_key,
         meetingsCount,
         presentCount,
         attendanceRate:
@@ -355,6 +373,47 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
         createdAt: r.created_at,
       };
     });
+  }
+
+  /**
+   * Líder + membros + visitantes da célula, achatados numa lista só para o
+   * seletor de ministrante. O líder vem primeiro porque é o caso comum.
+   */
+  async findMinistranteOptions(cellId: string): Promise<MinistranteOption[]> {
+    const churchId = getEffectiveChurchId() ?? null;
+    const rows = await this.prisma.$queryRaw<
+      Array<{ id: string; name: string; role: string; sort_order: number }>
+    >`
+      SELECT u.id, u.name, 'LIDER' AS role, 0 AS sort_order
+      FROM cells c
+      JOIN users u ON u.id = c.leader_id
+      WHERE c.id = ${cellId}
+        AND (${churchId}::text IS NULL OR c.church_id = ${churchId})
+
+      UNION ALL
+
+      SELECT cm.id, cm.name, cm.role_in_cell::text AS role, 1 AS sort_order
+      FROM cell_members cm
+      WHERE cm.cell_id = ${cellId}
+        AND (${churchId}::text IS NULL OR cm.church_id = ${churchId})
+
+      UNION ALL
+
+      SELECT v.id, v.name, 'VISITANTE' AS role, 2 AS sort_order
+      FROM visitors v
+      WHERE v.cell_id = ${cellId}
+        AND (${churchId}::text IS NULL OR v.church_id = ${churchId})
+        AND NOT EXISTS (
+          SELECT 1 FROM cell_members cmx WHERE cmx.source_visitor_id = v.id
+        )
+
+      ORDER BY sort_order, name
+    `;
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      role: r.role as MinistranteOption['role'],
+    }));
   }
 
   /**
@@ -433,6 +492,7 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
     const writable = {
       ...(details?.lesson !== undefined ? { lesson: details.lesson } : {}),
       ...(details?.ministrante !== undefined ? { ministrante: details.ministrante } : {}),
+      ...(details?.materialId !== undefined ? { materialId: details.materialId } : {}),
     };
     await this.prisma.cellMeeting.upsert({
       where: { cellId_meetingDate: { cellId, meetingDate } },
@@ -441,10 +501,24 @@ export class PrismaAttendanceRepository implements IAttendanceRepository {
     });
   }
 
-  async updateMeetingPhoto(cellId: string, meetingDate: Date, photoKey: string): Promise<void> {
-    await this.prisma.cellMeeting.updateMany({
-      where: { cellId, meetingDate },
-      data: { photoKey },
+  /**
+   * Grava a foto do encontro, criando o encontro se ele ainda não existir.
+   *
+   * Era `updateMany`: quando o líder só anexava a foto (sem mexer em presença,
+   * lição ou ministrante), não havia linha em `cell_meetings` para atualizar,
+   * o update casava zero linhas e a foto sumia — subia para o MinIO e nunca
+   * era referenciada.
+   */
+  async updateMeetingPhoto(
+    cellId: string,
+    meetingDate: Date,
+    photoKey: string,
+    createdById: string,
+  ): Promise<void> {
+    await this.prisma.cellMeeting.upsert({
+      where: { cellId_meetingDate: { cellId, meetingDate } },
+      create: { cellId, meetingDate, createdById, photoKey },
+      update: { photoKey },
     });
   }
 

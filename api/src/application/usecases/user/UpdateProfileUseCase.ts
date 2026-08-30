@@ -1,6 +1,6 @@
 import type { IUserRepository } from '@domain/repositories/IUserRepository';
 import type { User, Child } from '@domain/entities/User';
-import type { MinioService } from '@infrastructure/storage/MinioService';
+import { MinioService, StorageFolder } from '@infrastructure/storage/MinioService';
 import { AppError } from '@shared/errors/AppError';
 import path from 'path';
 
@@ -43,7 +43,11 @@ export class UpdateProfileUseCase {
     let photoKey: string | undefined;
     if (input.fileBuffer && input.mimeType && input.originalName) {
       const ext = path.extname(input.originalName).toLowerCase() || '.jpg';
-      const objectName = `users/${input.userId}/photo${ext}`;
+      const objectName = MinioService.objectKey(
+        StorageFolder.users,
+        input.userId,
+        `photo${ext}`,
+      );
       await this.minioService.uploadFile({
         objectName,
         buffer: input.fileBuffer,

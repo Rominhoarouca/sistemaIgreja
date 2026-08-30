@@ -4,7 +4,9 @@ import type { AddSpiritualEventUseCase } from '@application/usecases/spiritual-h
 import type { ISpiritualHistoryRepository } from '@domain/repositories/ISpiritualHistoryRepository';
 
 const addEventSchema = z.object({
-  visitorId: z.string().uuid(),
+  // Visitante OU membro — o use case recusa os dois ou nenhum.
+  visitorId: z.string().uuid().optional(),
+  memberId: z.string().uuid().optional(),
   eventType: z.enum([
     'enviado_batismo',
     'batizado',
@@ -36,6 +38,12 @@ export class SpiritualHistoryController {
   findByVisitor = async (req: Request, res: Response): Promise<void> => {
     const { visitorId } = req.params as { visitorId: string };
     const history = await this.spiritualHistoryRepo.findByVisitor(visitorId);
+    res.json({ history });
+  };
+
+  findByMember = async (req: Request, res: Response): Promise<void> => {
+    const { memberId } = req.params as { memberId: string };
+    const history = await this.spiritualHistoryRepo.findByMember(memberId);
     res.json({ history });
   };
 

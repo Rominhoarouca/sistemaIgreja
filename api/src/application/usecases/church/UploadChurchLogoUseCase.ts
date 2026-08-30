@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { IChurchRepository } from '@domain/repositories/IChurchRepository';
 import type { Church } from '@domain/entities/Church';
-import type { MinioService } from '@infrastructure/storage/MinioService';
+import { MinioService, StorageFolder } from '@infrastructure/storage/MinioService';
 import { AppError } from '@shared/errors/AppError';
 
 interface UploadLogoInput {
@@ -28,26 +28,32 @@ export class UploadChurchLogoUseCase {
     if (!church) throw AppError.notFound('Igreja não encontrada');
 
     const ext = input.originalName.split('.').pop() ?? 'png';
-    const objectName = `churches/${input.churchId}/logo/${randomUUID()}.${ext}`;
+    const objectName = MinioService.objectKey(
+      StorageFolder.logo,
+      `${randomUUID()}.${ext}`,
+    );
 
+    // churchId explícito: o upload da logo também roda para o SUPERADMIN, que
+    // não tem igreja no contexto de tenant.
     await this.minio.uploadFile({
       objectName,
       buffer: input.buffer,
       mimeType: input.mimeType,
       size: input.size,
+      churchId: input.churchId,
     });
 
     // Remove logo anterior (best-effort).
     if (church.logoKey) {
       try {
-        await this.minio.deleteObject(church.logoKey);
+        await this.minio.deleteObject(church.logoKey, input.churchId);
       } catch {
         /* ignore */
       }
     }
 
     const updated = await this.churchRepo.updateLogoKey(input.churchId, objectName);
-    const logoUrl = await this.minio.presignedDownloadUrl(objectName);
+    const logoUrl = await this.minio.presignedDownloadUrl(objectName, 3600, input.churchId);
     return { church: updated, logoUrl };
   }
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { MaterialController } from '../controllers/MaterialController';
-import { authMiddleware } from '../middlewares/auth.middleware';
+import { authMiddleware, restoreTenantContext } from '../middlewares/auth.middleware';
 
 // Store files in memory (buffer) — they are immediately forwarded to MinIO
 const upload = multer({
@@ -32,7 +32,7 @@ export function materialRoutes(controller: MaterialController): Router {
    *     tags: [Materials]
    */
   router.get('/', controller.findByCell);
-  router.post('/', upload.single('file'), controller.upload);
+  router.post('/', upload.single('file'), restoreTenantContext, controller.upload);
 
   /**
    * @openapi

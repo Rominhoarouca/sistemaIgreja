@@ -8,6 +8,8 @@ import 'package:flutter_map_marker_popup/flutter_map_marker_popup.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/address_selector.dart';
+import '../../../../shared/widgets/app_map_tiles.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data helpers
@@ -900,12 +902,7 @@ class _VisitorSelfRegisterPageState extends State<VisitorSelfRegisterPage> {
           prefixIcon: Icons.phone_outlined,
           keyboardType: TextInputType.phone,
           textInputAction: TextInputAction.next,
-          inputFormatters: [
-            MaskTextInputFormatter(
-              mask: '(##) #####-####',
-              filter: {'#': RegExp(r'[0-9]')},
-            ),
-          ],
+          inputFormatters: brPhoneInputFormatters,
           validator: (v) {
             if (v == null || v.trim().isEmpty) return 'Campo obrigatório';
             final cleaned = v.replaceAll(RegExp(r'\D'), '');
@@ -1370,10 +1367,7 @@ class _CellSelectorState extends State<_CellSelector> {
             maxZoom: 18,
           ),
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.app',
-            ),
+            appTileLayer(),
             PopupMarkerLayer(
               options: PopupMarkerLayerOptions(
                 popupController: _popupController,
@@ -1476,10 +1470,7 @@ class _CellSelectorState extends State<_CellSelector> {
           maxZoom: 18,
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.example.app',
-          ),
+          appTileLayer(),
           PopupMarkerLayer(
             options: PopupMarkerLayerOptions(
               popupController: _popupController,

@@ -4,6 +4,7 @@ import '../../../../design_system/design_system.dart';
 import '../utils/snackbar_helper.dart';
 import '../../../../shared/widgets/cep_address_fields.dart';
 import '../widgets/demographic_fields.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 /// SRP: responsável apenas pelo formulário de novo visitante.
 class NewVisitorSheet extends StatefulWidget {
@@ -124,6 +125,7 @@ class _NewVisitorSheetState extends State<NewVisitorSheet> {
                 hint: '(11) 99999-9999',
                 prefixIcon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
+                inputFormatters: brPhoneInputFormatters,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: AppSpacing.base),

@@ -29,6 +29,7 @@ export class RegisterUserUseCase {
       email: input.email,
       password: hashed,
       role: input.role,
+      roles: [input.role],
       photoKey: null,
       phone: null,
       address: null,

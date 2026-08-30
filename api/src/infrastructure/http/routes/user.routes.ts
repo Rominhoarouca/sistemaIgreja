@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import type { UserController } from '../controllers/UserController';
-import { authMiddleware, requireAdmin, requireSupervisorOrAdmin, requireStaff } from '../middlewares/auth.middleware';
+import { authMiddleware, requireAdmin, requireSupervisorOrAdmin, requireStaff, restoreTenantContext } from '../middlewares/auth.middleware';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -13,10 +13,11 @@ export function userRoutes(controller: UserController): Router {
   router.use(authMiddleware);
 
   router.get('/me', controller.getProfile);
-  router.patch('/me', upload.single('photo'), controller.updateProfile);
+  router.patch('/me', upload.single('photo'), restoreTenantContext, controller.updateProfile);
   router.get('/leaders', requireSupervisorOrAdmin, controller.findLeaders);
   router.get('/supervisors', requireAdmin, controller.findSupervisors);
   router.get('/coordinadores', requireAdmin, controller.findCoordinadores);
+  router.get('/', requireAdmin, controller.listUsers);
   router.get('/search', requireAdmin, controller.searchUsers);
   router.get('/my-leaders', requireStaff, controller.getMyLeaders);
   router.get('/my-supervisors', requireStaff, controller.getMySupervisors);
@@ -26,6 +27,7 @@ export function userRoutes(controller: UserController): Router {
   router.patch('/leaders/:leaderId', requireAdmin, controller.updateLeaderDescription);
   router.patch('/supervisors/:supervisorId/coordenacao', requireAdmin, controller.assignSupervisorCoordenacao);
   router.patch('/:userId/password', requireStaff, controller.resetUserPassword);
+  router.patch('/:userId/roles', requireAdmin, controller.setUserRoles);
 
   return router;
 }

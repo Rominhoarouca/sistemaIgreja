@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../injection/injection.dart';
+import '../../../../shared/widgets/cell_type_badge.dart';
 
 /// Nearby Cells page — RF02 / RF03
 /// Shows list of nearby cell groups with distance
@@ -198,9 +199,22 @@ class _CellCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  (cell['name'] as String?) ?? 'Célula',
-                  style: AppTypography.titleSmall,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        (cell['name'] as String?) ?? 'Célula',
+                        style: AppTypography.titleSmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (CellTypeBadge.has(cell['cellTypeName'] as String?)) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      CellTypeBadge(
+                        typeName: cell['cellTypeName'] as String?,
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.xs2),
                 Text(

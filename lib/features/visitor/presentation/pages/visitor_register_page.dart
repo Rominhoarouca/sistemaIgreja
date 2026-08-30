@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../shared/widgets/address_selector.dart';
+import '../../../../shared/utils/phone_input.dart';
 
 /// Visitor Registration page — RF01
 /// Collects: name, phone, email (opt), address, bairroId (via AddressSelector), originChurch (opt)
@@ -104,9 +105,10 @@ class _VisitorRegisterPageState extends State<VisitorRegisterPage> {
                     AppTextField(
                       controller: _phoneCtrl,
                       label: 'Telefone / WhatsApp *',
-                      hint: '(00) 00000-0000',
+                      hint: '(11) 99999-9999',
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: brPhoneInputFormatters,
                       textInputAction: TextInputAction.next,
                       validator: (v) => (v == null || v.trim().length < 10)
                           ? 'Telefone inválido'

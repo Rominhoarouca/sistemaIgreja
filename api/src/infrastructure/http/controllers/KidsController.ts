@@ -8,6 +8,7 @@ import type { KidsQrService } from '@application/services/KidsQrService';
 import type { PickupCodeService } from '@application/services/PickupCodeService';
 import type { AckNotifier } from '@application/services/AckNotifier';
 import { AppError } from '@shared/errors/AppError';
+import { hasRole } from '../middlewares/auth.middleware';
 
 const optionalText = (max: number) =>
   z
@@ -302,7 +303,7 @@ export class KidsController {
    * pode cadastrar um filho vinculado a outra conta.
    */
   createOwnChild = async (req: Request, res: Response): Promise<void> => {
-    if (req.userRole !== 'RESPONSAVEL') {
+    if (!hasRole(req, 'RESPONSAVEL')) {
       throw AppError.forbidden('Só o responsável cadastra o próprio filho por aqui');
     }
     const body = quickChildSchema.parse(req.body);
@@ -557,7 +558,12 @@ export class KidsController {
 
     const child = await this.kidsRepo.findChildById(alert.childId);
     const guardian = child?.guardians.find((g) => g.userId === req.userId) ?? null;
-    if (!guardian && child?.userId !== req.userId && req.userRole === 'RESPONSAVEL') {
+    if (
+      !guardian &&
+      child?.userId !== req.userId &&
+      hasRole(req, 'RESPONSAVEL') &&
+      !hasRole(req, 'ADMIN', 'SUPERADMIN', 'KIDS')
+    ) {
       throw AppError.forbidden('Este alerta não é sobre um filho seu');
     }
 
@@ -653,28 +659,28 @@ export class KidsController {
    * responsável da própria criança, ou professor da sala onde ela está agora.
    */
   private async assertChildVisible(req: Request, childId: string): Promise<void> {
-    if (req.userRole === 'ADMIN' || req.userRole === 'SUPERADMIN') return;
+    if (hasRole(req, 'ADMIN', 'SUPERADMIN')) return;
 
     const child = await this.kidsRepo.findChildById(childId);
     if (!child) throw AppError.notFound('Criança não encontrada');
 
-    if (req.userRole === 'RESPONSAVEL') {
+    // Cada papel é um caminho de acesso independente: quem acumula
+    // RESPONSAVEL e KIDS passa se qualquer um dos dois autorizar.
+    if (hasRole(req, 'RESPONSAVEL')) {
       const isGuardian =
         child.userId === req.userId || child.guardians.some((g) => g.userId === req.userId);
-      if (!isGuardian) throw AppError.forbidden('Esta criança não é sua');
-      return;
+      if (isGuardian) return;
     }
 
-    if (req.userRole === 'KIDS') {
+    if (hasRole(req, 'KIDS')) {
       const open = await this.kidsRepo.findOpenCheckinByChild(childId);
-      const allowed =
-        open !== null && (await this.kidsRepo.isTeacherOfSession(open.sessionId, req.userId));
-      if (!allowed) {
-        throw AppError.forbidden('A criança não está em uma sala sua');
+      if (open !== null && (await this.kidsRepo.isTeacherOfSession(open.sessionId, req.userId))) {
+        return;
       }
-      return;
     }
 
+    if (hasRole(req, 'RESPONSAVEL')) throw AppError.forbidden('Esta criança não é sua');
+    if (hasRole(req, 'KIDS')) throw AppError.forbidden('A criança não está em uma sala sua');
     throw AppError.forbidden('Acesso negado');
   }
 }

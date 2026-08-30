@@ -1,6 +1,6 @@
 import type { INotificationRepository } from '@domain/repositories/INotificationRepository';
 import type { Notification, CreateNotificationData } from '@domain/entities/Notification';
-import type { MinioService } from '@infrastructure/storage/MinioService';
+import { MinioService, StorageFolder } from '@infrastructure/storage/MinioService';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 
@@ -27,7 +27,10 @@ export class CreateNotificationUseCase {
 
     if (input.imageBuffer && input.imageMimeType && input.imageOriginalName && input.imageSizeBytes) {
       const ext = path.extname(input.imageOriginalName).toLowerCase();
-      const objectName = `notifications/${uuidv4()}${ext}`;
+      const objectName = MinioService.objectKey(
+        StorageFolder.notifications,
+        `${uuidv4()}${ext}`,
+      );
       await this.minioService.uploadFile({
         objectName,
         buffer: input.imageBuffer,

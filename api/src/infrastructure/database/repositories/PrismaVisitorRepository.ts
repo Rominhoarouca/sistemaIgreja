@@ -118,6 +118,24 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     return this.mapRow(row);
   }
 
+  async updatePhotoKey(id: string, photoKey: string | null): Promise<Visitor> {
+    const row = (await this.prisma.visitor.update({
+      where: { id },
+      data: { photoKey },
+      include: { convertedMember: { select: { id: true } }, ...bairroInclude },
+    })) as any;
+    return this.mapRow(row);
+  }
+
+  async setBaptized(id: string, isBaptized: boolean): Promise<Visitor> {
+    const row = (await this.prisma.visitor.update({
+      where: { id },
+      data: { isBaptized },
+      include: { convertedMember: { select: { id: true } }, ...bairroInclude },
+    })) as any;
+    return this.mapRow(row);
+  }
+
   async countByStatus(): Promise<Record<string, number>> {
     const grouped = await this.prisma.visitor.groupBy({
       by: ['status'],
@@ -177,6 +195,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
     knownPersonName?: string | null;
     interests?: string[];
     status: string;
+    photoKey?: string | null;
     leaderId: string | null;
     cellId: string | null;
     referredById: string | null;
@@ -197,6 +216,7 @@ export class PrismaVisitorRepository implements IVisitorRepository {
       neighborhood: loc.neighborhood,
       city: loc.city,
       state: loc.state,
+      photoKey: row.photoKey ?? null,
       originChurch: row.originChurch,
       birthDate: row.birthDate ?? null,
       gender: row.gender ?? null,

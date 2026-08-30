@@ -177,6 +177,11 @@ export class NotificationController {
     res.json({ notification });
   };
 
+  /** Bate no papel principal ou nos acumulados (usuário multi-papel). */
+  private byRole(role: 'LIDER' | 'SUPERVISOR' | 'COORDENADOR') {
+    return { OR: [{ role }, { roles: { has: role } }] };
+  }
+
   private async resolveAudience(
     explicitUserIds: string[],
     groups: z.infer<typeof groupSchema>[],
@@ -194,17 +199,17 @@ export class NotificationController {
     for (const group of groups) {
       switch (group.type) {
         case 'SUPERVISORS': {
-          const users = await this.prisma.user.findMany({ where: { role: 'SUPERVISOR' }, select: { id: true } });
+          const users = await this.prisma.user.findMany({ where: this.byRole('SUPERVISOR'), select: { id: true } });
           users.forEach((u) => ids.add(u.id));
           break;
         }
         case 'LEADERS': {
-          const users = await this.prisma.user.findMany({ where: { role: 'LIDER' }, select: { id: true } });
+          const users = await this.prisma.user.findMany({ where: this.byRole('LIDER'), select: { id: true } });
           users.forEach((u) => ids.add(u.id));
           break;
         }
         case 'COORDENADORES': {
-          const users = await this.prisma.user.findMany({ where: { role: 'COORDENADOR' }, select: { id: true } });
+          const users = await this.prisma.user.findMany({ where: this.byRole('COORDENADOR'), select: { id: true } });
           users.forEach((u) => ids.add(u.id));
           break;
         }
@@ -215,13 +220,14 @@ export class NotificationController {
             select: { leaderId: true },
             distinct: ['leaderId'],
           });
-          cells.forEach((c) => ids.add(c.leaderId));
+          // Célula sem líder não tem para quem notificar.
+          cells.forEach((c) => c.leaderId && ids.add(c.leaderId));
           break;
         }
         case 'COORDENACAO_LEADERS': {
           if (!group.coordenacaoId) break;
           const users = await this.prisma.user.findMany({
-            where: { role: 'LIDER', supervisor: { coordenacaoId: group.coordenacaoId } },
+            where: { ...this.byRole('LIDER'), supervisor: { coordenacaoId: group.coordenacaoId } },
             select: { id: true },
           });
           users.forEach((u) => ids.add(u.id));
@@ -229,7 +235,7 @@ export class NotificationController {
         }
         case 'LEADERS_WITH_CELLS': {
           const users = await this.prisma.user.findMany({
-            where: { role: 'LIDER', cells: { some: {} } },
+            where: { ...this.byRole('LIDER'), cells: { some: {} } },
             select: { id: true },
           });
           users.forEach((u) => ids.add(u.id));
@@ -237,7 +243,7 @@ export class NotificationController {
         }
         case 'LEADERS_WITHOUT_CELLS': {
           const users = await this.prisma.user.findMany({
-            where: { role: 'LIDER', cells: { none: {} } },
+            where: { ...this.byRole('LIDER'), cells: { none: {} } },
             select: { id: true },
           });
           users.forEach((u) => ids.add(u.id));

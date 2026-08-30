@@ -31,7 +31,8 @@ export class GetPublicChurchUseCase {
     let logoUrl: string | null = null;
     if (church.logoKey) {
       try {
-        logoUrl = await this.minio.presignedDownloadUrl(church.logoKey);
+        // Rota pública: não há contexto de tenant, o bucket vem do id da igreja.
+        logoUrl = await this.minio.presignedDownloadUrl(church.logoKey, 3600, church.id);
       } catch {
         logoUrl = null;
       }

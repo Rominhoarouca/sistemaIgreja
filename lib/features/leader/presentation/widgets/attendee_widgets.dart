@@ -22,6 +22,8 @@ class CellAttendee {
     required this.presentCount,
     required this.attendanceRate,
     required this.createdAt,
+    this.roleInCell = 'MEMBRO',
+    this.photoUrl,
     this.lastPresentDate,
     this.absentStreak = 0,
   });
@@ -47,6 +49,8 @@ class CellAttendee {
         ? null
         : parseMeetingDate(json['lastPresentDate'] as String?),
     absentStreak: (json['absentStreak'] as num?)?.toInt() ?? 0,
+    roleInCell: json['roleInCell'] as String? ?? 'MEMBRO',
+    photoUrl: json['photoUrl'] as String?,
     createdAt:
         DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
   );
@@ -79,7 +83,17 @@ class CellAttendee {
   /// Faltas seguidas mais recentes. Ver `absentStreak` no repositório da API.
   final int absentStreak;
 
+  /// Papel na célula: `MEMBRO`, `VICE_LIDER`, `ANFITRIAO` ou `VISITANTE`.
+  final String roleInCell;
+
+  /// Foto de perfil (URL assinada), quando cadastrada.
+  final String? photoUrl;
+
   bool get isMember => kind == 'MEMBER';
+
+  /// Membro com função na célula — o que o badge destaca.
+  bool get hasCellRole =>
+      roleInCell == 'VICE_LIDER' || roleInCell == 'ANFITRIAO';
 
   /// Parou de frequentar: faltou nos últimos [kInactiveAbsentStreak] encontros
   /// em que a presença dela foi registrada. Duas faltas seguidas ainda é vida
@@ -130,6 +144,8 @@ class CellMeetingSummary {
     required this.lesson,
     required this.ministrante,
     required this.isRecorded,
+    this.materialId,
+    this.materialTitle,
   });
 
   factory CellMeetingSummary.fromJson(Map<String, dynamic> json) =>
@@ -141,6 +157,8 @@ class CellMeetingSummary {
         lesson: json['lesson'] as String?,
         ministrante: json['ministrante'] as String?,
         isRecorded: json['isRecorded'] as bool? ?? false,
+        materialId: json['materialId'] as String?,
+        materialTitle: json['materialTitle'] as String?,
       );
 
   final DateTime meetingDate;
@@ -150,6 +168,14 @@ class CellMeetingSummary {
   final String? lesson;
   final String? ministrante;
   final bool isRecorded;
+
+  /// Material do acervo usado como lição, quando houver.
+  final String? materialId;
+  final String? materialTitle;
+
+  /// O que exibir como lição: o material tem prioridade sobre o texto livre.
+  String? get lessonLabel =>
+      (materialTitle?.isNotEmpty ?? false) ? materialTitle : lesson;
 }
 
 /// Data de encontro vinda da API.
@@ -273,7 +299,10 @@ class AttendeeCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppAvatar(initials: attendee.initials),
+              AppAvatar(
+                initials: attendee.initials,
+                imageUrl: attendee.photoUrl,
+              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -375,11 +404,25 @@ class _KindBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (attendee.isMember) {
-      return const AppBadge(
-        label: 'Membro',
-        variant: AppBadgeVariant.success,
-        size: AppBadgeSize.sm,
-      );
+      // Vice-líder e anfitrião substituem "Membro": é a informação que o líder
+      // procura na lista.
+      return switch (attendee.roleInCell) {
+        'VICE_LIDER' => const AppBadge(
+          label: 'Vice-líder',
+          variant: AppBadgeVariant.info,
+          size: AppBadgeSize.sm,
+        ),
+        'ANFITRIAO' => const AppBadge(
+          label: 'Anfitrião',
+          variant: AppBadgeVariant.primary,
+          size: AppBadgeSize.sm,
+        ),
+        _ => const AppBadge(
+          label: 'Membro',
+          variant: AppBadgeVariant.success,
+          size: AppBadgeSize.sm,
+        ),
+      };
     }
     // Para visitantes o status de acompanhamento diz mais que "Visitante".
     return AppBadge(
@@ -526,7 +569,7 @@ class _FrequencyStrip extends StatelessWidget {
 
 /// Card "Últimas reuniões": data, se a presença já foi registrada, lição,
 /// ministrante e quantos membros/visitantes estiveram presentes.
-class LastMeetingsCard extends StatelessWidget {
+class LastMeetingsCard extends StatefulWidget {
   const LastMeetingsCard({
     super.key,
     required this.meetings,
@@ -539,27 +582,54 @@ class LastMeetingsCard extends StatelessWidget {
   final int maxItems;
 
   @override
+  State<LastMeetingsCard> createState() => _LastMeetingsCardState();
+}
+
+class _LastMeetingsCardState extends State<LastMeetingsCard> {
+  /// Recolhível: na tela de célula esta lista fica embaixo dos frequentadores
+  /// e empurra o resto para longe.
+  bool _expanded = true;
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mutedColor = isDark ? AppColors.text3Dark : AppColors.textSecondary;
-    final shown = meetings.take(maxItems).toList();
+    final shown = widget.meetings.take(widget.maxItems).toList();
 
     return AppCard(
       padding: const EdgeInsets.all(AppSpacing.base),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_month_outlined,
-                size: AppSpacing.iconSm,
-                color: isDark ? AppColors.linkDark : AppColors.primary,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Text('Últimas reuniões', style: AppTypography.titleSmall),
-            ],
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_outlined,
+                  size: AppSpacing.iconSm,
+                  color: isDark ? AppColors.linkDark : AppColors.primary,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Últimas reuniões',
+                    style: AppTypography.titleSmall,
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: mutedColor,
+                  ),
+                ),
+              ],
+            ),
           ),
+          if (_expanded) ...[
           const SizedBox(height: AppSpacing.md),
           if (shown.isEmpty)
             Padding(
@@ -578,8 +648,9 @@ class LastMeetingsCard extends StatelessWidget {
             label: 'Mais reuniões',
             variant: AppButtonVariant.outline,
             size: AppButtonSize.sm,
-            onPressed: onSeeAll,
+            onPressed: widget.onSeeAll,
           ),
+          ],
         ],
       ),
     );

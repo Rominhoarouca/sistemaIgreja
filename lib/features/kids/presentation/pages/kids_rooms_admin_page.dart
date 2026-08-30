@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../design_system/design_system.dart';
 import '../../../../injection/injection.dart';
 import '../../data/kids_models.dart';
@@ -144,7 +146,21 @@ class _KidsRoomsAdminPageState extends State<KidsRoomsAdminPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Salas do Kids')),
+      appBar: AppBar(
+        title: const Text('Salas do Kids'),
+        actions: [
+          // O vínculo de professor só lista quem já tem conta; sem esta porta
+          // não havia como cadastrar um professor novo a partir do Kids.
+          IconButton(
+            tooltip: 'Cadastrar professor',
+            icon: const Icon(Icons.person_add_alt_outlined),
+            onPressed: () async {
+              await context.push(AppRoutes.adminUsersRegister);
+              if (mounted) _load();
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _editRoom(),
         icon: const Icon(Icons.add),

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import type { IUserRepository } from '@domain/repositories/IUserRepository';
 import type { IRefreshTokenRepository } from '@domain/repositories/IRefreshTokenRepository';
 import type { User } from '@domain/entities/User';
+import { effectiveRoles } from '@domain/entities/User';
 import { AppError } from '@shared/errors/AppError';
 
 interface RefreshOutput {
@@ -43,7 +44,7 @@ export class RefreshTokenUseCase {
     await this.refreshTokenRepo.deleteByToken(token);
 
     const accessToken = jwt.sign(
-      { sub: user.id, role: user.role, churchId: user.churchId },
+      { sub: user.id, role: user.role, roles: effectiveRoles(user), churchId: user.churchId },
       jwtSecret,
       { expiresIn } as jwt.SignOptions,
     );

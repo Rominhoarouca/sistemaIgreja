@@ -23,6 +23,8 @@ export interface CreateUserData {
   complemento?: string;
   bairroId?: string;
   role: UserRole;
+  /** Papéis adicionais. `role` é sempre incluído. */
+  roles?: UserRole[];
   cellIds?: string[];
   leaderIds?: string[];
   supervisorIds?: string[];
@@ -34,7 +36,11 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<UserWithPassword | null>;
   save(user: Omit<UserWithPassword, 'createdAt' | 'updatedAt'>): Promise<User>;
   createUser(data: CreateUserData): Promise<User>;
+  /** Todos os usuários da igreja — tela de perfis. */
+  listAll(): Promise<User[]>;
   listLeaders(): Promise<User[]>;
+  /** Líderes que ainda não lideram nenhuma célula. */
+  listLeadersWithoutCell(): Promise<User[]>;
   listSupervisors(): Promise<User[]>;
   listCoordinadores(): Promise<User[]>;
   searchUsers(query: string): Promise<User[]>;
@@ -44,6 +50,7 @@ export interface IUserRepository {
   resetPassword(userId: string, passwordHash: string): Promise<void>;
   assignSupervisor(leaderId: string, supervisorId: string | null): Promise<void>;
   promoteUser(userId: string, role: UserRole): Promise<void>;
+  setRoles(userId: string, roles: UserRole[]): Promise<User>;
   assignSupervisorToCoordenacao(supervisorId: string, coordenacaoId: string | null): Promise<void>;
   updateLeaderDescription(leaderId: string, description: string | null): Promise<void>;
   getProfile(id: string): Promise<UserProfile | null>;

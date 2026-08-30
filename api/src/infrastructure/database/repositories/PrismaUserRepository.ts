@@ -1,6 +1,15 @@
 import type { PrismaClient } from '@prisma/client';
 import type { IUserRepository, UpdateProfileData, CreateUserData } from '@domain/repositories/IUserRepository';
 import type { Child, User, UserProfile, UserWithPassword, UserRole } from '@domain/entities/User';
+import { effectiveRoles, highestRole } from '@domain/entities/User';
+
+/**
+ * Filtro por papel considerando o multi-papel: bate tanto no papel principal
+ * (`role`) quanto nos acumulados (`roles`).
+ */
+function byRole(role: UserRole) {
+  return { OR: [{ role }, { roles: { has: role } }] };
+}
 
 export class PrismaUserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -27,6 +36,7 @@ export class PrismaUserRepository implements IUserRepository {
         email: data.email,
         password: data.password,
         role: data.role,
+        roles: effectiveRoles(data),
         ...(data.churchId ? { churchId: data.churchId } : {}),
       },
     });
@@ -35,15 +45,20 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async createUser(data: CreateUserData): Promise<User> {
+    const roles = effectiveRoles({ role: data.role, roles: data.roles ?? [] });
+    // O papel principal é o mais privilegiado do conjunto: é ele que decide a
+    // home do app e as regras que restringem por papel.
+    const primaryRole = highestRole(roles);
     const supervisorId =
-      data.role !== 'LIDER' && data.leaderIds?.[0] ? data.leaderIds[0] : undefined;
+      !roles.includes('LIDER') && data.leaderIds?.[0] ? data.leaderIds[0] : undefined;
 
     const user = await this.prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: data.password,
-        role: data.role,
+        role: primaryRole,
+        roles,
         ...(data.phone ? { phone: data.phone } : {}),
         ...(data.address ? { address: data.address } : {}),
         ...(supervisorId ? { supervisorId } : {}),
@@ -52,7 +67,7 @@ export class PrismaUserRepository implements IUserRepository {
     });
 
     // Handle cell associations for leaders
-    if (data.role === 'LIDER' && data.cellIds && data.cellIds.length > 0) {
+    if (roles.includes('LIDER') && data.cellIds && data.cellIds.length > 0) {
       await this.prisma.cell.updateMany({
         where: { id: { in: data.cellIds } },
         data: { leaderId: user.id },
@@ -60,7 +75,7 @@ export class PrismaUserRepository implements IUserRepository {
     }
 
     // Handle leader associations for supervisors
-    if (data.role === 'SUPERVISOR' && data.leaderIds && data.leaderIds.length > 0) {
+    if (roles.includes('SUPERVISOR') && data.leaderIds && data.leaderIds.length > 0) {
       await this.prisma.user.updateMany({
         where: { id: { in: data.leaderIds } },
         data: { supervisorId: user.id },
@@ -68,7 +83,7 @@ export class PrismaUserRepository implements IUserRepository {
     }
 
     // Handle associations for coordinators
-    if (data.role === 'COORDENADOR' && data.coordenacaoId) {
+    if (roles.includes('COORDENADOR') && data.coordenacaoId) {
       if (data.leaderIds && data.leaderIds.length > 0) {
         await this.prisma.user.updateMany({
           where: { id: { in: data.leaderIds } },
@@ -90,16 +105,29 @@ export class PrismaUserRepository implements IUserRepository {
 
   async listLeaders(): Promise<User[]> {
     const leaders = await this.prisma.user.findMany({
-      where: { role: 'LIDER' },
+      where: byRole('LIDER'),
       orderBy: { name: 'asc' },
     });
 
     return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
   }
 
+  async listAll(): Promise<User[]> {
+    const users = await this.prisma.user.findMany({ orderBy: { name: 'asc' } });
+    return users.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
+  async listLeadersWithoutCell(): Promise<User[]> {
+    const leaders = await this.prisma.user.findMany({
+      where: { ...byRole('LIDER'), cells: { none: {} } },
+      orderBy: { name: 'asc' },
+    });
+    return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
+  }
+
   async listSupervisors(): Promise<User[]> {
     const supervisors = await this.prisma.user.findMany({
-      where: { role: 'SUPERVISOR' },
+      where: byRole('SUPERVISOR'),
       orderBy: { name: 'asc' },
     });
     return supervisors.map(({ password: _p, ...rest }) => ({ ...rest }));
@@ -107,7 +135,7 @@ export class PrismaUserRepository implements IUserRepository {
 
   async listCoordinadores(): Promise<User[]> {
     const coordinadores = await this.prisma.user.findMany({
-      where: { role: 'COORDENADOR' },
+      where: byRole('COORDENADOR'),
       orderBy: { name: 'asc' },
     });
     return coordinadores.map(({ password: _p, ...rest }) => ({ ...rest }));
@@ -129,7 +157,7 @@ export class PrismaUserRepository implements IUserRepository {
 
   async findLeadersBySupervisorId(supervisorId: string): Promise<User[]> {
     const leaders = await this.prisma.user.findMany({
-      where: { role: 'LIDER', supervisorId },
+      where: { ...byRole('LIDER'), supervisorId },
       orderBy: { name: 'asc' },
     });
     return leaders.map(({ password: _p, ...rest }) => ({ ...rest }));
@@ -142,7 +170,7 @@ export class PrismaUserRepository implements IUserRepository {
     });
     if (!coordenacao) return [];
     const supervisors = await this.prisma.user.findMany({
-      where: { role: 'SUPERVISOR', coordenacaoId: coordenacao.id },
+      where: { ...byRole('SUPERVISOR'), coordenacaoId: coordenacao.id },
       orderBy: { name: 'asc' },
     });
     return supervisors.map(({ password: _p, ...rest }) => ({ ...rest }));
@@ -154,10 +182,20 @@ export class PrismaUserRepository implements IUserRepository {
       select: { id: true },
     });
     if (!coordenacao) return [];
+    // Duas portas de entrada na coordenação: pelo supervisor ou direto. Um
+    // coordenador pode ter zero supervisores e ainda assim ter líderes na
+    // rede — só o primeiro caso era considerado.
     const leaders = await this.prisma.user.findMany({
       where: {
-        role: 'LIDER',
-        supervisor: { coordenacaoId: coordenacao.id },
+        AND: [
+          byRole('LIDER'),
+          {
+            OR: [
+              { supervisor: { coordenacaoId: coordenacao.id } },
+              { supervisorId: null, coordenacaoId: coordenacao.id },
+            ],
+          },
+        ],
       },
       orderBy: { name: 'asc' },
     });
@@ -249,11 +287,32 @@ export class PrismaUserRepository implements IUserRepository {
     );
   }
 
+  /**
+   * Promover soma o novo papel aos que a pessoa já tem — o líder promovido a
+   * supervisor continua liderando a célula dele.
+   */
   async promoteUser(userId: string, role: UserRole): Promise<void> {
+    const current = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, roles: true },
+    });
+    if (!current) return;
+    const roles = effectiveRoles({ role: current.role, roles: [...current.roles, role] });
     await this.prisma.user.update({
       where: { id: userId },
-      data: { role },
+      data: { role: highestRole(roles), roles },
     });
+  }
+
+  /** Define o conjunto completo de papéis do usuário (tela de perfis). */
+  async setRoles(userId: string, requested: UserRole[]): Promise<User> {
+    const roles = effectiveRoles({ role: highestRole(requested), roles: requested });
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: highestRole(roles), roles },
+    });
+    const { password: _p, ...rest } = user;
+    return { ...rest };
   }
 
   async assignSupervisorToCoordenacao(supervisorId: string, coordenacaoId: string | null): Promise<void> {

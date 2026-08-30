@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../../design_system/design_system.dart';
 import '../../domain/models/leader_option.dart';
 
+/// Sentinela devolvida quando o usuário escolhe "sem líder" — distingue
+/// "cancelou a tela" (null) de "quer a célula sem líder".
+const LeaderOption noLeaderOption = LeaderOption(id: '', name: '', email: '');
+
 /// SRP: responsável apenas por exibir a seleção de líderes.
 class LeaderSelectorPage extends StatefulWidget {
   const LeaderSelectorPage({
@@ -47,6 +51,29 @@ class _LeaderSelectorPageState extends State<LeaderSelectorPage> {
               onChanged: (v) => setState(() => _query = v),
             ),
             const SizedBox(height: AppSpacing.base),
+            // "Sem líder" é a primeira opção: a célula pode ser cadastrada
+            // antes de existir líder para ela (`null` limpa a seleção).
+            AppCard(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              onTap: () => Navigator.of(context).pop(noLeaderOption),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.person_off_outlined,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      'Sem líder por enquanto',
+                      style: AppTypography.titleSmall,
+                    ),
+                  ),
+                  if (widget.initialId == null)
+                    const Icon(Icons.check_circle, color: AppColors.success),
+                ],
+              ),
+            ),
             Expanded(
               child: ListView.builder(
                 itemCount: filtered.length,

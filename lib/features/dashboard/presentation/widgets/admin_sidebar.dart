@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../design_system/design_system.dart';
+import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../../routing/role_home.dart';
 import '../../../saas/domain/church_context.dart';
 import '../../../saas/presentation/church_context_controller.dart';
 import '../../../saas/presentation/widgets/feature_locked_dialog.dart';
@@ -178,6 +180,11 @@ class _AdminSidebarState extends State<AdminSidebar> {
         'Materiais',
         AppRoutes.adminMaterials,
       ),
+      const _SidebarItem(
+        Icons.photo_library_outlined,
+        'Álbuns',
+        AppRoutes.albums,
+      ),
     ]),
     _SidebarGroup('Pessoas', [
       _SidebarItem(
@@ -202,6 +209,11 @@ class _AdminSidebarState extends State<AdminSidebar> {
         AppRoutes.adminUsersRegister,
       ),
       const _SidebarItem(
+        Icons.manage_accounts_outlined,
+        'Perfis dos usuários',
+        AppRoutes.adminUserRoles,
+      ),
+      const _SidebarItem(
         Icons.qr_code_2_outlined,
         'QR Code de cadastro',
         AppRoutes.adminQrCode,
@@ -222,6 +234,11 @@ class _AdminSidebarState extends State<AdminSidebar> {
         Icons.hub_outlined,
         'Coordenações',
         AppRoutes.adminCoordenacoes,
+      ),
+      const _SidebarItem(
+        Icons.link_off_outlined,
+        'Vínculos pendentes',
+        AppRoutes.adminPendingLinks,
       ),
     ]),
     _SidebarGroup('Kids', [
@@ -286,12 +303,15 @@ class _AdminSidebarState extends State<AdminSidebar> {
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
+                  // Nome da igreja; cai em "Multiplicado" enquanto o contexto
+                  // não carregou. A sidebar já escuta o controller.
                   child: Text(
-                    'Sistema Igreja',
+                    ChurchContextController.instance.displayName,
                     style: AppTypography.titleMedium.copyWith(
                       color: AppColors.white,
                     ),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ),
               ],
@@ -473,14 +493,32 @@ class _SidebarUserCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      'Administrador',
+                      user == null
+                          ? 'Administrador'
+                          : orderedRoles(user).map((r) => r.label).join(' · '),
                       style: AppTypography.labelSmall.copyWith(
                         color: AppColors.white.withValues(alpha: .55),
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
+              // Quem acumula papéis alterna aqui entre as áreas.
+              if (user != null && user.hasMultipleRoles)
+                PopupMenuButton<UserRole>(
+                  tooltip: 'Trocar de perfil',
+                  icon: Icon(
+                    Icons.swap_horiz_rounded,
+                    size: 18,
+                    color: AppColors.white.withValues(alpha: .7),
+                  ),
+                  onSelected: (role) => context.go(homeRouteForRole(role)),
+                  itemBuilder: (_) => [
+                    for (final role in orderedRoles(user))
+                      PopupMenuItem(value: role, child: Text(role.label)),
+                  ],
+                ),
               IconButton(
                 tooltip: 'Sair',
                 icon: Icon(
