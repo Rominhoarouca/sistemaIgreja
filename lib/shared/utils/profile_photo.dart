@@ -25,6 +25,15 @@ const double _kMaxPhotoSide = 720;
 /// visível no tamanho em que a foto é exibida.
 const int _kPhotoQuality = 75;
 
+/// Lado maior da foto do encontro.
+///
+/// Maior que o do avatar porque essa foto é aberta em tela cheia e entra na
+/// montagem do álbum. Ainda assim reduz uma foto de câmera de vários MB para
+/// algumas centenas de KB — o suficiente para não esbarrar no limite de corpo
+/// do nginx nem penalizar o líder que sobe pelo 4G.
+const double kMeetingPhotoMaxSide = 1600;
+const int kMeetingPhotoQuality = 80;
+
 /// Pergunta câmera ou galeria e devolve a imagem já reduzida.
 /// `null` quando o usuário desiste.
 Future<ProfilePhoto?> pickProfilePhoto(BuildContext context) async {

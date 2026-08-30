@@ -3262,7 +3262,16 @@ class _MeetingAttendanceSheetState extends State<_MeetingAttendanceSheet> {
       ),
     );
     if (source == null) return;
-    final picked = await picker.pickImage(source: source, imageQuality: 80);
+    // Reduz antes de sair do aparelho. Sem limite de dimensao, a foto de uma
+    // camera de 12 MP sai com varios MB, estoura o corpo aceito pelo nginx
+    // (413) e ainda gasta banda do lider em campo. 1600px cobre a visualizacao
+    // em tela cheia com folga — o thumb da tela usa 180px de altura.
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: kMeetingPhotoMaxSide,
+      maxHeight: kMeetingPhotoMaxSide,
+      imageQuality: kMeetingPhotoQuality,
+    );
     if (picked == null) return;
     // XFile.readAsBytes funciona nas duas plataformas; File(path) só em nativo.
     final bytes = await picked.readAsBytes();
